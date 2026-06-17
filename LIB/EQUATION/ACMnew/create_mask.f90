@@ -3,7 +3,7 @@
 ! block level) so the physics modules have to provide an interface to create the mask at a tree
 ! level. All parts of the mask shall be included: chi, boundary values, sponges.
 ! This is a block-level wrapper to fill the mask.
-subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
+subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
     use module_globals
     implicit none
 
@@ -40,7 +40,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
     endif
 
 
-    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_3D_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_3D_acm called but acm not initialized"
 
     ! Initialization of Insects, this needs to be called only by one call every time the mask is created for all insects at once
     if (stage == "init_stage") then
@@ -57,13 +57,13 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
         case ('sphere-fixed')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_sphere( mask(:,:,:,1), mask(:,:,:,5), x0, dx, g, params_acm%x_cntr(1:3), params_acm%R_cyl, color_set=1_ik, smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
+                call draw_sphere( mask(:,:,:,1), mask(:,:,:,5), x0, dx, g, params_acm%x_cntr(1:3), params_acm%R_cyl, color_set=1_ik, smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
         case ('sphere-free')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
-                call draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
+                call draw_free_sphere(x0, dx, Bs, g, mask, insect_id, i_geom=i_geom)
             endif
 
         case ('active-grid')
@@ -131,7 +131,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
 
         case ('channel-3d')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_channel(x0, dx, Bs, g, mask )
+                call draw_channel(x0, dx, Bs, g, mask, i_geom=i_geom)
             endif
         
         case ('primitives-collection')
@@ -147,7 +147,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
                 endif
             elseif (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! normal call, everything is prepared so we can just call it
-                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety, i_collection=i_geom)
+                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom), i_collection=i_geom)
             endif
 
         case ('none')
@@ -171,7 +171,7 @@ subroutine create_mask_3D_ACM( time, x0, dx, Bs, g, mask, stage )
         endif
     endif
 
-end subroutine create_mask_3D_ACM
+end subroutine create_mask_3D_acm
 
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ end subroutine create_mask_3D_ACM
 ! block level) so the physics modules have to provide an interface to create the mask at a tree
 ! level. All parts of the mask shall be included: chi, boundary values, sponges.
 ! This is a block-level wrapper to fill the mask.
-subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
+subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
     implicit none
 
     ! grid
@@ -206,7 +206,7 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
     ! happens, do nothing.
     if (.not. params_acm%penalization) return
 
-    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_2D_ACM called but ACM not initialized"
+    if (.not. params_acm%initialized) write(*,'(A)') "WARNING: create_mask_2D_acm called but acm not initialized"
 
     !---------------------------------------------------------------------------
     ! Mask function and forcing values
@@ -215,71 +215,71 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
         select case (trim(standardize_string(params_acm%geometries(i_geom))))
         case ('rotating-rod')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
-                call draw_rotating_rod( time, mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_rotating_rod( time, mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
             endif
 
         case ('circle', 'cylinder')  ! someone called this cylinder, but it is actually a circle in 2D
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, params_acm%x_cntr(1:2), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, params_acm%x_cntr(1:2), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
         case ('lamballais')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_lamballais( mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_lamballais( mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
             endif
 
         case ('lamballais-local')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
-            call draw_lamballais_local_variation(mask(:,:,1,:), x0, dx, Bs, g )
+            call draw_lamballais_local_variation(mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
         endif
 
         case ('plate-free')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
-                call draw_plate_free( mask(:,:,1,:), x0, dx, Bs, g, insect_id )
+                call draw_plate_free( mask(:,:,1,:), x0, dx, Bs, g, insect_id, i_geom=i_geom )
             endif
 
         case ('cylinder-free')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
-                call draw_free_cylinder( mask(:,:,1,:), x0, dx, Bs, g, insect_id )
+                call draw_free_cylinder( mask(:,:,1,:), x0, dx, Bs, g, insect_id, i_geom=i_geom )
             endif
 
         case ('rotating-cylinder')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
-                call draw_rotating_cylinder( time, mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_rotating_cylinder( time, mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
             endif
 
         case ('two-circles', 'two-cylinders')  ! actually two circles in 2D
             if (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! center coefficients where hardcoded, I just repeat them here to include this old condition
-                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.5884_rk*params_acm%domain_size(1), 0.4116_rk*params_acm%domain_size(2)/), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
-                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.4116_rk*params_acm%domain_size(1), 0.5884_rk*params_acm%domain_size(2)/), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.5884_rk*params_acm%domain_size(1), 0.4116_rk*params_acm%domain_size(2)/), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.4116_rk*params_acm%domain_size(1), 0.5884_rk*params_acm%domain_size(2)/), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
         case ('two-moving-cylinders')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
-                call draw_two_moving_cylinders( time, mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_two_moving_cylinders( time, mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
             endif
 
         case ('flapping-wings')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
-                call draw_2d_flapping_wings( time, mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_2d_flapping_wings( time, mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
             endif
 
         case ('cavity')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! cavity means that the periodic borders are walls. It is like drawing 4 rectangles with half-size l and height infinity to cover all borders
-                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_acm%domain_size(1), 0.0_rk/), half_size=(/1.0e6_rk, params_acm%length/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
-                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_acm%domain_size(1), params_acm%domain_size(2)/), half_size=(/1.0e6_rk, params_acm%length/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_acm%domain_size(1), 0.0_rk/), half_size=(/1.0e6_rk, params_acm%length/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_acm%domain_size(1), params_acm%domain_size(2)/), half_size=(/1.0e6_rk, params_acm%length/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
 
-                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.0_rk, 0.5_rk*params_acm%domain_size(2)/), half_size=(/params_acm%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
-                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/params_acm%domain_size(1), 0.5_rk*params_acm%domain_size(2)/), half_size=(/params_acm%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.0_rk, 0.5_rk*params_acm%domain_size(2)/), half_size=(/params_acm%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/params_acm%domain_size(1), 0.5_rk*params_acm%domain_size(2)/), half_size=(/params_acm%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
         case ('2d-wingsection')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
-                call draw_2d_wingsections( time, mask(:,:,1,:), x0, dx, Bs, g )
+                call draw_2d_wingsections( time, mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
             endif
 
         case ('primitives-collection')
@@ -295,7 +295,7 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
                 endif
             elseif (stage == "time-independent-part" .or. stage == "all-parts") then
                 ! normal call, everything is prepared so we can just call it
-                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_acm%smoothing_type_int, smoothing_width=params_acm%smoothing_width, smoothing_safety=params_acm%smoothing_safety, i_collection=i_geom)
+                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom), i_collection=i_geom)
             endif
 
         case ('none')
@@ -319,13 +319,123 @@ subroutine create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
         endif
     endif
 
-end subroutine create_mask_2D_ACM
+end subroutine create_mask_2D_acm
 
 ! !-------------------------------------------------------------------------------
+subroutine geometry_indicator_acm( time, Bs, g, x0, dx, refinement_status, stage )
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: BS(1:3), g
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:params_acm%dim), dx(1:params_acm%dim)
+    real(kind=rk), intent(in) :: time
+    !> refinement status of block (to be filled)
+    integer(kind=ik), intent(out) :: refinement_status
+    ! can be different for refinement or coarsening
+    character(len=*), intent(in) :: stage
+
+    integer(kind=ik) :: set_refinement, i_geom, insect_id
+    real(kind=rk) :: xend(1:params_acm%dim), block_extent(1:params_acm%dim)
+    logical :: geometry_in_block
+
+    if (stage == "refinement") then
+        set_refinement = 1
+        refinement_status = 0  ! defaults to not refine
+    elseif (stage == "coarsening") then
+        set_refinement = 0
+        refinement_status = -1  ! defaults to refine
+    else
+        call abort(260617, "unknown request to geometry_indicator_acm")
+    endif
+
+    ! compute end of blocks
+    block_extent = dx(1:params_acm%dim) * real(BS(1:params_acm%dim), kind=rk)
+    xend(1:params_acm%dim) = x0(1:params_acm%dim) + block_extent(1:params_acm%dim)
+
+    geometry_in_block = .false.  ! assume block is not in geometry, unless we find out otherwise
+    do i_geom = 1, params_acm%n_geometries
+        select case (trim(standardize_string(params_acm%geometries(i_geom))))
+        !------------------
+        ! insects - they should check if any of body wing_l, wing_r, wing_l2 or wing_r2 is in the block
+        !------------------
+        case ('insect')
+            ! get insect ID
+            call get_insect_id(i_geom, insect_id)
+            ! call insect module function
+            call insect_geometry_indicator(time, insect_id, Bs, g, x0, dx, geometry_in_block)
+        !------------------
+        ! primitives-collection - they should check for every individual element
+        !------------------
+        case ('primitives-collection')
+            call primitives_collection_geometry_indicator(time, i_geom, Bs, g, x0, dx, params_acm%dim, geometry_in_block)
+
+        !------------------
+        ! 3D cases
+        !------------------
+        case ('sphere-free')
+            ! this is a free geometry, so insect handles movement - get insect ID
+            call get_insect_id(i_geom, insect_id)
+            ! check if state is in block
+            if (all(Insects(insect_id)%STATE(1:params_acm%dim) >= x0(1:params_acm%dim)) .and. all(Insects(insect_id)%STATE(1:params_acm%dim) <= xend(1:params_acm%dim)) ) then
+                geometry_in_block = .true.
+            endif
+        case ('channel-3d')
+            ! check if top or bottom is in the block
+            if (x0(params_acm%dim) <= block_extent(params_acm%dim) .or. abs(params_acm%domain_size(params_acm%dim) - xend(params_acm%dim)) <= block_extent(params_acm%dim)) then
+                geometry_in_block = .true.
+            endif
+        !------------------
+        ! 2D cases
+        !------------------
+        case ('circle', 'cylinder', 'rotating-rod', 'rotating-cylinder', 'sphere-fixed')
+            ! check if x_cntr is in block
+            if (all(params_acm%x_cntr(1:params_acm%dim) >= x0(1:params_acm%dim)) .and. all(params_acm%x_cntr(1:params_acm%dim) <= xend(1:params_acm%dim)) ) then
+                geometry_in_block = .true.
+            endif
+        case ('lamballais', 'lamballais-local')
+            ! check if x_cntr is in block
+            if (all(params_acm%x_cntr(1:params_acm%dim) >= x0(1:params_acm%dim)) .and. all(params_acm%x_cntr(1:params_acm%dim) <= xend(1:params_acm%dim)) ) then
+                geometry_in_block = .true.
+            endif
+        case ('plate-free', 'cylinder-free')
+            ! this is a free geometry, so insect handles movement - get insect ID
+            call get_insect_id(i_geom, insect_id)
+            ! check if state is in block
+            if (all((/0.5_rk*params_acm%domain_size(1), Insects(insect_id)%STATE(2)/) >= x0(1:params_acm%dim)) .and. all((/0.5_rk*params_acm%domain_size(1), Insects(insect_id)%STATE(2)/) <= xend(1:params_acm%dim)) ) then
+                geometry_in_block = .true.
+            endif
+        case ('two-circels', 'two-cylinders')
+            ! check if one of the centers is in block
+            if ((all((/0.5884_rk, 0.4116_rk/)*params_acm%domain_size(1:2) >= x0(1:params_acm%dim)) .and. all((/0.5884_rk, 0.4116_rk/)*params_acm%domain_size(1:2) <= xend(1:params_acm%dim))) .or. &
+                (all((/0.4116_rk, 0.5884_rk/)*params_acm%domain_size(1:2) >= x0(1:params_acm%dim)) .and. all((/0.4116_rk, 0.5884_rk/)*params_acm%domain_size(1:2) <= xend(1:params_acm%dim)))) then
+                geometry_in_block = .true.
+            endif
+        case ('cavity')
+            ! check if one of the borders is in block
+            if (any(x0(1:params_acm%dim) <= block_extent(1:params_acm%dim)) .or. any(abs(params_acm%domain_size(1:params_acm%dim) - xend(1:params_acm%dim)) <= block_extent(1:params_acm%dim))) then
+                geometry_in_block = .true.
+            endif
+
+
+        case ('flapping-wings', 'two-moving-cylinders', '2d-wingsection', 'active-grid', 'none')
+            ! no idea, I just skip it for now and assume that point-wise it will be sufficient
+
+        case default
+            call abort(260617,"ERROR: geometry for VPM is unknown: "//params_acm%geometries(i_geom))
+        end select
+
+        ! now set the refinement status - if it is contained, we return
+        if (geometry_in_block) then
+            refinement_status = set_refinement
+            return
+        endif
+    enddo
+
+end subroutine geometry_indicator_acm
+
 ! !-------------------------------------------------------------------------------
-
-
-subroutine draw_lamballais(mask, x0, dx, Bs, g )
+subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
 
     use module_params
     use module_globals
@@ -339,6 +449,8 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g )
     real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi
@@ -366,7 +478,7 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g )
 
     if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
 
-    select case(params_acm%smoothing_type)
+    select case(params_acm%smoothing_type(i_geom))
     !--------------------------------
     case ("hester")
     !--------------------------------
@@ -496,7 +608,7 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g )
 
 end subroutine draw_lamballais
 
-subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
+subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g, i_geom )
 
     use module_params
     use module_globals
@@ -510,6 +622,8 @@ subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
     real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi, epsilon_ring, xi_ring
@@ -539,7 +653,7 @@ subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
 
     if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
 
-    select case(params_acm%smoothing_type)
+    select case(params_acm%smoothing_type(i_geom))
     !--------------------------------
     case ("hester")
     !--------------------------------
@@ -696,7 +810,7 @@ end subroutine draw_lamballais_local_variation
 !-------------------------------------------------------------------------------
 ! The "free cylinder" is a 2D mask function that is coupled with the insect module
 ! it is used for debuging and development (hence the coupling)
-subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id )
+subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id, i_geom )
 
     use module_params
     use module_globals
@@ -712,6 +826,8 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id )
     real(kind=rk), dimension(2), intent(in) :: x0, dx
     !> insect id for coupling with insect module
     integer(kind=ik), intent(in) :: insect_id
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, r, h, dx_min, tmp
@@ -744,7 +860,7 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id )
             ! distance from center of cylinder
             r = dsqrt(x*x + y*y)
 
-            tmp = step(r, params_acm%R_cyl, h, 5*h, params_acm%smoothing_type_int)
+            tmp = step(r, params_acm%R_cyl, h, 5*h, params_acm%smoothing_type_int(i_geom))
             if (tmp >= mask(ix,iy,1)) then
                 ! mask function
                 mask(ix,iy,1) = tmp
@@ -761,7 +877,7 @@ end subroutine draw_free_cylinder
 !-------------------------------------------------------------------------------
 ! as above draw_free_cylinder, but draws a thin, rectangular plate with width "length"
 ! and thickness "thickness"
-subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id )
+subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id, i_geom )
 
     use module_params
     use module_globals
@@ -777,6 +893,8 @@ subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id )
     real(kind=rk), dimension(2), intent(in) :: x0, dx
     !> insect id for coupling with insect module
     integer(kind=ik), intent(in) :: insect_id
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, r, h, dx_min, tmpy, tmpx, tmp
@@ -809,8 +927,8 @@ subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id )
             ! note origin is in the domain middle in x-direction (used for dev only...)
             x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_acm%domain_size(1)
 
-            tmpx = step( abs(x), 0.5_rk*params_acm%length, h, 5*h, params_acm%smoothing_type_int)
-            tmpy = step( abs(y), 0.5_rk*params_acm%thickness, h, 5*h, params_acm%smoothing_type_int)
+            tmpx = step( abs(x), 0.5_rk*params_acm%length, h, 5*h, params_acm%smoothing_type_int(i_geom))
+            tmpy = step( abs(y), 0.5_rk*params_acm%thickness, h, 5*h, params_acm%smoothing_type_int(i_geom))
 
             tmp = tmpy*tmpx
 
@@ -829,7 +947,7 @@ end subroutine
 
 !-------------------------------------------------------------------------------
 
-subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
+subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id, i_geom )
 
     use module_params
     use module_globals
@@ -845,6 +963,8 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
     real(kind=rk), dimension(1:3), intent(in) :: x0, dx
     !> insect id for coupling with insect module
     integer(kind=ik), intent(in) :: insect_id
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
@@ -871,7 +991,7 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
                 ! distance from center of cylinder
                 r = dsqrt(x*x + y*y + z*z)
 
-                mask(ix,iy,iz,1) = step(r, params_acm%R_cyl, h, 5*h, params_acm%smoothing_type_int)
+                mask(ix,iy,iz,1) = step(r, params_acm%R_cyl, h, 5*h, params_acm%smoothing_type_int(i_geom))
                 mask(ix,iy,iz,2) = Insects(insect_id)%STATE(4)
                 mask(ix,iy,iz,3) = Insects(insect_id)%STATE(5)
                 mask(ix,iy,iz,4) = Insects(insect_id)%STATE(6)
@@ -884,7 +1004,7 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
 end subroutine draw_free_sphere
 
 !-------------------------------------------------------------------------------
-subroutine draw_channel(x0, dx, Bs, g, mask )
+subroutine draw_channel(x0, dx, Bs, g, mask, i_geom )
 
     use module_params
     use module_globals
@@ -898,6 +1018,8 @@ subroutine draw_channel(x0, dx, Bs, g, mask )
     real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, z, r, h, tmp, dx_min, H_fluid, safety, epsilon, xi, delta
@@ -928,7 +1050,7 @@ subroutine draw_channel(x0, dx, Bs, g, mask )
     ! |
     ! | h_channel
 
-    select case(params_acm%smoothing_type)
+    select case(params_acm%smoothing_type(i_geom))
     !--------------------------------
     case ("discontinuous", "dis")
     !--------------------------------
@@ -1030,7 +1152,7 @@ end subroutine draw_channel
 
 !-------------------------------------------------------------------------------
 ! A cylinder that rotates around the domain center with a radius of 1 and a frequency of 1 (non-dimensional units)
-subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
+subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g, i_geom )
 
     use module_params
     use module_globals
@@ -1044,6 +1166,8 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
     real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk) :: x, y, r, h, dx_min, tmp, x00, y00, radius, frequ, alpha
@@ -1079,7 +1203,7 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
             ! distance from center of cylinder
             r = dsqrt( (x-x00)*(x-x00) + (y-y00)*(y-y00) )
 
-            tmp = step(r, params_acm%R_cyl, h, 5*h, params_acm%smoothing_type_int)
+            tmp = step(r, params_acm%R_cyl, h, 5*h, params_acm%smoothing_type_int(i_geom))
 
             if (tmp >= mask(ix,iy,1) .and. tmp > 0.0_rk) then
                 ! mask function
@@ -1098,7 +1222,7 @@ end subroutine draw_rotating_cylinder
 
 ! ------------------------------------------------------------------------------
 ! Two cylinders that move! Yaj
-subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
+subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g, i_geom )
 
     use module_params
     use module_globals
@@ -1114,13 +1238,16 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     real(kind=rk), dimension(2), intent(in)        :: x0, dx
     !> simulation time
     real(kind=rk), intent(in) :: time
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
+
     ! auxiliary variables
     real(kind=rk)         :: x1, x2, y1, y2, R1, R2, cx1, cx2, cy1,&
     cy2, r_1, r_2, h, mask1, mask2, freq, vy2
     real(kind=rk), allocatable, save :: mu(:)
     !real(kind=rk)         :: f1, f2, St1, St2 ,Re1, Re2
     ! loop variables
-    integer(kind=ik)      :: ix, iy, k, nfft_y0, smoothing_i
+    integer(kind=ik)      :: ix, iy, k, nfft_y0
 
     !---------------------------------------------------------------------------------------------
     ! variables initialization
@@ -1169,15 +1296,6 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
     ! parameter for smoothing function (width)
     h = 1.5_rk*max(dx(1), dx(2))
 
-    select case(params_acm%smoothing_type)
-    case ("cos", "cosine")
-        smoothing_i = 0
-    case ("dis", "discontinuous")
-        smoothing_i = 2
-    case default
-        call abort(260603, "ERROR: Can't handle that smoothing type: " // params_acm%smoothing_type)
-    end select
-
     do iy=1, Bs(2)+2*g
         y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
         y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
@@ -1188,7 +1306,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
             r_1 = dsqrt(x1*x1 + y1*y1)
             ! distance from center of cylinder 2
             r_2 = dsqrt(x2*x2 + y2*y2)
-            if (smoothing_i == 0) then  ! cosine mask
+            if (params_acm%smoothing_type_int(i_geom) == STEP_METHOD_COSINE) then  ! cosine mask
                 mask1 = step_cosine( r_1, R1, h)
                 mask2 = step_cosine( r_2, R2, h)
                 if (mask2>0.0) then
@@ -1199,7 +1317,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
                   mask(ix,iy,5) = 1.0_rk
                 end if
                 mask(ix,iy,1) = mask1 + mask2
-            elseif (smoothing_i == 2) then  ! discontinuous mask
+            elseif (params_acm%smoothing_type_int(i_geom) == STEP_METHOD_DISC) then  ! discontinuous mask
                 ! if point is inside one of the cylinders, set mask to 1
                 if (r_1 <= R1) then
                     mask(ix,iy,1) = 1.0_rk
@@ -1213,7 +1331,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
                     mask(ix,iy,:) = 0.0_rk
                 end if
             else
-                call abort(260602, "ERROR: Can't handle that smoothing type: " // params_acm%smoothing_type)
+                call abort(260602, "ERROR: Can't handle that smoothing type: " // params_acm%smoothing_type(i_geom))
             end if
         end do
     end do
@@ -1222,7 +1340,7 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
 end subroutine draw_two_moving_cylinders
 
 
-subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
+subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g, i_geom)
     ! simple 2D insect
     ! taken from publication:
     !       Fluid Dyn. Res. 44 (2012), Keigo Ota, Kosuke Suzuki
@@ -1254,12 +1372,15 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
     real(kind=rk), dimension(2), intent(in)        :: x0, dx
     !> simulation time
     real(kind=rk), intent(in) :: time
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
+    
     ! auxiliary variables
     real(kind=rk)         :: x1, x2, y1, y2, R, cxr, cxl, cyr, cyl, c, K, L, b2,&
                              r_wing_r, r_wing_l,r_body, h, mask_wing_r, x, y, xb, yb, &
                              mask_wing_l, mask_body, freq, x_bodycenter(2), theta, theta_dt, &
                              cos_theta, sin_theta, uwing_x, uwing_y, ubody_x, ubody_y, A
-    integer(kind=ik)            :: ix, iy, smoothing_i
+    integer(kind=ik)            :: ix, iy
     integer(kind=2), parameter  :: color_l=2, color_r=3
     integer(kind=2)             :: color
     !---------------------------------------------------------------------------------------------
@@ -1267,15 +1388,6 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
-
-    select case(params_acm%smoothing_type)
-    case ("cos", "cosine")
-        smoothing_i = 0
-    case ("dis", "discontinuous")
-        smoothing_i = 2
-    case default
-        call abort(260603, "ERROR: Can't handle that smoothing type: " // params_acm%smoothing_type)
-    end select
 
     ! reset mask array
     mask = 0.0_rk
@@ -1342,14 +1454,14 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
             ! reset color
             color = 0
             ! draw mask
-            if (smoothing_i == 0) then  ! cosine mask
+            if (params_acm%smoothing_type_int(i_geom) == STEP_METHOD_COSINE) then  ! cosine mask
                 mask_wing_r = step_cosine( r_wing_r, c*0.5_rk, h)
                 mask_wing_l = step_cosine( r_wing_l, c*0.5_rk, h)
                 mask_body = step_cosine( r_body, R, h)
                 mask(ix,iy,1) = mask_wing_r + mask_wing_l + mask_body
                 if (mask_wing_r>0.0_rk) color = color_r
                 if (mask_wing_l>0.0_rk) color = color_l
-            elseif (smoothing_i == 2) then  ! discontinuous mask
+            elseif (params_acm%smoothing_type_int(i_geom) == STEP_METHOD_DISC) then  ! discontinuous mask
                 ! if point is inside one of the cylinders, set mask to 1
                 if (r_wing_r <= c*0.5_rk ) then
                     mask(ix,iy,1) = 1.0_rk
@@ -1363,7 +1475,7 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
                     mask(ix,iy,:) = 0.0_rk
                 end if
             else
-                call abort(260602, "ERROR: Can't handle that smoothing type: " // params_acm%smoothing_type)
+                call abort(260602, "ERROR: Can't handle that smoothing type: " // params_acm%smoothing_type(i_geom))
             end if
 
             ! set the velocity values inside the rigid body domain
@@ -1383,7 +1495,7 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
 
 end subroutine draw_2d_flapping_wings
 
-subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
+subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g, i_geom)
     use module_params
     use module_globals
 
@@ -1398,6 +1510,8 @@ subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
     real(kind=rk), dimension(2), intent(in)        :: x0, dx
     !> simulation time
     real(kind=rk), intent(in) :: time
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     integer :: ix, iy, iz, mpicode
     real (kind=rk) :: x2, y2, vx2, vy2, vx2t, vy2t, anglez2, omz2, omz2t, x00, y00
@@ -1411,8 +1525,8 @@ subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
     hsmth = N*minval(dx) ! smoothing layer thickness
     rmax = 0.5d0
 
-    x00 = params_acm%domain_size(1)/2.0_rk
-    y00 = params_acm%domain_size(2)/2.0_rk
+    x00 = params_acm%x_cntr(1)
+    y00 = params_acm%x_cntr(2)
 
     ! Flapping parameters
     Am = 1.00d0
@@ -1440,7 +1554,7 @@ subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
             yref = y*dcos(anglez2) - x*dsin(anglez2)
             rref = dsqrt( xref**2 + 4.0d0**2 * yref**2 ) ! Radius in cylindrical coordinates
 
-            tmp = step(rref, rmax-0.0d0*hsmth, hsmth, 5*hsmth, params_acm%smoothing_type_int)
+            tmp = step(rref, rmax-0.0d0*hsmth, hsmth, 5*hsmth, params_acm%smoothing_type_int(i_geom))
 
             mask(ix,iy,1) = tmp
             mask(ix,iy,2) = -omz2*y + vx2

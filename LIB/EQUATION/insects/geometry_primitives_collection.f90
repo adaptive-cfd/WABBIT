@@ -240,3 +240,33 @@ subroutine draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int, s
     end do
 
 end subroutine draw_primitives_collection
+
+
+!> This function is called for every geometry in the collection and should check if the geometry is present in the block and set geometry_in_block accordingly
+subroutine primitives_collection_geometry_indicator(time, i_collection, BS, g, x0, dx, dim, geometry_in_block)
+    use module_globals
+    implicit none
+
+    real(kind=rk), intent(in) :: time
+    integer(kind=ik), intent(in) :: i_collection
+    integer, intent(in) :: BS(1:3), g
+    real(kind=rk), intent(in) :: x0(:), dx(:)
+    integer(kind=ik), intent(in) :: dim
+    logical, intent(out) :: geometry_in_block
+
+    integer(kind=ik) :: i_geom
+    real(kind=rk) :: xend(1:dim), block_extent(1:dim)
+
+    ! compute end of blocks
+    block_extent(1:dim) = dx(1:dim) * real(BS(1:dim), kind=rk)
+    xend(1:dim) = x0(1:dim) + block_extent(1:dim)
+
+    ! all current primitives are convex shapes and contain the center, so we can just check if the center is in the block
+    do i_geom = 1, geom_array(i_collection)%n_objects
+        if (all(geom_array(i_collection)%geometric_data(i_geom,1:dim) >= x0(1:dim)) .and. all(geom_array(i_collection)%geometric_data(i_geom,1:dim) <= xend(1:dim))) then
+            geometry_in_block = .true.
+            return
+        end if
+    end do
+
+end subroutine primitives_collection_geometry_indicator

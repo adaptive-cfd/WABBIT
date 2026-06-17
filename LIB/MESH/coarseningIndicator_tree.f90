@@ -31,7 +31,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
-    logical :: consider_hvy_tmp, inputIsWD, check_mask
+    logical :: consider_hvy_tmp, inputIsWD
     real(kind=rk) :: t0  !< timing for debugging
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -64,24 +64,6 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
             lgt_ID = lgt_active(k_b, tree_ID)
             lgt_block( lgt_ID, IDX_REFINE_STS ) = 0
         enddo
-    endif
-
-    ! construct mask function, if it is used as secondary criterion. This criterion
-    ! ensures that regions with gradients in the mask function (the fluid/solid interface)
-    ! are not coarsened (except for dealiasing, because all blocks on Jmax are coarsened)
-    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and.indicator/='undo_refinement') then
-
-        t0 = MPI_Wtime()
-        ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
-        ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
-        ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
-        ! While this uses hvy_tmp as well, we use different tree_ID so there is no clash
-        call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
-        call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
-        ! simplify if-condition downwards and check mask for indicator if it was created here
-        check_mask = .true.
-    else
-        check_mask = .false.
     endif
 
     ! the indicator primary-variables is for compressible Navier-Stokes and first
@@ -317,22 +299,113 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
                 lgt_block(lgt_ID, IDX_REFINE_STS) = -1
             else
                 ! evaluate the criterion on this block.
-                if (check_mask) then
-                    call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_ID), &
-                    hvy_tmp(:,:,:,:,hvy_ID), indicator, &
-                    lgt_block(lgt_ID, IDX_REFINE_STS), norm, level, inputIsWD, hvy_mask(:,:,:,:,hvy_ID))
-                else
-                    call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_ID), &
-                    hvy_tmp(:,:,:,:,hvy_ID), indicator, &
-                    lgt_block(lgt_ID, IDX_REFINE_STS), norm, level, inputIsWD)
-                endif
+                call coarseningIndicator_block( params, hvy_block(:,:,:,:,hvy_ID), &
+                hvy_tmp(:,:,:,:,hvy_ID), indicator, &
+                lgt_block(lgt_ID, IDX_REFINE_STS), norm, level, inputIsWD)
             endif
         enddo
         call toc( "coarseningIndicator (coarseIndicator_block)", 123, MPI_Wtime()-t0 )
 
     end select
 
+    ! check mask function, if it is used as secondary criterion. This criterion
+    ! ensures that regions with gradients in the mask function (the fluid/solid interface)
+    ! are not coarsened (except for dealiasing, because all blocks on Jmax are coarsened)
+    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and.indicator/='undo_refinement') then
+        call coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel )
+    endif
+
     ! after modifying all refinement flags, we need to synchronize light data
     call synchronize_lgt_data( params,  refinement_status_only=.true. )
+
+end subroutine
+
+
+!> In case we want to coarsen after the mask, this is the routine for it.
+!! Since some indicators have to be decided globally and not using the mask (for example, if the mask is yet so coarse, that not a single point hits the actual geometry)
+!! and we might want to extend this for deciding it for each individual geometry, this gets it's own routine
+!! This is a tree-level routine
+subroutine coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel)
+    
+    use module_physics_metamodule
+
+    implicit none
+    real(kind=rk), intent(in)           :: time                          !< Time used for mask generation
+    type (type_params), intent(inout)   :: params                        !< user defined parameter structure
+    real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)       !< mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+    !> mask functions separately. This makes the mask routines tree-level routines (and no longer
+    !! block level) so the physics modules have to provide an interface to create the mask at a tree
+    !! level. All parts of the mask shall be included: chi, boundary values, sponges.
+    real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)        !< heavy temporary data array - used for time-independent mask
+    integer(kind=ik), intent(in)        :: tree_ID
+    logical, intent(in)                 :: ignore_maxlevel
+
+    integer(kind=ik) :: k_b, hvy_ID, level, lgt_Id, Bs(3), g, Jmax
+    real(kind=rk) :: mask_max, mask_min, t0, x0(1:3), dx(1:3)
+    integer(kind=ik) :: refinement_status_geometry, refinement_status, refinement_status_mask
+
+    Jmax = params%Jmax
+    Bs = params%Bs
+    g = params%g
+
+    ! at first, we update the mask
+    t0 = MPI_Wtime()
+    ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
+    ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
+    ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
+    ! While this uses hvy_tmp as well, we use different tree_ID so there is no clash
+    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
+    
+    ! loop over all blocks
+    do k_b = 1, hvy_n(tree_ID)
+        hvy_ID = hvy_active(k_b, tree_ID)
+        call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
+        ! get block spacing and origin for the geometry indicator
+        call get_block_spacing_origin( params, lgt_id, x0, dx )
+        refinement_status = lgt_block(lgt_ID, IDX_REFINE_STS) ! get current refinement status
+        level = lgt_block(lgt_ID, IDX_MESH_LVL)
+
+        ! force blocks on maximum refinement level to coarsen, if parameter is set.
+        ! Note this behavior can be bypassed using the ignore_maxlevel switch.
+        if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) continue
+
+        ! check globally if a geometry is contained within a block
+        ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
+        call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, refinement_status_geometry, "coarsening")
+        if (max(refinement_status, refinement_status_geometry) >= 0) then
+            ! block has to stay, no need to check mask point-wise
+            lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
+        else
+
+            ! Now check point-wise
+            ! t0 = MPI_Wtime()
+            ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
+            refinement_status_mask = -1_ik ! default we coarsen
+            mask_max = 0.0_rk
+            mask_min = 2.0_rk
+
+            ! check if any interface point is within the block
+            ! merge selects 2D or 3D bounds depending on params%dim
+            if (any(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 1.0e-9_rk .and. &
+                    hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) < 1.0_rk-1.0e-9_rk)) then
+                refinement_status_mask = 0_ik
+            endif
+            mask_max = maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+            mask_min = minval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+
+            ! maybe the resolution is so coarse no point on the smoothing layer exists
+            ! in that case if both 1 and 0 are in a mask it also has to contain an interface
+            if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
+
+            ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
+            refinement_status = max(refinement_status, refinement_status_mask)
+            lgt_block(lgt_ID, IDX_REFINE_STS) = refinement_status
+        endif
+
+        ! timing for debugging - block based so should not be deployed for productive versions
+        ! call toc( "coarseningIndicator_block (mask_comp)", 1001, MPI_Wtime()-t0 )
+    enddo
+
 
 end subroutine

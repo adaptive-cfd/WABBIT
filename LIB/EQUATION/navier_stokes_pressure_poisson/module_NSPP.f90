@@ -28,7 +28,7 @@ module module_nspp
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_NSPP, PREPARE_SAVE_DATA_NSPP, RHS_NSPP, GET_DT_BLOCK_NSPP, &
   INICOND_NSPP, BOUNDCOND_NSPP, FIELD_NAMES_NSPP, STATISTICS_NSPP, TIME_STATISTICS_NSPP, create_mask_2D_NSPP, &
-  create_mask_3D_NSPP, PREPARE_THRESHOLDFIELD_NSPP, &
+  create_mask_3D_NSPP, geometry_indicator_nspp, PREPARE_THRESHOLDFIELD_NSPP, &
   INITIALIZE_ASCII_FILES_NSPP
   !**********************************************************************************************
 
@@ -134,9 +134,9 @@ module module_nspp
     ! stuff for lamballais cylinder
     real(kind=rk) :: R0, R1, R2
     character(len=clong) :: file_usx, file_usy, file_usp
-    character(len=cshort) :: smoothing_type
-    integer(kind=ik) :: smoothing_type_int
-    real(kind=rk) :: smoothing_width, smoothing_safety
+    character(len=cshort), allocatable :: smoothing_type(:)
+    integer(kind=ik), allocatable :: smoothing_type_int(:)
+    real(kind=rk), allocatable :: smoothing_width(:), smoothing_safety(:)
     real(kind=rk), allocatable :: u_lamballais(:,:,:)
 
     logical :: initialized = .false.
@@ -310,17 +310,21 @@ contains
     call read_param_mpi(FILE, 'VPM', 'file_usx', params_nspp%file_usx, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usy', params_nspp%file_usy, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usp', params_nspp%file_usp, 'none')
-    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_nspp%smoothing_type, 'cos')
-    select case(params_nspp%smoothing_type)
-        case("cos", "cosine")
-            params_nspp%smoothing_type_int = STEP_METHOD_COSINE
-        case("hester")
-            params_nspp%smoothing_type_int = STEP_METHOD_HESTER
-        case("dis", "disc", "discontinuous")
-            params_nspp%smoothing_type_int = STEP_METHOD_DISC
-        case default
-            call abort(62371118, "unknown smoothing type: "//params_nspp%smoothing_type)
-    end select
+    allocate(params_nspp%smoothing_type(1:params_nspp%n_geometries), params_nspp%smoothing_type_int(1:params_nspp%n_geometries), params_nspp%smoothing_width(1:params_nspp%n_geometries), params_nspp%smoothing_safety(1:params_nspp%n_geometries) )
+    params_nspp%smoothing_type(:) = "cos"
+    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_nspp%smoothing_type, params_nspp%smoothing_type )
+    do i=1,params_nspp%n_geometries
+        select case(params_nspp%smoothing_type(i))
+            case("cos", "cosine")
+                params_nspp%smoothing_type_int(i) = STEP_METHOD_COSINE
+            case("hester")
+                params_nspp%smoothing_type_int(i) = STEP_METHOD_HESTER
+            case("dis", "disc", "discontinuous")
+                params_nspp%smoothing_type_int(i) = STEP_METHOD_DISC
+            case default
+                call abort(62371118, "unknown smoothing type: "//params_nspp%smoothing_type(i))
+        end select
+    enddo
 
     ! stuff for channel flow
     call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_nspp%use_channel_forcing, .false. )
@@ -442,19 +446,21 @@ contains
     nx_max = maxval( (params_nspp%Bs) * 2**(params_nspp%Jmax) )
 
     ! compute some settings for VPM
-    select case(params_nspp%smoothing_type)
-        case("cos", "cosine")
-            params_nspp%smoothing_width = dx_min * params_nspp%C_smooth
-            params_nspp%smoothing_safety = 1.0_rk * params_nspp%smoothing_width
-        case ("hester")
-            params_nspp%smoothing_width = sqrt(params_nspp%nu * params_nspp%C_eta)
-            params_nspp%smoothing_safety = max(5.0_rk * params_nspp%smoothing_width, 2*maxval( ddx(1:params_nspp%dim) ))
-        case("discontinuous", "dis")
-            params_nspp%smoothing_width = dx_min * params_nspp%C_smooth
-            params_nspp%smoothing_safety = 3.0_rk * params_nspp%smoothing_width
-        case default
-            call abort(260602, "Never heard of the smoothing type "//trim(params_nspp%smoothing_type))
-    end select
+    do i=1,params_nspp%n_geometries
+        select case(params_nspp%smoothing_type(i))
+            case("cos", "cosine")
+                params_nspp%smoothing_width(i) = dx_min * params_nspp%C_smooth
+                params_nspp%smoothing_safety(i) = 1.0_rk * params_nspp%smoothing_width(i)
+            case ("hester")
+                params_nspp%smoothing_width(i) = sqrt(params_nspp%nu * params_nspp%C_eta)
+                params_nspp%smoothing_safety(i) = max(5.0_rk * params_nspp%smoothing_width(i), 2*maxval( ddx(1:params_nspp%dim) ))
+            case("discontinuous", "dis")
+                params_nspp%smoothing_width(i) = dx_min * params_nspp%C_smooth
+                params_nspp%smoothing_safety(i) = 3.0_rk * params_nspp%smoothing_width(i)
+            case default
+                call abort(260602, "Never heard of the smoothing type "//trim(params_nspp%smoothing_type(i)))
+        end select
+    enddo
 
     ! print some time-step related information
     if (params_nspp%nu > 0.0_rk) then
@@ -492,8 +498,9 @@ contains
 
     ! before we init the insects, we have to count how many there are
     do i=1,params_nspp%n_geometries
-        if (params_nspp%geometries(i) == "Insect".or.params_nspp%geometries(i)=="active_grid" &
-        .or. params_nspp%geometries(i)=="cylinder-free".or.params_nspp%geometries(i)=="sphere-free".or.params_nspp%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_nspp%geometries(i), "insect") .or. strings_are_similar(params_nspp%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_nspp%geometries(i), "cylinder-free") .or. strings_are_similar(params_nspp%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_nspp%geometries(i), "plate-free")) then
             n_insects = n_insects + 1
         endif
     enddo
@@ -511,8 +518,9 @@ contains
         ! if used, setup insect. Note active grid is part of the insects: they require the same init module
         !
         ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
-        if (params_nspp%geometries(i) == "Insect".or.params_nspp%geometries(i)=="active_grid" &
-        .or. params_nspp%geometries(i)=="cylinder-free".or.params_nspp%geometries(i)=="sphere-free".or.params_nspp%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_nspp%geometries(i), "insect") .or. strings_are_similar(params_nspp%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_nspp%geometries(i), "cylinder-free") .or. strings_are_similar(params_nspp%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_nspp%geometries(i), "plate-free")) then
             ! when computing passive scalars, we require derivatives of the mask function, which
             ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
             ! module task so the NSPP module cannot do it. Note it has to be done only if scalars are used.
@@ -521,10 +529,10 @@ contains
             call get_insect_id( i, insect_id )
             if (params_nspp%set_mask_on_ghost_nodes) then
                 call insect_init( params_nspp%start_time, filename, insect_id, params_nspp%read_from_files, "", params_nspp%domain_size, &
-                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type, N_ghost_nodes=0, colors_default=(/params_nspp%n_geometries + 5*insect_id,params_nspp%n_geometries+1+5*insect_id,params_nspp%n_geometries+2+5*insect_id,params_nspp%n_geometries+3+5*insect_id,params_nspp%n_geometries+4+5*insect_id, params_nspp%geometry_colors(i)/))
+                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_nspp%n_geometries + 5*(insect_id-1),params_nspp%n_geometries+1+5*(insect_id-1),params_nspp%n_geometries+2+5*(insect_id-1),params_nspp%n_geometries+3+5*(insect_id-1),params_nspp%n_geometries+4+5*(insect_id-1), params_nspp%geometry_colors(i)/))
             else
                 call insect_init( params_nspp%start_time, filename, insect_id, params_nspp%read_from_files, "", params_nspp%domain_size, &
-                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type, N_ghost_nodes=g, colors_default=(/params_nspp%n_geometries + 5*insect_id,params_nspp%n_geometries+1+5*insect_id,params_nspp%n_geometries+2+5*insect_id,params_nspp%n_geometries+3+5*insect_id,params_nspp%n_geometries+4+5*insect_id, params_nspp%geometry_colors(i)/))
+                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_nspp%n_geometries + 5*(insect_id-1),params_nspp%n_geometries+1+5*(insect_id-1),params_nspp%n_geometries+2+5*(insect_id-1),params_nspp%n_geometries+3+5*(insect_id-1),params_nspp%n_geometries+4+5*(insect_id-1), params_nspp%geometry_colors(i)/))
             endif
 
             ! compute maximum color
@@ -726,8 +734,9 @@ contains
       character(len=cshort) :: headers(1:100)  ! we can use this to create headers
 
       is_insect = .false.
-      if (any(params_nspp%geometries(:) == "Insect").or.any(params_nspp%geometries(:)=="active_grid") &
-        .or. any(params_nspp%geometries(:)=="cylinder-free").or.any(params_nspp%geometries(:)=="sphere-free").or.any(params_nspp%geometries(:)=="plate-free")) is_insect = .true.
+      if (any(strings_are_similar(params_nspp%geometries(:), "insect")) .or. any(strings_are_similar(params_nspp%geometries(:), "active-grid")) .or. &
+        any(strings_are_similar(params_nspp%geometries(:), "cylinder-free")) .or. any(strings_are_similar(params_nspp%geometries(:), "sphere-free")) .or. &
+        any(strings_are_similar(params_nspp%geometries(:), "plate-free"))) is_insect = .true.
 
       has_two_wings = .false.
       do i_insect = 1, n_insects
@@ -864,8 +873,9 @@ contains
     integer :: i, count_insects
     count_insects = 0
     do i = 1, i_geom
-        if (params_nspp%geometries(i) == "Insect".or.params_nspp%geometries(i)=="active_grid" &
-        .or. params_nspp%geometries(i)=="cylinder-free".or.params_nspp%geometries(i)=="sphere-free".or.params_nspp%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_nspp%geometries(i), "insect") .or. strings_are_similar(params_nspp%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_nspp%geometries(i), "cylinder-free") .or. strings_are_similar(params_nspp%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_nspp%geometries(i), "plate-free")) then
             count_insects = count_insects + 1
         endif
     enddo

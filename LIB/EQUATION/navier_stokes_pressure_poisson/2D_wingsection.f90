@@ -1,4 +1,4 @@
-subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g )
+subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g, i_geom )
     use module_globals
     implicit none
 
@@ -9,6 +9,8 @@ subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g )
     real(kind=rk), dimension(:,:,:), intent(out)     :: mask
     !> spacing and origin of block
     real(kind=rk), dimension(2), intent(in) :: x0, dx
+    !> geometry index
+    integer(kind=ik), intent(in) :: i_geom
 
     ! auxiliary variables
     real(kind=rk)  :: x, y, R, h, dx_min, tmp, xp, yp, omega, u, v
@@ -75,8 +77,8 @@ subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g )
                 u = u00 - omega*y
                 v = v00 + omega*x
 
-                tmp = step(abs(xp-0.5_rk), 0.5_rk, h, 5*h, params_nspp%smoothing_type_int)
-                tmp = tmp*step(abs(yp), 0.5_rk*wingsections(i)%section_thickness, h, 5*h, params_nspp%smoothing_type_int)
+                tmp = step(abs(xp-0.5_rk), 0.5_rk, h, 5*h, params_nspp%smoothing_type_int(i_geom))
+                tmp = tmp*step(abs(yp), 0.5_rk*wingsections(i)%section_thickness, h, 5*h, params_nspp%smoothing_type_int(i_geom))
 
                 if (tmp >= mask(ix,iy,1)) then
                     ! mask function

@@ -28,7 +28,7 @@ module module_acm
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, create_mask_2D_ACM, &
-  create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
+  create_mask_3D_ACM, geometry_indicator_acm, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM
   !**********************************************************************************************
 
@@ -139,9 +139,9 @@ module module_acm
     ! stuff for lamballais cylinder
     real(kind=rk) :: R0, R1, R2
     character(len=clong) :: file_usx, file_usy, file_usp
-    character(len=cshort) :: smoothing_type
-    integer(kind=ik) :: smoothing_type_int
-    real(kind=rk) :: smoothing_width, smoothing_safety
+    character(len=cshort), allocatable :: smoothing_type(:)
+    integer(kind=ik), allocatable :: smoothing_type_int(:)
+    real(kind=rk), allocatable :: smoothing_width(:), smoothing_safety(:)
     real(kind=rk), allocatable :: u_lamballais(:,:,:)
 
     logical :: initialized = .false.
@@ -315,17 +315,21 @@ contains
     call read_param_mpi(FILE, 'VPM', 'file_usx', params_acm%file_usx, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usy', params_acm%file_usy, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usp', params_acm%file_usp, 'none')
-    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, 'cos')
-    select case(params_acm%smoothing_type)
-        case("cos", "cosine")
-            params_acm%smoothing_type_int = STEP_METHOD_COSINE
-        case("hester")
-            params_acm%smoothing_type_int = STEP_METHOD_HESTER
-        case("dis", "disc", "discontinuous")
-            params_acm%smoothing_type_int = STEP_METHOD_DISC
-        case default
-            call abort(62371118, "unknown smoothing type: "//params_acm%smoothing_type)
-    end select
+    allocate(params_acm%smoothing_type(1:params_acm%n_geometries), params_acm%smoothing_type_int(1:params_acm%n_geometries), params_acm%smoothing_width(1:params_acm%n_geometries), params_acm%smoothing_safety(1:params_acm%n_geometries) )
+    params_acm%smoothing_type(:) = "cos"
+    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, params_acm%smoothing_type )
+    do i=1,params_acm%n_geometries
+        select case(params_acm%smoothing_type(i))
+            case("cos", "cosine")
+                params_acm%smoothing_type_int(i) = STEP_METHOD_COSINE
+            case("hester")
+                params_acm%smoothing_type_int(i) = STEP_METHOD_HESTER
+            case("dis", "disc", "discontinuous")
+                params_acm%smoothing_type_int(i) = STEP_METHOD_DISC
+            case default
+                call abort(62371118, "unknown smoothing type: "//params_acm%smoothing_type(i))
+        end select
+    enddo
 
     ! stuff for channel flow
     call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )
@@ -447,19 +451,21 @@ contains
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
 
     ! compute some settings for VPM
-    select case(params_acm%smoothing_type)
-        case("cos", "cosine")
-            params_acm%smoothing_width = dx_min * params_acm%C_smooth
-            params_acm%smoothing_safety = 1.0_rk * params_acm%smoothing_width
-        case ("hester")
-            params_acm%smoothing_width = sqrt(params_acm%nu * params_acm%C_eta)
-            params_acm%smoothing_safety = max(5.0_rk * params_acm%smoothing_width, 2*maxval( ddx(1:params_acm%dim) ))
-        case("discontinuous", "dis")
-            params_acm%smoothing_width = dx_min * params_acm%C_smooth
-            params_acm%smoothing_safety = 3.0_rk * params_acm%smoothing_width
-        case default
-            call abort(260602, "Never heard of the smoothing type "//trim(params_acm%smoothing_type))
-    end select
+    do i=1,params_acm%n_geometries
+        select case(params_acm%smoothing_type(i))
+            case("cos", "cosine")
+                params_acm%smoothing_width(i) = dx_min * params_acm%C_smooth
+                params_acm%smoothing_safety(i) = 1.0_rk * params_acm%smoothing_width(i)
+            case ("hester")
+                params_acm%smoothing_width(i) = sqrt(params_acm%nu * params_acm%C_eta)
+                params_acm%smoothing_safety(i) = max(5.0_rk * params_acm%smoothing_width(i), 2*maxval( ddx(1:params_acm%dim) ))
+            case("discontinuous", "dis")
+                params_acm%smoothing_width(i) = dx_min * params_acm%C_smooth
+                params_acm%smoothing_safety(i) = 3.0_rk * params_acm%smoothing_width(i)
+            case default
+                call abort(260602, "Never heard of the smoothing type "//trim(params_acm%smoothing_type(i)))
+        end select
+    enddo
 
     ! print some time-step related information
     if (params_acm%c_0 > 0.0_rk) then
@@ -503,8 +509,9 @@ contains
 
     ! before we init the insects, we have to count how many there are
     do i=1,params_acm%n_geometries
-        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
-        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_acm%geometries(i), "insect") .or. strings_are_similar(params_acm%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_acm%geometries(i), "plate-free")) then
             n_insects = n_insects + 1
         endif
     enddo
@@ -522,8 +529,9 @@ contains
         ! if used, setup insect. Note active grid is part of the insects: they require the same init module
         !
         ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
-        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
-        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_acm%geometries(i), "insect") .or. strings_are_similar(params_acm%geometries(i), "active_grid") .or. &
+            strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_acm%geometries(i), "plate-free")) then
             ! when computing passive scalars, we require derivatives of the mask function, which
             ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
             ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
@@ -532,10 +540,10 @@ contains
             call get_insect_id( i, insect_id )
             if (params_acm%set_mask_on_ghost_nodes) then
                 call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
-                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type, N_ghost_nodes=0, colors_default=(/params_acm%n_geometries + 5*insect_id,params_acm%n_geometries+1+5*insect_id,params_acm%n_geometries+2+5*insect_id,params_acm%n_geometries+3+5*insect_id,params_acm%n_geometries+4+5*insect_id, params_acm%geometry_colors(i)/))
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_acm%n_geometries + 5*(insect_id-1),params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1), params_acm%geometry_colors(i)/))
             else
                 call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
-                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type, N_ghost_nodes=g, colors_default=(/params_acm%n_geometries + 5*insect_id,params_acm%n_geometries+1+5*insect_id,params_acm%n_geometries+2+5*insect_id,params_acm%n_geometries+3+5*insect_id,params_acm%n_geometries+4+5*insect_id, params_acm%geometry_colors(i)/))
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_acm%n_geometries + 5*(insect_id-1),params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1), params_acm%geometry_colors(i)/))
             endif
 
             ! compute maximum color
@@ -740,8 +748,9 @@ contains
       character(len=cshort) :: headers(1:100)  ! we can use this to create headers
 
       is_insect = .false.
-      if (any(params_acm%geometries(:) == "Insect").or.any(params_acm%geometries(:)=="active_grid") &
-        .or. any(params_acm%geometries(:)=="cylinder-free").or.any(params_acm%geometries(:)=="sphere-free").or.any(params_acm%geometries(:)=="plate-free")) is_insect = .true.
+      if (any(strings_are_similar(params_acm%geometries(:), "insect")) .or. any(strings_are_similar(params_acm%geometries(:), "active-grid")) .or. &
+        any(strings_are_similar(params_acm%geometries(:), "cylinder-free")) .or. any(strings_are_similar(params_acm%geometries(:), "sphere-free")) .or. &
+        any(strings_are_similar(params_acm%geometries(:), "plate-free"))) is_insect = .true.
 
       has_two_wings = .false.
       do i_insect = 1, n_insects
@@ -878,8 +887,9 @@ contains
     integer :: i, count_insects
     count_insects = 0
     do i = 1, i_geom
-        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
-        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_acm%geometries(i), "insect") .or. strings_are_similar(params_acm%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_acm%geometries(i), "plate-free")) then
             count_insects = count_insects + 1
         endif
     enddo

@@ -13,7 +13,7 @@ module module_insects
    PRIVATE
 
    ! functions
-   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_All_Insects, insects_array_init, insect_init, &
+   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, insect_geometry_indicator, Update_All_Insects, insects_array_init, insect_init, &
       insect_clean, draw_active_grid_winglets, init_insect_data, write_insect_data, &
       aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_rhs, &
       BodyMotion, FlappingMotionWrap, StrokePlane, mask_from_pointcloud, &
@@ -728,7 +728,36 @@ contains
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
    end subroutine Draw_Insect
 
+   !-------------------------------------------------------------------------------
+   ! check if this block contains part of the insect
+   !-------------------------------------------------------------------------------
+   subroutine insect_geometry_indicator(time, insect_id, BS, g, x0, dx, geometry_in_block)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      integer(kind=ik), intent(in) :: insect_id
+      integer, intent(in) :: BS(1:3), g
+      real(kind=rk), intent(in) :: x0(1:3), dx(1:3)  ! positions of block from WABBIT, so situated at g+1
+      logical, intent(out) :: geometry_in_block
 
+      real(kind=rk) :: xend(1:3), block_extent(1:3)
+
+      ! compute end of blocks
+      block_extent = dx * real(BS, kind=rk)
+      xend = x0 + block_extent
+
+      ! check if body center is contained - it is located around xc_body_g
+      if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
+         geometry_in_block = .true.
+      endif
+
+      ! For now, we just try to resolve body center and hope it is contained
+      ! However, body shapes can be complex and we cannot necessarily assume, that the center is contained.
+      ! Ideally, I would love to check if the body is resolved with sufficient points (maybe 8 or something), but every body has different size parameters and some are hardcoded and I cannot simply use L_body and do not want to study every body. Is there a simple way for that @Thomas
+
+      ! Check if wing is contained - this is tricky, as we usually only have the pivot point (which often is not contained and outside) and complex shapes
+      ! so for now, I skip this and hope that (fingers cross), resolving the body is enough to draw the wings as well
+
+   end subroutine insect_geometry_indicator
 
    !-------------------------------------------------------
    ! Compute angle from coefficients provided by Maeda

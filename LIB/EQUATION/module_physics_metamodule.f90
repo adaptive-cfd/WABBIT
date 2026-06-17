@@ -28,7 +28,7 @@ module module_physics_metamodule
     !**********************************************************************************************
     PUBLIC :: READ_PARAMETERS_meta, PREPARE_SAVE_DATA_meta, RHS_meta, GET_DT_BLOCK_meta, &
     INICOND_meta, FIELD_NAMES_meta, PREPARE_THRESHOLDFIELD_meta, &
-    STATISTICS_meta, TIME_STATISTICS_meta, CREATE_MASK_meta, INITIALIZE_ASCII_FILES_meta, BOUNDCOND_META
+    STATISTICS_meta, TIME_STATISTICS_meta, CREATE_MASK_meta, geometry_indicator_meta, INITIALIZE_ASCII_FILES_meta, BOUNDCOND_META
     !**********************************************************************************************
 
 contains
@@ -79,6 +79,35 @@ contains
 
         end select
 
+    end subroutine
+
+    !> \brief When checking for indicators, we usually check the mask point-wise. However, for very coarse grid, it could happen that a geometry is contained within a block, but no mask value actually hits it. Therefore, we check actual geometry parameters - this is done by the physics modules, as they contain the actual geometry information
+    subroutine geometry_indicator_meta ( physics, time, Bs, g, x0, dx, refinement_status, stage )
+        implicit none
+        character(len=*), intent(in) :: physics
+        real(kind=rk), intent(in)    :: time
+        integer(kind=ik), intent(in) :: Bs(1:3), g
+        real(kind=rk), intent(in)    :: x0(1:3), dx(1:3)
+        integer, intent(out) :: refinement_status
+        character(len=*), intent(in) :: stage
+
+        select case ( physics )
+        case ('ACM-new')
+            call geometry_indicator_ACM( time, Bs, g, x0, dx, refinement_status, stage )
+
+        case ('ConvDiff-new')
+            ! not implemented yet (this module does not use penalization)
+
+        case ('navier_stokes')
+            ! not implemented yet
+
+        case ('NSPP')
+            call geometry_indicator_NSPP( time, Bs, g, x0, dx, refinement_status, stage )
+
+        case default
+            call abort(1212,'unknown physics...say whaaat?')
+
+        end select
     end subroutine
 
 

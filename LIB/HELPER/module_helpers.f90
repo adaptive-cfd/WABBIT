@@ -16,6 +16,10 @@ module module_helpers
         module procedure step_disc2, step_disc4
     end interface
 
+    interface strings_are_similar
+        module procedure strings_are_similar_char, strings_are_similar_char_array
+    end interface
+
     interface get_cmd_arg
         module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
     end interface
@@ -864,13 +868,24 @@ contains
 
     !-------------------------------------------------------------------------!
     !> @brief compare if strings are similar, so allow for upper-lower case and "-" or "_" to be the same
-    logical function strings_are_similar(str1, str2)
+    logical function strings_are_similar_char(str1, str2)
         implicit none
         character(len=*), intent(in) :: str1, str2
 
-        strings_are_similar = (standardize_string(str1) == standardize_string(str2))
+        strings_are_similar_char = (standardize_string(str1) == standardize_string(str2))
 
-    end function strings_are_similar
+    end function strings_are_similar_char
+    !> Array overload of the above function, compares each element of the array to the string and gives back an array of logicals
+    function strings_are_similar_char_array(str1, str2)
+        implicit none
+        character(len=*), intent(in) :: str1(:), str2
+        logical :: strings_are_similar_char_array(size(str1))
+        integer :: i
+        do i = 1, size(str1)
+            strings_are_similar_char_array(i) = (standardize_string(str1(i)) == standardize_string(str2))
+        enddo
+
+    end function strings_are_similar_char_array
 
     !-------------------------------------------------------------------------!
     !> @brief standardize string by setting it to all lower-case and changing "_" to "-"

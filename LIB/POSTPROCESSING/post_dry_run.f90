@@ -187,7 +187,7 @@ subroutine post_dry_run
             endif
 
             ! generate complete mask on the initial equidistant grid
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
 
 
             ! refine the grid near the interface and re-generate the mask function.
@@ -209,7 +209,7 @@ subroutine post_dry_run
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
                 ! on new grid, create the mask again
-                call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
                 Nmask = lgt_n(tree_ID_flow)
 
                 ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
@@ -219,7 +219,7 @@ subroutine post_dry_run
                 lgt_n_new = lgt_n(tree_ID_flow)
 
                 ! on new grid, create the mask again
-                call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
 
                 ! current finest level is:
                 Jnow = maxActiveLevel_tree(tree_ID_flow)
@@ -248,7 +248,7 @@ subroutine post_dry_run
             enddo
 
             ! on new grid, create the mask again
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
             Nmask = lgt_n(tree_ID_flow)
 
             ! write the kinematics file for the insects
@@ -302,7 +302,7 @@ subroutine post_dry_run
             call readHDF5vct_tree( (/fname/), params, hvy_mask, tree_ID_flow, time=time)
 
             ! create the mask
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
 
             ! as we intend to create the mask on a given grid, pruning makes no sense
 

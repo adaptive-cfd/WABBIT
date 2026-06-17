@@ -186,6 +186,17 @@ subroutine BodyMotion(time, Insect)
             Insect%body_moves = "yes"
         endif
 
+        
+    case ("linear")
+        psi      = Insect%yawpitchroll_0(3) ! roll
+        beta     = Insect%yawpitchroll_0(2) ! pitch
+        gamma    = Insect%yawpitchroll_0(1) ! yaw
+        psi_dt   = 0.0_rk  ! tethered: angles const
+        beta_dt  = 0.0_rk
+        gamma_dt = 0.0_rk
+        xc = Insect%x0 + time*Insect%v0
+        vc = Insect%v0
+        Insect%body_moves = "yes"
 
 
     case ("free_flight")

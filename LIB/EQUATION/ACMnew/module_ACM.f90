@@ -81,6 +81,9 @@ module module_acm
     real(kind=rk) :: HIT_energy = 1.0_rk
     real(kind=rk) :: HIT_gain = 100.0_rk
 
+    logical :: use_energy_limiter = .false.
+    real(kind=rk) :: energy_start = -1.0_rk
+
     ! channel flow
     logical :: use_channel_forcing = .false.
     real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk

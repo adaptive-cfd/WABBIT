@@ -71,7 +71,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             if (ref_status == +1) then
                 ! block has to refine, no need to check mask point-wise
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                continue
+                cycle
             endif
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
@@ -119,7 +119,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             if (ref_status == +1) then
                 ! block has to refine, no need to check mask point-wise
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                continue
+                cycle
             endif
 
             ! merge selects 2D or 3D bounds depending on params%dim

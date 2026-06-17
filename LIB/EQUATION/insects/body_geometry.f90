@@ -70,19 +70,19 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     ! stage I:
     !---------------------------------------------------------------------------
     ! create the body mask, not the solid velocity field.
-    select case (Insect%BodyType)
+    select case (trim(standardize_string(Insect%BodyType)))
     case ("nobody")
         return
-    case ("suzuki_thin_rod")
+    case ("suzuki-thin-rod")
         call draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("superSTL")
+    case ("superstl")
         call draw_body_superSTL( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("jerry","Jerry")
+    case ("jerry")
         call draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("hawkmoth","Hawkmoth")
+    case ("hawkmoth")
         call draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
 
     case ("platicle")
@@ -91,10 +91,10 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     case ("coin")
         call draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("sphere","SPHERE","Sphere")
+    case ("sphere")
         call draw_body_sphere( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("drosophila_maeda","drosophila_slim")
+    case ("drosophila-maeda","drosophila-slim")
         call draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
 
     case ("bumblebee")
@@ -103,10 +103,10 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     case ("emundus")
         call draw_body_emundus( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("paratuposa_simple")
+    case ("paratuposa-simple")
         call draw_body_paratuposa_simple( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("mosquito_iams")
+    case ("mosquito-iams")
         call draw_body_mosquito_iams( xx0, ddx, mask, mask_color, us, Insect)
 
     case ("cone")

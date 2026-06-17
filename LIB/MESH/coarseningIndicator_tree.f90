@@ -368,7 +368,7 @@ subroutine coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, i
 
         ! force blocks on maximum refinement level to coarsen, if parameter is set.
         ! Note this behavior can be bypassed using the ignore_maxlevel switch.
-        if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) continue
+        if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) cycle
 
         ! check globally if a geometry is contained within a block
         ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
@@ -376,32 +376,32 @@ subroutine coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, i
         if (max(refinement_status, refinement_status_geometry) >= 0) then
             ! block has to stay, no need to check mask point-wise
             lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
-        else
-
-            ! Now check point-wise
-            ! t0 = MPI_Wtime()
-            ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
-            refinement_status_mask = -1_ik ! default we coarsen
-            mask_max = 0.0_rk
-            mask_min = 2.0_rk
-
-            ! check if any interface point is within the block
-            ! merge selects 2D or 3D bounds depending on params%dim
-            if (any(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 1.0e-9_rk .and. &
-                    hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) < 1.0_rk-1.0e-9_rk)) then
-                refinement_status_mask = 0_ik
-            endif
-            mask_max = maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
-            mask_min = minval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
-
-            ! maybe the resolution is so coarse no point on the smoothing layer exists
-            ! in that case if both 1 and 0 are in a mask it also has to contain an interface
-            if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
-
-            ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
-            refinement_status = max(refinement_status, refinement_status_mask)
-            lgt_block(lgt_ID, IDX_REFINE_STS) = refinement_status
+            cycle
         endif
+
+        ! Now check point-wise
+        ! t0 = MPI_Wtime()
+        ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
+        refinement_status_mask = -1_ik ! default we coarsen
+        mask_max = 0.0_rk
+        mask_min = 2.0_rk
+
+        ! check if any interface point is within the block
+        ! merge selects 2D or 3D bounds depending on params%dim
+        if (any(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 1.0e-9_rk .and. &
+                hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) < 1.0_rk-1.0e-9_rk)) then
+            refinement_status_mask = 0_ik
+        endif
+        mask_max = maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+        mask_min = minval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+
+        ! maybe the resolution is so coarse no point on the smoothing layer exists
+        ! in that case if both 1 and 0 are in a mask it also has to contain an interface
+        if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
+
+        ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
+        refinement_status = max(refinement_status, refinement_status_mask)
+        lgt_block(lgt_ID, IDX_REFINE_STS) = refinement_status
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (mask_comp)", 1001, MPI_Wtime()-t0 )

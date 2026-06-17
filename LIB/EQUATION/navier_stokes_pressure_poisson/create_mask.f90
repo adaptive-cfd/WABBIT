@@ -322,6 +322,8 @@ subroutine create_mask_2D_nspp( time, x0, dx, Bs, g, mask, stage )
 end subroutine create_mask_2D_nspp
 
 ! !-------------------------------------------------------------------------------
+!> This routine is called to point to any point of the surface of an object, so that it might be considered.
+!! Sometimes the grid is so coarse, that no point of the grid is actually in the geometry, but we still want to refine it to capture the geometry. This routine is called for this purpose.
 subroutine geometry_indicator_nspp( time, Bs, g, x0, dx, refinement_status, stage )
     implicit none
 
@@ -336,7 +338,7 @@ subroutine geometry_indicator_nspp( time, Bs, g, x0, dx, refinement_status, stag
     character(len=*), intent(in) :: stage
 
     integer(kind=ik) :: set_refinement, i_geom, insect_id
-    real(kind=rk) :: xend(1:params_nspp%dim), block_extent(1:params_nspp%dim)
+    real(kind=rk) :: xend(1:params_nspp%dim), block_extent(1:params_nspp%dim), pos_check(1:params_nspp%dim)
     logical :: geometry_in_block
 
     if (stage == "refinement") then
@@ -353,6 +355,7 @@ subroutine geometry_indicator_nspp( time, Bs, g, x0, dx, refinement_status, stag
     block_extent = dx(1:params_nspp%dim) * real(BS(1:params_nspp%dim), kind=rk)
     xend(1:params_nspp%dim) = x0(1:params_nspp%dim) + block_extent(1:params_nspp%dim)
 
+    geometry_in_block = .false.  ! assume block is not in geometry, unless we find out otherwise
     do i_geom = 1, params_nspp%n_geometries
         select case (trim(standardize_string(params_nspp%geometries(i_geom))))
         !------------------
@@ -363,6 +366,19 @@ subroutine geometry_indicator_nspp( time, Bs, g, x0, dx, refinement_status, stag
             call get_insect_id(i_geom, insect_id)
             ! call insect module function
             call insect_geometry_indicator(time, insect_id, Bs, g, x0, dx, geometry_in_block)
+        case ('sphere-free', 'plate-free', 'cylinder-free')
+            ! those are free geometries, so insect handles movement - get insect ID
+            call get_insect_id(i_geom, insect_id)
+            pos_check = Insects(insect_id)%STATE(1:params_nspp%dim)
+            if (strings_are_similar(params_nspp%geometries(i_geom), "cylinder-free") .or. strings_are_similar(params_nspp%geometries(i_geom), "sphere-free")) then
+                pos_check(1) = pos_check(1) + params_nspp%R_cyl  ! go onto the boundary
+            else
+                pos_check(1) = pos_check(1) + params_nspp%length  ! go onto the boundary for the plate
+            endif
+            ! check if state is in block
+            if (all(pos_check >= x0(1:params_nspp%dim)) .and. all(pos_check <= xend(1:params_nspp%dim)) ) then
+                geometry_in_block = .true.
+            endif
         !------------------
         ! primitives-collection - they should check for every individual element
         !------------------
@@ -372,47 +388,42 @@ subroutine geometry_indicator_nspp( time, Bs, g, x0, dx, refinement_status, stag
         !------------------
         ! 3D cases
         !------------------
-        case ('sphere-free')
-            ! this is a free geometry, so insect handles movement - get insect ID
-            call get_insect_id(i_geom, insect_id)
-            ! check if state is in block
-            if (all(Insects(insect_id)%STATE(1:params_nspp%dim) >= x0(1:params_nspp%dim)) .and. all(Insects(insect_id)%STATE(1:params_nspp%dim) <= xend(1:params_nspp%dim)) ) then
-                geometry_in_block = .true.
-            endif
         case ('channel-3d')
-            ! check if top or bottom is in the block
-            if (x0(params_nspp%dim) <= block_extent(params_nspp%dim) .or. abs(params_nspp%domain_size(params_nspp%dim) - xend(params_nspp%dim)) <= block_extent(params_nspp%dim)) then
+            ! check if top or bottom h_channel is in the block
+            if (params_nspp%h_channel >= x0(params_nspp%dim) .or. params_nspp%domain_size(params_nspp%dim) - params_nspp%h_channel <= xend(params_nspp%dim)) then
                 geometry_in_block = .true.
             endif
         !------------------
         ! 2D cases
         !------------------
-        case ('circle', 'cylinder', 'rotating-rod', 'rotating-cylinder', 'sphere-fixed')
-            ! check if x_cntr is in block
+        case ('circle', 'cylinder', 'sphere-fixed')
+            ! check if x_cntr + r is in block
+            pos_check = params_nspp%x_cntr(1:params_nspp%dim)
+            pos_check(1) = pos_check(1) + params_nspp%R_cyl  ! go onto the boundary
+            if (all(pos_check >= x0(1:params_nspp%dim)) .and. all(pos_check <= xend(1:params_nspp%dim)) ) then
+                geometry_in_block = .true.
+            endif
+        case ('rotating-rod', 'rotating-cylinder')
+            ! x_cntr is always on the boundary
             if (all(params_nspp%x_cntr(1:params_nspp%dim) >= x0(1:params_nspp%dim)) .and. all(params_nspp%x_cntr(1:params_nspp%dim) <= xend(1:params_nspp%dim)) ) then
                 geometry_in_block = .true.
             endif
         case ('lamballais', 'lamballais-local')
-            ! check if x_cntr is in block
-            if (all(params_nspp%x_cntr(1:params_nspp%dim) >= x0(1:params_nspp%dim)) .and. all(params_nspp%x_cntr(1:params_nspp%dim) <= xend(1:params_nspp%dim)) ) then
-                geometry_in_block = .true.
-            endif
-        case ('plate-free', 'cylinder-free')
-            ! this is a free geometry, so insect handles movement - get insect ID
-            call get_insect_id(i_geom, insect_id)
-            ! check if state is in block
-            if (all((/0.5_rk*params_nspp%domain_size(1), Insects(insect_id)%STATE(2)/) >= x0(1:params_nspp%dim)) .and. all((/0.5_rk*params_nspp%domain_size(1), Insects(insect_id)%STATE(2)/) <= xend(1:params_nspp%dim)) ) then
+            ! check if x_cntr + R0 is in block
+            pos_check = params_nspp%x_cntr(1:params_nspp%dim)
+            pos_check(1) = pos_check(1) + params_nspp%R0  ! go onto the boundary
+            if (all(pos_check >= x0(1:params_nspp%dim)) .and. all(pos_check <= xend(1:params_nspp%dim)) ) then
                 geometry_in_block = .true.
             endif
         case ('two-circels', 'two-cylinders')
-            ! check if one of the centers is in block
-            if ((all((/0.5884_rk, 0.4116_rk/)*params_nspp%domain_size(1:2) >= x0(1:params_nspp%dim)) .and. all((/0.5884_rk, 0.4116_rk/)*params_nspp%domain_size(1:2) <= xend(1:params_nspp%dim))) .or. &
-                (all((/0.4116_rk, 0.5884_rk/)*params_nspp%domain_size(1:2) >= x0(1:params_nspp%dim)) .and. all((/0.4116_rk, 0.5884_rk/)*params_nspp%domain_size(1:2) <= xend(1:params_nspp%dim)))) then
+            ! check if one of the centers + r is in block
+            if ((all((/0.5884_rk+params_nspp%R_cyl, 0.4116_rk/)*params_nspp%domain_size(1:2) >= x0(1:params_nspp%dim)) .and. all((/0.5884_rk+params_nspp%R_cyl, 0.4116_rk/)*params_nspp%domain_size(1:2) <= xend(1:params_nspp%dim))) .or. &
+                (all((/0.4116_rk+params_nspp%R_cyl, 0.5884_rk/)*params_nspp%domain_size(1:2) >= x0(1:params_nspp%dim)) .and. all((/0.4116_rk+params_nspp%R_cyl, 0.5884_rk/)*params_nspp%domain_size(1:2) <= xend(1:params_nspp%dim)))) then
                 geometry_in_block = .true.
             endif
         case ('cavity')
             ! check if one of the borders is in block
-            if (any(x0(1:params_nspp%dim) <= block_extent(1:params_nspp%dim)) .or. any(abs(params_nspp%domain_size(1:params_nspp%dim) - xend(1:params_nspp%dim)) <= block_extent(1:params_nspp%dim))) then
+            if (any(params_nspp%h_channel >= x0(1:params_nspp%dim)) .or. any(params_nspp%domain_size(1:params_nspp%dim) - xend(1:params_nspp%dim) <= params_nspp%h_channel)) then
                 geometry_in_block = .true.
             endif
 
@@ -855,7 +866,7 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id, i_geom )
         y = dble(iy-(g+1)) * dx(2) + x0(2) - Insects(insect_id)%STATE(2)
         do ix = 1, Bs(1)+2*g
             ! note origin is in the domain middle in x-direction (used for dev only...)
-            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_nspp%domain_size(1)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - Insects(insect_id)%STATE(1)
             ! distance from center of cylinder
             r = dsqrt(x*x + y*y)
 
@@ -924,7 +935,7 @@ subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id, i_geom )
 
         do ix = 1, Bs(1)+2*g
             ! note origin is in the domain middle in x-direction (used for dev only...)
-            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_nspp%domain_size(1)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - Insects(insect_id)%STATE(1)
 
             tmpx = step( abs(x), 0.5_rk*params_nspp%length, h, 5*h, params_nspp%smoothing_type_int(i_geom))
             tmpy = step( abs(y), 0.5_rk*params_nspp%thickness, h, 5*h, params_nspp%smoothing_type_int(i_geom))

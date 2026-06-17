@@ -118,7 +118,7 @@ subroutine post_dry_run
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = 0
-    params%threshold_state_vector_component(1) = 1
+    params%threshold_state_vector_component(1) = 1  ! old: threshold after mask
 
     deallocate(params%symmetry_vector_component)
     allocate(params%symmetry_vector_component(1:params%n_eqn))
@@ -136,14 +136,15 @@ subroutine post_dry_run
     endif
 
     params%eps = 1.0e-6
-    params%coarsening_indicator = "threshold-state-vector"
-    params%refinement_indicator = "mask-threshold"
+    params%coarsening_indicator = "threshold-state-vector"  ! we only want the real mask checking, so wavelet thresholding is ignored
+    params%refinement_indicator = "mask-threshold"  ! refine everywhere, where we have a mask interface
+    params%threshold_mask = .true.  ! we want to refine based on the mask value
 
     if (params%rank==0) then
         write(*,'(A)') "DRY-RUN: creating mask function. Please note that the params"
-        write(*,'(A)') "         eps=1.0e-5, force_maxlevel_dealiasing=false and"
-        write(*,'(A)') "         threshold_state_vector_component are hard-coded"
-        write(*,'(A)') "         and thus NOT read from the INI file."
+        write(*,'(A)') "         eps=1.0e-6, force_maxlevel_dealiasing=F, "
+        write(*,'(A)') "         threshold_state_vector_component and threshold_mask=T"
+        write(*,'(A)') "         are hard-coded and thus NOT read from the INI file."
     endif
 
     Bs = params%Bs
@@ -212,9 +213,7 @@ subroutine post_dry_run
                 call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
                 Nmask = lgt_n(tree_ID_flow)
 
-                ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
-                ! is effectively ignored. It seems redundant; if we set a small eps (done independent
-                ! of the parameter file), this yields the same result
+                ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
                 call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
                 lgt_n_new = lgt_n(tree_ID_flow)
 

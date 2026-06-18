@@ -81,7 +81,7 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
     integer(kind=ik)           :: k, l, lgt_id, hvy_id, fail_crit, fail_normal, ierr
     integer(kind=ik)           :: rank, Bs(3)
     real(kind=rk)              :: ddx(1:3), xx0(1:3)
-    integer(kind=ik)           :: g, ix, iy, iz, g_depth, p_f, p_t, p_f_old, g_min
+    integer(kind=ik)           :: g, ix, iy, iz, g_depth, p_f, p_t, p_f_old, g_min, Jmin_backup, Jmax_backup
     integer(kind=tsize)        :: treecode
     real(kind=rk)              :: x, y, z
     character(len=80)          :: file_dump
@@ -98,14 +98,11 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
         write(*,'("UNIT TEST: It tests if all ghost patches are correctly set up")')
     end if
 
-    if (params%Jmax<2) then
-        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for Jmax<2, skipping it."
-        return
-    endif
-    if (params%Jmax==params%Jmin) then
-        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for equidistant grids, skipping it."
-        return
-    endif
+    ! this test needs levels to be 1-2, so we temporarily accept them in case the user has set different Jmin/Jmax
+    Jmin_backup = params%Jmin
+    Jmax_backup = params%Jmax
+    params%Jmin = 1
+    params%Jmax = 2
 
     Bs = params%Bs
     g  = params%g
@@ -277,5 +274,9 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
             endif
         endif
     endif
+
+    ! reset Jmin / Jmax
+    params%Jmin = Jmin_backup
+    params%Jmax = Jmax_backup
 
 end subroutine

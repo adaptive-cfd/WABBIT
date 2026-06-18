@@ -11,7 +11,7 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     logical, optional, intent(in)           :: verbose
 
     integer(kind=ik)                        :: k, hvy_id, lgt_id
-    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, Bs(1:3), Jmin, Jmax
+    integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, Bs(1:3), Jmin_backup, Jmax_backup
     real(kind=rk)                           :: x0(1:3), dx(1:3)
     real(kind=rk), allocatable              :: norm(:), norm_ref(:)
     integer(kind=tsize)                     :: treecode
@@ -35,19 +35,9 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     allocate(norm(1:params%n_eqn))
     allocate(norm_ref(1:params%n_eqn))
 
-    if (params%Jmax<2) then
-        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for Jmax<2, skipping it."
-        return
-    endif
-
-    if (params%Jmax==params%Jmin) then
-        if (params%rank==0) write(*,'(A)') "UNIT TEST: Test cannot be performed for equidistant grids, skipping it."
-        return
-    endif
-
-    ! test is on Jmin=0, so let's enable that for a moment
-    Jmin = params%Jmin
-    Jmax = params%Jmax
+    ! test is on Jmin=0, so let's enable that for a moment, backup the other levels
+    Jmin_backup = params%Jmin
+    Jmax_backup = params%Jmax
     params%Jmax = 1
     params%Jmin = 0
 
@@ -158,6 +148,6 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     call reset_tree(params, .true., tree_ID=tree_ID)
 
     ! reset the Jmin and Jmax parameters to their original values
-    params%Jmax = Jmax
-    params%Jmin = Jmin
+    params%Jmax = Jmax_backup
+    params%Jmin = Jmin_backup
 end subroutine

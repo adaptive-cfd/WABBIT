@@ -368,7 +368,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
         else
             call abort(250708, "taylor_green is a 2D test case. Use taylor-green-vanRees2011 for 3D case")
         endif
-    case ("taylor-green-vanRees2011")
+    case ("taylor-green-vanrees2011")
         ! this condition is 3D only!
         if (params_acm%dim==3) then
             do iz = 1, Bs(3)+2*g

@@ -169,7 +169,7 @@ subroutine post_dry_run
     ! init t-file for mask volume - we assume 20 values
     headers(1) = "time"
     do k=0,20
-        write(headers(k+2),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+        write(headers(k+2),"(A,i0.3,A)") "c", k, ":mask_volume"
     end do
     headers(23) = "sponge_volume"
 

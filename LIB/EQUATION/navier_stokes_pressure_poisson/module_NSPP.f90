@@ -81,7 +81,8 @@ module module_nspp
 
     ! channel flow
     logical :: use_channel_forcing = .false.
-    real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk
+    real(kind=rk), allocatable :: mask_volume(:)
+    real(kind=rk) :: meanflow_channel(1:3) = 0.0_rk
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0
@@ -576,7 +577,7 @@ contains
     enddo
 
     ! now initialze force arrays for colors at last, because we know how many colors we have
-    allocate( params_nspp%force_color(1:3, 0:ncolors), params_nspp%moment_color(1:3, 0:ncolors) )
+    allocate( params_nspp%force_color(1:3, 0:ncolors), params_nspp%moment_color(1:3, 0:ncolors), params_nspp%mask_volume(0:ncolors) )
 
     params_nspp%initialized = .true.
   end subroutine READ_PARAMETERS_NSPP
@@ -850,7 +851,11 @@ contains
 
             call init_insect_data(overwrite)
         endif
-        call init_t_file('mask_volume.t', overwrite)
+        do i_color = 0, ncolors
+            write(headers(i_color+2),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+        enddo
+        headers(ncolors+3) = "sponge_volume"
+        call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+3) )
         call init_t_file('u_residual.t', overwrite)
         call init_t_file('forces_rk.t', overwrite)
         call init_t_file('penal_power.t', overwrite, (/&

@@ -23,9 +23,9 @@ subroutine post_dry_run
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)               :: filename, fname, grid_list
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration
-    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final
+    character(len=cshort)               :: filename, fname, grid_list, headers(1:100)
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz
+    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(0:100), sponge_volume
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, include_tfinal
     type(inifile) :: FILE
 
@@ -166,6 +166,12 @@ subroutine post_dry_run
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
+    ! init t-file for mask volume - we assume 20 values
+    headers(1) = "time"
+    do k=0,20
+        write(headers(k+2),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+    end do
+    headers(23) = "sponge_volume"
 
     !-----------------------------------
     call init_insect_data(overwrite=.true.)
@@ -252,6 +258,25 @@ subroutine post_dry_run
 
             ! write the kinematics file for the insects
             call write_insect_data(time)
+
+            ! we compute the mask (and sponge) volume for each color and write it to a file
+            do k=1,hvy_n(tree_ID_flow)
+                hvy_id = hvy_active(k,tree_ID_flow)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
+                ! loop over all points
+                do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2); do iy = g+1,Bs(1)+g; do ix = g+1,Bs(1)+g
+                    ! add volume of this point to the correct color
+                    mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) = mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
+                enddo; enddo; enddo
+                ! sponge volume is in 6th entry
+                sponge_volume = sponge_volume + sum(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, g+1, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 6, hvy_id)) * product(dx(1:params%dim))
+            enddo
+            ! allreduce to get the total volume for each color
+            call MPI_ALLREDUCE(MPI_IN_PLACE, mask_volume, 100, MPI_REAL, MPI_SUM, WABBIT_COMM, ierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, sponge_volume, 1, MPI_REAL, MPI_SUM, WABBIT_COMM, ierr)
+            ! usually, the physics module know how many colors there are, but we do not have access to it. So let's just assume 20 and write 20 values plus sponge volume
+            call append_t_file( 'mask_volume.t', (/time, mask_volume(0:20), sponge_volume/) )
 
             ! before (possible) pruning, we sync the ghosts
             call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )

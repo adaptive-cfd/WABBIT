@@ -276,7 +276,7 @@ contains
         allocate(params_nspp%geometry_files(1))
         allocate(params_nspp%geometry_colors(1))
         params_nspp%geometries(1) = params_nspp%geometry_legacy
-        params_nspp%geometry_colors(:) = 1
+        params_nspp%geometry_colors(:) = 0
     else
         call read_param_mpi(FILE, 'VPM', 'n_geometries', params_nspp%n_geometries, 1)
         allocate(params_nspp%geometries(params_nspp%n_geometries))
@@ -288,7 +288,7 @@ contains
         params_nspp%geometry_string = ""
         call read_param_mpi(FILE, 'VPM', 'geometry_files', params_nspp%geometry_files, defaultvalue=params_nspp%geometry_files )
         call read_param_mpi(FILE, 'VPM', 'geometry_string', params_nspp%geometry_string, defaultvalue=params_nspp%geometry_string )
-        ! colors default to increasing from 0
+        ! make colors to be steadily increasing from 0
         do i=1,params_nspp%n_geometries
             params_nspp%geometry_colors(i) = i - 1
         enddo

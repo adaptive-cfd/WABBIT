@@ -481,9 +481,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             call append_t_file( 'div.t', (/time, params_acm%div_max, params_acm%div_min/) )
             if (params_acm%penalization .or. params_acm%use_sponge) then
-                ! total force (excluding zero color)
-                call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,1:ncolors)), &
-                sum(params_acm%force_color(2,1:ncolors)), sum(params_acm%force_color(3,1:ncolors)) /) )
+                ! total force (excluding insect parts, they are considered by the full geometry, otherwise we count them twice)
+                call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,0:params_acm%n_geometries)), &
+                sum(params_acm%force_color(2,0:params_acm%n_geometries)), sum(params_acm%force_color(3,0:params_acm%n_geometries)) /) )
 
                 ! forces/moment for individual colors all in one file
                 ! This is what we should have done in the first place. For the insects below,

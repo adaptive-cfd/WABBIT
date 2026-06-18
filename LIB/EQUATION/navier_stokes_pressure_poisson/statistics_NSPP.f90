@@ -464,9 +464,9 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
 
             call append_t_file( 'div.t', (/time, params_nspp%div_max, params_nspp%div_min/) )
             if (params_nspp%penalization .or. params_nspp%use_sponge) then
-                ! total force (excluding zero color)
-                call append_t_file( 'forces.t', (/time, sum(params_nspp%force_color(1,1:ncolors)), &
-                sum(params_nspp%force_color(2,1:ncolors)), sum(params_nspp%force_color(3,1:ncolors)) /) )
+                ! total force (excluding insect parts, they are considered by the full geometry, otherwise we count them twice)
+                call append_t_file( 'forces.t', (/time, sum(params_nspp%force_color(1,0:params_nspp%n_geometries)), &
+                sum(params_nspp%force_color(2,0:params_nspp%n_geometries)), sum(params_nspp%force_color(3,0:params_nspp%n_geometries)) /) )
 
                 ! forces/moment for individual colors.
                 ! This is what we should have done in the first place. For the insects below,

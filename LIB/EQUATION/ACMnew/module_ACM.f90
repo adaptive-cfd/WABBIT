@@ -284,7 +284,7 @@ contains
         allocate(params_acm%geometry_files(1))
         allocate(params_acm%geometry_colors(1))
         params_acm%geometries(1) = params_acm%geometry_legacy
-        params_acm%geometry_colors(:) = 1
+        params_acm%geometry_colors(:) = 0
     else
         call read_param_mpi(FILE, 'VPM', 'n_geometries', params_acm%n_geometries, 1)
         allocate(params_acm%geometries(params_acm%n_geometries))
@@ -296,7 +296,10 @@ contains
         params_acm%geometry_string = ""
         call read_param_mpi(FILE, 'VPM', 'geometry_files', params_acm%geometry_files, defaultvalue=params_acm%geometry_files )
         call read_param_mpi(FILE, 'VPM', 'geometry_string', params_acm%geometry_string, defaultvalue=params_acm%geometry_string )
-        params_acm%geometry_colors(:) = 1
+        ! make colors to be steadily increasing from 0
+        do i=1,params_acm%n_geometries
+            params_acm%geometry_colors(i) = i - 1
+        enddo
         call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_acm%geometry_colors, defaultvalue=params_acm%geometry_colors )
     endif
     

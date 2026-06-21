@@ -285,7 +285,7 @@ contains
         allocate(params_acm%geometry_files(1))
         allocate(params_acm%geometry_colors(1))
         params_acm%geometries(1) = params_acm%geometry_legacy
-        params_acm%geometry_colors(:) = 0
+        params_acm%geometry_colors(:) = 1
     else
         call read_param_mpi(FILE, 'VPM', 'n_geometries', params_acm%n_geometries, 1)
         allocate(params_acm%geometries(params_acm%n_geometries))
@@ -293,16 +293,16 @@ contains
         allocate(params_acm%geometry_colors(params_acm%n_geometries))
         params_acm%geometries(:) = "none"
         call read_param_mpi(FILE, 'VPM', 'geometries', params_acm%geometries, defaultvalue=params_acm%geometries )
-        params_acm%geometry_files = ""
-        params_acm%geometry_string = ""
-        call read_param_mpi(FILE, 'VPM', 'geometry_files', params_acm%geometry_files, defaultvalue=params_acm%geometry_files )
-        call read_param_mpi(FILE, 'VPM', 'geometry_string', params_acm%geometry_string, defaultvalue=params_acm%geometry_string )
-        ! make colors to be steadily increasing from 0
-        do i=1,params_acm%n_geometries
-            params_acm%geometry_colors(i) = i - 1
-        enddo
-        call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_acm%geometry_colors, defaultvalue=params_acm%geometry_colors )
     endif
+    params_acm%geometry_files = ""
+    params_acm%geometry_string = ""
+    call read_param_mpi(FILE, 'VPM', 'geometry_files', params_acm%geometry_files, defaultvalue=params_acm%geometry_files )
+    call read_param_mpi(FILE, 'VPM', 'geometry_string', params_acm%geometry_string, defaultvalue=params_acm%geometry_string )
+    ! make colors to be steadily increasing from 0
+    do i=1,params_acm%n_geometries
+        params_acm%geometry_colors(i) = i
+    enddo
+    call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_acm%geometry_colors, defaultvalue=params_acm%geometry_colors )
     
     ! fixed geometry parameters. They are read only once and are the same for all geometries
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
@@ -544,10 +544,10 @@ contains
             call get_insect_id( i, insect_id )
             if (params_acm%set_mask_on_ghost_nodes) then
                 call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
-                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_acm%n_geometries + 5*(insect_id-1),params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1), params_acm%geometry_colors(i)/))
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1),params_acm%n_geometries+5+5*(insect_id-1), params_acm%geometry_colors(i)/))
             else
                 call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
-                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_acm%n_geometries + 5*(insect_id-1),params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1), params_acm%geometry_colors(i)/))
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1),params_acm%n_geometries+5+5*(insect_id-1), params_acm%geometry_colors(i)/))
             endif
 
             ! compute maximum color
@@ -591,7 +591,7 @@ contains
     enddo
 
     ! now initialze force arrays for colors at last, because we know how many colors we have
-    allocate( params_acm%force_color(1:3, 0:ncolors), params_acm%moment_color(1:3, 0:ncolors), params_acm%mask_volume(0:ncolors) )
+    allocate( params_acm%force_color(1:3, 1:ncolors), params_acm%moment_color(1:3, 1:ncolors), params_acm%mask_volume(1:ncolors) )
 
     params_acm%initialized = .true.
   end subroutine READ_PARAMETERS_ACM
@@ -869,11 +869,11 @@ contains
 
             call init_insect_data(overwrite)
         endif
-        do i_color = 0, ncolors
-            write(headers(i_color+2),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+        do i_color = 1, ncolors
+            write(headers(i_color+1),"(A,i0.3,A)") "c", i_color, ":mask_volume"
         enddo
-        headers(ncolors+3) = "sponge_volume"
-        call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+3) )
+        headers(ncolors+2) = "sponge_volume"
+        call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+2) )
         call init_t_file('u_residual.t', overwrite)
         call init_t_file('forces_rk.t', overwrite)
         call init_t_file('penal_power.t', overwrite, (/&

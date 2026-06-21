@@ -172,6 +172,7 @@ subroutine post_dry_run
         write(headers(k+2),"(A,i0.3,A)") "c", k, ":mask_volume"
     end do
     headers(23) = "sponge_volume"
+    call init_t_file( 'mask_volume.t', overwrite=.true., header=headers(1:23) )
 
     !-----------------------------------
     call init_insect_data(overwrite=.true.)

@@ -99,14 +99,12 @@ contains
         if (.not. exists .or. overwrite) then
             open (55, file=fname, status='replace')
             if (present(header)) then
-                ! make format string
-                write(format, '(A,i3.3,A,A,A)') "('%',", size(header,1)-1, "(A,'", tfile_separator, "'),A)"  ! note: last column is written without comma at the end
                 ! write header
                 write(55, '(A,A)', advance='no') '% ', trim(adjustl(header(1)))
                 do i_column = 2, size(header,1)
                     write(55, '(A,A)', advance='no') tfile_separator, trim(adjustl(header(i_column)))
                 end do
-                write(55,*) ""  ! new line after header
+                write(55,'(A)') ""  ! new line after header
             endif
             close(55)
         endif

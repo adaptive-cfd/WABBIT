@@ -277,7 +277,7 @@ contains
         allocate(params_nspp%geometry_files(1))
         allocate(params_nspp%geometry_colors(1))
         params_nspp%geometries(1) = params_nspp%geometry_legacy
-        params_nspp%geometry_colors(:) = 0
+        params_nspp%geometry_colors(:) = 1
     else
         call read_param_mpi(FILE, 'VPM', 'n_geometries', params_nspp%n_geometries, 1)
         allocate(params_nspp%geometries(params_nspp%n_geometries))
@@ -285,16 +285,16 @@ contains
         allocate(params_nspp%geometry_colors(params_nspp%n_geometries))
         params_nspp%geometries(:) = "none"
         call read_param_mpi(FILE, 'VPM', 'geometries', params_nspp%geometries, defaultvalue=params_nspp%geometries )
-        params_nspp%geometry_files = ""
-        params_nspp%geometry_string = ""
-        call read_param_mpi(FILE, 'VPM', 'geometry_files', params_nspp%geometry_files, defaultvalue=params_nspp%geometry_files )
-        call read_param_mpi(FILE, 'VPM', 'geometry_string', params_nspp%geometry_string, defaultvalue=params_nspp%geometry_string )
-        ! make colors to be steadily increasing from 0
-        do i=1,params_nspp%n_geometries
-            params_nspp%geometry_colors(i) = i - 1
-        enddo
-        call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_nspp%geometry_colors, defaultvalue=params_nspp%geometry_colors )
     endif
+    params_nspp%geometry_files = ""
+    params_nspp%geometry_string = ""
+    call read_param_mpi(FILE, 'VPM', 'geometry_files', params_nspp%geometry_files, defaultvalue=params_nspp%geometry_files )
+    call read_param_mpi(FILE, 'VPM', 'geometry_string', params_nspp%geometry_string, defaultvalue=params_nspp%geometry_string )
+    ! make colors to be steadily increasing from 0
+    do i=1,params_nspp%n_geometries
+        params_nspp%geometry_colors(i) = i
+    enddo
+    call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_nspp%geometry_colors, defaultvalue=params_nspp%geometry_colors )
     
     ! fixed geometry parameters. They are read only once and are the same for all geometries
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_nspp%x_cntr, (/0.5*params_nspp%domain_size(1), 0.5*params_nspp%domain_size(2), 0.5*params_nspp%domain_size(3)/)  )
@@ -328,8 +328,8 @@ contains
     enddo
 
     ! stuff for channel flow
-    call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_nspp%use_channel_forcing, .false. )
-    call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_nspp%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
+    call read_param_mpi(FILE, 'nspp-new', 'use_channel_forcing', params_nspp%use_channel_forcing, .false. )
+    call read_param_mpi(FILE, 'nspp-new', 'u_mean_set', params_nspp%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'VPM', 'h_channel', params_nspp%h_channel, 0.25_rk)
 
     do i=1,params_nspp%n_geometries
@@ -530,10 +530,10 @@ contains
             call get_insect_id( i, insect_id )
             if (params_nspp%set_mask_on_ghost_nodes) then
                 call insect_init( params_nspp%start_time, filename, insect_id, params_nspp%read_from_files, "", params_nspp%domain_size, &
-                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_nspp%n_geometries + 5*(insect_id-1),params_nspp%n_geometries+1+5*(insect_id-1),params_nspp%n_geometries+2+5*(insect_id-1),params_nspp%n_geometries+3+5*(insect_id-1),params_nspp%n_geometries+4+5*(insect_id-1), params_nspp%geometry_colors(i)/))
+                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_nspp%n_geometries+1+5*(insect_id-1),params_nspp%n_geometries+2+5*(insect_id-1),params_nspp%n_geometries+3+5*(insect_id-1),params_nspp%n_geometries+4+5*(insect_id-1),params_nspp%n_geometries+5+5*(insect_id-1), params_nspp%geometry_colors(i)/))
             else
                 call insect_init( params_nspp%start_time, filename, insect_id, params_nspp%read_from_files, "", params_nspp%domain_size, &
-                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_nspp%n_geometries + 5*(insect_id-1),params_nspp%n_geometries+1+5*(insect_id-1),params_nspp%n_geometries+2+5*(insect_id-1),params_nspp%n_geometries+3+5*(insect_id-1),params_nspp%n_geometries+4+5*(insect_id-1), params_nspp%geometry_colors(i)/))
+                params_nspp%nu, params_nspp%C_eta, dx_min, params_nspp%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_nspp%n_geometries+1+5*(insect_id-1),params_nspp%n_geometries+2+5*(insect_id-1),params_nspp%n_geometries+3+5*(insect_id-1),params_nspp%n_geometries+4+5*(insect_id-1),params_nspp%n_geometries+5+5*(insect_id-1), params_nspp%geometry_colors(i)/))
             endif
 
             ! compute maximum color
@@ -577,7 +577,7 @@ contains
     enddo
 
     ! now initialze force arrays for colors at last, because we know how many colors we have
-    allocate( params_nspp%force_color(1:3, 0:ncolors), params_nspp%moment_color(1:3, 0:ncolors), params_nspp%mask_volume(0:ncolors) )
+    allocate( params_nspp%force_color(1:3, 1:ncolors), params_nspp%moment_color(1:3, 1:ncolors), params_nspp%mask_volume(1:ncolors) )
 
     params_nspp%initialized = .true.
   end subroutine READ_PARAMETERS_NSPP
@@ -620,7 +620,7 @@ contains
     dim = params_nspp%dim
 
     ! NSPP: only convective velocity matters (no acoustic waves, pressure is elliptic)
-    ! In contrast to ACM, there are no fast modes with velocity u
+    ! In contrast to nspp, there are no fast modes with velocity u
     ! The pressure Poisson equation is solved implicitly and has no time-step restriction
     ! Compute maximum velocity magnitude directly
     if (params_nspp%dim == 2) then
@@ -851,11 +851,11 @@ contains
 
             call init_insect_data(overwrite)
         endif
-        do i_color = 0, ncolors
-            write(headers(i_color+2),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+        do i_color = 1, ncolors
+            write(headers(i_color+1),"(A,i0.3,A)") "c", i_color, ":mask_volume"
         enddo
-        headers(ncolors+3) = "sponge_volume"
-        call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+3) )
+        headers(ncolors+2) = "sponge_volume"
+        call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+2) )
         call init_t_file('u_residual.t', overwrite)
         call init_t_file('forces_rk.t', overwrite)
         call init_t_file('penal_power.t', overwrite, (/&

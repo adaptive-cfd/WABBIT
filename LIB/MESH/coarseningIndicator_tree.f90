@@ -311,7 +311,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! check mask function, if it is used as secondary criterion. This criterion
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except for dealiasing, because all blocks on Jmax are coarsened)
-    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and.indicator/='undo_refinement') then
+    if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/='undo_refinement') then
         call coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel )
     endif
 

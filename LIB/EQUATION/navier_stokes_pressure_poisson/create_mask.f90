@@ -346,7 +346,7 @@ subroutine geometry_indicator_nspp( time, Bs, g, x0, dx, refinement_status, stag
         refinement_status = 0  ! defaults to not refine
     elseif (stage == "coarsening") then
         set_refinement = 0
-        refinement_status = -1  ! defaults to refine
+        refinement_status = -1  ! defaults to coarsen
     else
         call abort(260617, "unknown request to geometry_indicator_nspp")
     endif

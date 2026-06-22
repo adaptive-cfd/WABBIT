@@ -48,13 +48,6 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! initialize it here:
     call setup_wavelet(params)
 
-    ! ! this is a HACK
-    ! if (params%physics_type == 'ACM-new' .or. params%physics_type == 'NSPP') then
-    !     tmp = params%threshold_mask
-    !     params%threshold_mask = .true.
-    !     if (.not. params%penalization) params%threshold_mask = .false.
-    ! endif
-
     ! choose between reading from files and creating datafields analytically
     if (params%read_from_files) then
         if (params%rank==0) write(*,'(A)') "INIT: Initial condition is read from file!"
@@ -87,11 +80,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         if (adapt) then
             ! now, evaluate the coarsening criterion on each block, and coarsen the grid where possible.
             ! adapt-mesh also performs neighbor and active lists updates
-            if (present(hvy_mask) .and. params%threshold_mask) then
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
-            else
-                call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_work=hvy_work)
-            endif
+            call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
 
             iter = iter + 1
             if (params%rank == 0) then
@@ -203,11 +192,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! adapt-mesh also performs neighbor and active lists updates
                     ! NOTE: the grid adaptation can take the mask function into account (such that the fluid/solid
                     ! interface is on the finest level).
-                    if (present(hvy_mask) .and. params%threshold_mask) then
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
-                    else
-                        call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_work=hvy_work)
-                    endif
+                    call adapt_tree( time, params, hvy_block, tree_ID, params%coarsening_indicator_inicond, hvy_tmp, hvy_mask=hvy_mask, hvy_work=hvy_work)
 
                     iter = iter + 1
                     if (params%rank == 0) then
@@ -313,11 +298,6 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         maxActiveLevel_tree(tree_ID)
         write(*,'("Initial grid and initial condition terminated.")')
         write(*,'(40("╼╾"))')
-    endif
-
-    ! HACK
-    if (params%physics_type == 'ACM-new' .or. params%physics_type == 'NSPP') then
-        params%threshold_mask = tmp
     endif
 
     call MPI_barrier(WABBIT_COMM, k)

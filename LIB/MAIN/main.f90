@@ -418,22 +418,10 @@ program main
         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_tree ) then
-            ! some coarsening indicators require us to know the mask function (if
-            ! it is considered as secondary criterion, e.g.). Creating the mask is a high-level
-            ! routine that relies on forests and pruned trees, which are not available in the module_mesh.
-            ! Hence the mask is created here.
-            if (params%threshold_mask) then
-                ! create mask function at current time
-                call createMask_tree(params, time, hvy_mask, hvy_tmp)
-
-                ! actual coarsening (including the mask function)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_mask=hvy_mask, hvy_work=hvy_work)
-            else
-                ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_work=hvy_work)
-            endif
+            ! actual coarsening (including the mask function)
+            ! if we adapt after the mask as well, the mask is created in adapt_tree
+            call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                hvy_mask=hvy_mask, hvy_work=hvy_work)
         endif
         call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)

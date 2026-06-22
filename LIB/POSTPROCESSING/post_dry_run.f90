@@ -25,7 +25,7 @@ subroutine post_dry_run
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename, fname, grid_list, headers(1:100)
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz
-    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(0:100), sponge_volume
+    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, include_tfinal
     type(inifile) :: FILE
 
@@ -261,6 +261,7 @@ subroutine post_dry_run
             call write_insect_data(time)
 
             ! we compute the mask (and sponge) volume for each color and write it to a file
+            mask_volume(:) = 0.0_rk
             do k=1,hvy_n(tree_ID_flow)
                 hvy_id = hvy_active(k,tree_ID_flow)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)

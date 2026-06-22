@@ -20,6 +20,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
 
     ! loop variable
     integer(kind=ik)      :: k, lgt_id, hvy_id
+    integer(kind=ik)      :: time_sec, time_frac
     ! file name
     character(len=cshort) :: fname, tmp
     ! cpu time variables for running time calculation
@@ -93,7 +94,16 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         if (params%use_iteration_as_fileid) then
           write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
         else
-          write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+          ! write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+            time_sec  = int(time)
+            time_frac = nint((time - real(time_sec, kind=rk)) * 1.0e6_rk)
+
+            if (time_frac == 1000000) then
+                time_sec  = time_sec + 1
+                time_frac = 0
+            endif
+
+            write(fname,'(a, "_", i6.6, i6.6, ".h5")') trim(adjustl(tmp)), time_sec, time_frac
         endif
 
         ! actual writing

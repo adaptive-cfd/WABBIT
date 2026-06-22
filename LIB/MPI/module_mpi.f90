@@ -148,10 +148,13 @@ subroutine init_ghost_nodes( params )
             write(*,'("GHOST-INIT: g= ",i2, " , g_RHS= ", i2)') params%g, params%g_rhs
         endif
 
-        if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. (g>=(Bs(3)+1)/2 .and. params%dim==3)) then
-            call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
-            & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
-            & number_ghost_nodes or increase number_block_nodes.")
+        if (params%Jmax>params%Jmin) then 
+            ! if thats not the case, the run is equidistant
+            if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. (g>=(Bs(3)+1)/2 .and. params%dim==3)) then
+                call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
+                & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
+                & number_ghost_nodes or increase number_block_nodes.")
+            endif
         endif
 
 #ifdef DEV

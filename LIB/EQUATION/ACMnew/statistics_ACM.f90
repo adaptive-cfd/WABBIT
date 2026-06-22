@@ -47,7 +47,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: force_block(1:3, 0:ncolors), moment_block(1:3, 0:ncolors), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal=0.0_rk, apowtotal=0.0_rk
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
-    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0, V_channel
+    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0
+    real(kind=rk) :: V_channel, u_bulk, tol, weight_trapez, y_lower, y_upper
     real(kind=rk), dimension(3) :: dxyz
     real(kind=rk), dimension(1:3,1:5) :: iwmoment
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
@@ -271,16 +272,26 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
             meanflow_block(3) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
 
+            tol = 1.0e-12_rk
+            y_lower = params_acm%h_channel
+            y_upper = params_acm%domain_size(2) - params_acm%h_channel
+
             ! relevant in 3D only
             if (params_acm%use_channel_forcing) then
                 do iy = g+1, Bs(2)+g
                     y = x0(2) + dble(iy-(g+1)) * dx(2)
 
-                    ! exclude channel walls
-                    if (( y>params_acm%h_channel).and.(y<params_acm%domain_size(2)-params_acm%h_channel)) then
-                        meanflow_channel_block(1) = meanflow_channel_block(1) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
-                        meanflow_channel_block(2) = meanflow_channel_block(2) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
-                        meanflow_channel_block(3) = meanflow_channel_block(3) + sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
+                    if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
+
+                        if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
+                            weight_trapez = 0.5_rk
+                        else
+                            weight_trapez = 1.0_rk
+                        endif
+
+                        meanflow_channel_block(1) = meanflow_channel_block(1) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
+                        meanflow_channel_block(2) = meanflow_channel_block(2) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
+                        meanflow_channel_block(3) = meanflow_channel_block(3) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
                     endif
                 enddo
             endif
@@ -434,7 +445,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! mean flow but only in fluid domain
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%meanflow_channel, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
-            V_channel = params_acm%domain_size(1)*params_acm%domain_size(3)*(params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)
+            ! include one additional grid spacing in y because the mean flow is averaged
+            ! over all discrete channel layers including both wall-aligned grid points
+            V_channel = params_acm%domain_size(1) * params_acm%domain_size(3) * (params_acm%domain_size(2) - 2.0_rk*params_acm%h_channel)
             params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
         endif
 

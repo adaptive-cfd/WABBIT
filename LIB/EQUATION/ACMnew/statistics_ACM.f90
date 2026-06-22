@@ -415,6 +415,19 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%ACM_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
+
+        ! energy limiter (used for testing operator instability). If active, kills the simulation
+        ! if current energy exceeds 2.1 times the initial one.
+        if ( params_acm%use_energy_limiter) then
+            if (time<=1.0e-6_rk) then
+                params_acm%energy_start = params_acm%ACM_energy
+            elseif ((time>1.0e-4_rk).and.(params_acm%ACM_energy>0.0_rk)) then
+                if (params_acm%ACM_energy > 2.1_rk * params_acm%energy_start ) then
+                    call abort(888888, "Energy is doubled, leaving.")
+                endif
+            endif
+        endif
+
         !-------------------------------------------------------------------------
         ! divergence
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)

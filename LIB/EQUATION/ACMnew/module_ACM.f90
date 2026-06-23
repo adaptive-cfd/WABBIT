@@ -565,6 +565,11 @@ contains
 
             ! compute maximum color
             ncolors = max( ncolors, int(maxval((/ insects(insect_id)%color_body, insects(insect_id)%color_l, insects(insect_id)%color_r, insects(insect_id)%color_l2, insects(insect_id)%color_r2/)), kind=ik) )
+
+            ! check if this insect is in free-flight mode but we did not activate free flight for physics
+            if (.not. params_acm%use_free_flight_solver .and. strings_are_similar(insects(insect_id)%BodyMotion, "free_flight")) then
+                call abort(62371118, "You seem to use an insect in free-flight mode, but you did not activate the free-flight solver in the physics settings. Please check your ini-file.")
+            endif
         endif
 
         if (params_acm%geometries(i)=="2D-wingsection" .or. params_acm%geometries(i)=="two-moving-cylinders") then

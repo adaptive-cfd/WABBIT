@@ -130,7 +130,7 @@ subroutine post_add_two_masks(params)
 
     call createActiveSortedLists_forest(params)
 
-    select case(standardize_string(mode))
+    select case(trim(standardize_string(mode)))
     case ("--noise-like-grid1")
         do k = 1, hvy_n(1)
             hvy_id = hvy_active(k, 1)

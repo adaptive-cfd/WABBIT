@@ -90,13 +90,13 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     if (present(nrhs_slots1)) then
         nrhs_slots = nrhs_slots1
     else
-        if (params%time_step_method == "RungeKuttaGeneric".or.params%time_step_method == "RungeKuttaGeneric-FSI") then
+        if (strings_are_similar(params%time_step_method, "rungekuttageneric") .or. strings_are_similar(params%time_step_method, "rungekuttageneric-fsi")) then
             nrhs_slots = size(params%butcher_tableau,1)
-        elseif (params%time_step_method == "RungeKuttaChebychev".or.params%time_step_method == "RungeKuttaChebychev-FSI") then
+        elseif (strings_are_similar(params%time_step_method, "rungekuttachebychev") .or. strings_are_similar(params%time_step_method, "rungekuttachebychev-fsi")) then
             nrhs_slots = 6
-        elseif (params%time_step_method == "Krylov") then
+        elseif (strings_are_similar(params%time_step_method, "krylov")) then
             nrhs_slots = params%M_krylov +3
-        elseif ((params%time_step_method == 'none').or.(params%time_step_method == 'no')) then
+        elseif ((strings_are_similar(params%time_step_method, 'none').or.strings_are_similar(params%time_step_method, 'no'))) then
             nrhs_slots = 0
         else
             call abort(191018161, "time_step_method is unkown: "//trim(adjustl(params%time_step_method)))

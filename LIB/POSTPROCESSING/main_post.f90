@@ -44,7 +44,7 @@ program main_post
     call get_command_argument( 1, mode )
     if (rank==0) write(*,'("Starting postprocessing in ", a20, " mode")') mode
 
-    select case(standardize_string(mode))
+    select case(trim(standardize_string(mode)))
     case ("--wing-pressure-interpolation")
         call post_pressure_interpolation(params)
         

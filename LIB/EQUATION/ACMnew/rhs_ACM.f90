@@ -53,7 +53,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     real(kind=rk), allocatable, save :: vor(:,:,:,:)
     integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_inv, x, y, z, f_block(1:3)
+    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), x, y, z, f_block(1:3), C_eta_apply(1:ncolors)
     integer(kind=2) :: color
     integer(kind=ik) :: i_insect
 
@@ -71,18 +71,23 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     ! to its final value (small, say C_eta=1e-4) thus drastically increases the shock width. The shock intensity decays as R^-1 (2D) or 
     ! R^-2 (3D), but even in 3D it can still require resolution of the shock wave that can be expensive.
     if (params_acm%soft_penalization_startup) then
-        if (time < params_acm%penalization_startup_tau) then
+        if (time < params_acm%penalization_startup_time) then
+            params_acm%C_eta_temp = params_acm%C_eta_start
+        elseif (time < params_acm%penalization_startup_time + params_acm%penalization_startup_tau) then
             ! the formulation with EXP seems to be more efficient in damping the initial shock wave; 2D tests showed that nicely.
             ! The new defaults are C_eta_start = 1.0  and  penalization_startup_tau=0.20. Note relatively long before this time the penalization
             ! is (almost) completely activated because of the exponential decay
-            params_acm%C_eta = params_acm%C_eta_const + params_acm%C_eta_start*exp(-20.0*time/params_acm%penalization_startup_tau)
+            ! Min is used to cap the exponential to 1.0, so that nothing is happening before the startup time
+            params_acm%C_eta_temp = params_acm%C_eta + (params_acm%C_eta_start - params_acm%C_eta)*min(exp(-20.0*(time-params_acm%penalization_startup_time)/params_acm%penalization_startup_tau), 1.0_rk)
         else
             ! constant value of C_eta after the startup phase
-            params_acm%C_eta = params_acm%C_eta_const    
+            params_acm%C_eta_temp = params_acm%C_eta
         endif
+        C_eta_apply = params_acm%C_eta
+        C_eta_apply(params_acm%penalization_startup_colors:) = params_acm%C_eta_temp
     else
         ! constant value of C_eta
-        params_acm%C_eta = params_acm%C_eta_const
+        C_eta_apply = params_acm%C_eta
     endif
 
     select case(stage)
@@ -166,7 +171,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         if (params_acm%use_free_flight_solver) then
             if (dim == 2) then
                 dV = dx(1)*dx(2)
-                C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
                 do i_insect = 1, n_insects
@@ -181,7 +185,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                             ! exclude walls, trees, etc... (they have color 0)
                             ! if (color>0_2 .and. color < 6_2) then
                             ! penalization term
-                            penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) * C_eta_inv
+                            penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) / C_eta_apply(color)
 
                             f_block = f_block - penal
                             f_block(3) = 0.0_rk
@@ -198,7 +202,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 enddo
             else
                 dV = dx(1)*dx(2)*dx(3)
-                C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
                 do i_insect = 1, n_insects
@@ -213,9 +216,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                                 color = int( mask(ix, iy, iz, 5), kind=2 )
 
                                 ! exclude walls, trees, etc... (they have color 0)
-                                if (color>0_2 .and. color < 6_2) then
+                                if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
                                     ! penalization term
-                                    penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+                                    penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) / C_eta_apply(color)
 
                                     f_block = f_block - penal
 
@@ -344,15 +347,14 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
     !>
-    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta, C_eta_inv, gamma
+    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta_apply(1:ncolors), gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, u_dxdy, v_dx, v_dy, v_dxdx, v_dxdy, &
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, nu_bulk, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     C_sponge_inv, &
                      up_dx, vp_dy
     ! loop variables
-    integer(kind=ik) :: ix, iy, idir
+    integer(kind=ik) :: ix, iy, idir, color
     ! coefficients for Tam&Webb (4th order 1st derivative), see T&W 1993 - Dispersion- Relation- Preserving FD schemes for Computational Acoustics
     real(kind=rk), parameter :: a_TW4(-3:3) = (/-0.02651995_rk, +0.18941314_rk, -0.79926643_rk, 0.0_rk, 0.79926643_rk, -0.18941314_rk, 0.02651995_rk/)
     ! coefficients for Tam&Webb revised (4th order 1st derivative), see T&W 1993 - Direct Computation of Nonlinear Acoustic Pulses using High Order FD schemes
@@ -375,7 +377,6 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     nu          = params_acm%nu
     nu_p        = params_acm%nu_p
     nu_bulk     = params_acm%nu_bulk
-    C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
     dx_inv = 1.0_rk / dx(1)
@@ -383,7 +384,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
 
-    C_eta_inv = 1.0_rk / C_eta
+    ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
+    C_eta_apply = params_acm%C_eta
+    C_eta_apply(params_acm%penalization_startup_colors:) = params_acm%C_eta_temp
 
     if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)<params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
         write(write_statement, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') "phi size: ", size(phi,1), " x ", size(phi,2), " x ", size(phi,3), " expected: ", Bs(1)+2*g, " x ", Bs(2)+2*g, " x ", params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics
@@ -422,8 +425,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Rhs in skew-symmetric formulation (of nonlinear term)
                     ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
@@ -452,8 +457,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! actual RHS. note mean flow forcing is just a constant and added at the end of the routine
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
@@ -494,8 +501,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -529,8 +538,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     v_dydy = (b_FD4(-2)*phi(ix,iy-2,2) + b_FD4(-1)*phi(ix,iy-1,2) + b_FD4(0)*phi(ix,iy,2) + b_FD4(+1)*phi(ix,iy+1,2) + b_FD4(+2)*phi(ix,iy+2,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -576,8 +587,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     ! usz (:,:,4)
                     ! color (.;.5)
                     ! sponge (:,:,6)
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Rhs in skew-symmetric formulation (of nonlinear term)
                     ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
@@ -614,9 +626,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     ! usz (:,:,4)
                     ! color (.;.5)
                     ! sponge (:,:,6)
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
-    
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
+
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
                     rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
@@ -728,8 +741,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) +b_FD6(-2)*phi(ix,iy-2,2) +b_FD6(-1)*phi(ix,iy-1,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix,iy+1,2) +b_FD6(+2)*phi(ix,iy+2,2) +b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                                        ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Rhs in skew-symmetric formulation (of nonlinear term)
                     ! see Reiss, J. A Family of Energy Stable, Skew-Symmetric Finite Difference Schemes on Collocated Grids. J Sci Comput 65, 821–838 (2015).
@@ -759,8 +774,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     v_dydy = (b_FD6(-3)*phi(ix,iy-3,2) +b_FD6(-2)*phi(ix,iy-2,2) +b_FD6(-1)*phi(ix,iy-1,2) +b_FD6( 0)*phi(ix,iy,2) +b_FD6(+1)*phi(ix,iy+1,2) +b_FD6(+2)*phi(ix,iy+2,2) +b_FD6(+3)*phi(ix,iy+3,2))*dy2_inv
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
                     rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
@@ -825,8 +842,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     div_U = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1)) * dx_inv + &
                             sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,2)) * dy_inv
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Skew-symmetric formulation
                     rhs(ix,iy,1) = -0.5_rk*(uu_dx + uv_dy   + phi(ix,iy,1)*u_dx + phi(ix,iy,2)*u_dy ) -p_dx + nu*(u_dxdx + u_dydy ) + penalx
@@ -858,8 +877,10 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
                     div_U = u_dx + v_dy
 
-                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
-                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+                    ! get this points color
+                    color = int( mask(ix, iy, 5), kind=2 )
+                    penalx = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) / C_eta_apply(color) * (phi(ix,iy,2) -mask(ix,iy,3))
 
                     ! Standard formulation
                     rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
@@ -877,14 +898,12 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! HACK
     if (all(params_acm%geometries(:) /= "lamballais") .or. all(params_acm%geometries(:) /= "lamballais-local")) then 
         if (params_acm%use_sponge) then
-            ! avoid division by multiplying with inverse
-            C_sponge_inv = 1.0_rk / params_acm%C_sponge
 
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
-                    spo = mask(ix,iy,6) * C_sponge_inv
+                    spo = mask(ix,iy,6) / params_acm%C_sponge
 
                     rhs(ix,iy,1) = rhs(ix,iy,1) - (phi(ix,iy,1)-params_acm%u_mean_set(1)) * spo
                     rhs(ix,iy,2) = rhs(ix,iy,2) - (phi(ix,iy,2)-params_acm%u_mean_set(2)) * spo
@@ -900,17 +919,16 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         ! use same C_eta_ring as object, not the sponge value. Note C_eta_ring=C_eta usually, but in the local variation
         ! case we can set the inner cylinder and the outer ring with two different C_eta values. The default is C_eta_ring=C_eta simply.
         ! The whole ring (ux,uy,p) is penalized here and not inside the RHS function using mask(:,:,1) (the obstacle mask).
-        C_sponge_inv = 1.0_rk / params_acm%C_eta_ring
         do iy = g+1, Bs(2)+g
             do ix = g+1, Bs(1)+g
                 ! mask(:,:,4) contains p_ref forcing in the ring
                 ! rhs_p      = rhsp         - chi_ring     *( p          - p_lamballais) / C_eta
                 ! ux
-                rhs(ix,iy,1) = rhs(ix,iy,1) - mask(ix,iy,6)*(phi(ix,iy,1)-mask(ix,iy,2))*C_sponge_inv
+                rhs(ix,iy,1) = rhs(ix,iy,1) - mask(ix,iy,6)*(phi(ix,iy,1)-mask(ix,iy,2)) / params_acm%C_sponge
                 ! uy
-                rhs(ix,iy,2) = rhs(ix,iy,2) - mask(ix,iy,6)*(phi(ix,iy,2)-mask(ix,iy,3))*C_sponge_inv
+                rhs(ix,iy,2) = rhs(ix,iy,2) - mask(ix,iy,6)*(phi(ix,iy,2)-mask(ix,iy,3)) / params_acm%C_sponge
                 ! pressure
-                rhs(ix,iy,3) = rhs(ix,iy,3) - mask(ix,iy,6)*(phi(ix,iy,3)-mask(ix,iy,4))*C_sponge_inv
+                rhs(ix,iy,3) = rhs(ix,iy,3) - mask(ix,iy,6)*(phi(ix,iy,3)-mask(ix,iy,4)) / params_acm%C_sponge
             enddo
         enddo
     endif
@@ -960,16 +978,16 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
-                     nu, C_eta, C_eta_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
+                     nu, C_eta_apply(1:ncolors), gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
     real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, u_dxdy, u_dxdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, v_dxdy, v_dydz, &
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, w_dxdz, w_dydz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz, div_u
+                     p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz, div_u
     !> loop variables
-    integer(kind=ik) :: ix, iy, iz
+    integer(kind=ik) :: ix, iy, iz, color
 
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
@@ -995,7 +1013,6 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! set parameters for readability
     c_0         = params_acm%c_0
     nu          = params_acm%nu
-    C_eta       = params_acm%C_eta
     gamma       = params_acm%gamma_p
 
     dx_inv = 1.0_rk / dx(1)
@@ -1006,7 +1023,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     dy2_inv = 1.0_rk / (dx(2)**2)
     dz2_inv = 1.0_rk / (dx(3)**2)
 
-    C_eta_inv = 1.0_rk / C_eta
+    ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
+    C_eta_apply = params_acm%C_eta
+    C_eta_apply(params_acm%penalization_startup_colors:) = params_acm%C_eta_temp
 
     select case(order_discretization)
     case("FD_2nd_central")
@@ -1064,7 +1083,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1117,7 +1136,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1)  / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1186,7 +1205,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1238,7 +1257,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
     
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1391,7 +1410,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1441,7 +1460,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1506,7 +1525,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
     
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1554,7 +1573,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix, iy, iz, 3)
                         p = phi(ix, iy, iz, 4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1605,7 +1624,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix,iy,iz,3)
                         p = phi(ix,iy,iz,4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1676,7 +1695,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w = phi(ix,iy,iz,3)
                         p = phi(ix,iy,iz,4)
 
-                        chi = mask(ix,iy,iz,1) * C_eta_inv
+                        chi = mask(ix,iy,iz,1) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         penalx = -chi * (u - mask(ix,iy,iz,2))
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
@@ -1729,16 +1748,13 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! sponge term.
     ! --------------------------------------------------------------------------
     if (params_acm%use_sponge) then
-        ! avoid division by multiplying with inverse
-        C_sponge_inv = 1.0_rk / params_acm%C_sponge
-
         do iz = g+1, Bs(3)+g
             do iy = g+1, Bs(2)+g
                 do ix = g+1, Bs(1)+g
                     ! NOTE: the sponge term acts, if active, on ALL components, ux,uy,p
                     ! which is different from the penalization term, which acts only on ux,uy and not p
                     ! NOTE: sponge mask set in hvy_mask
-                    spo = mask(ix,iy,iz,6) * C_sponge_inv
+                    spo = mask(ix,iy,iz,6) / params_acm%C_sponge
 
                     rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1)-params_acm%u_mean_set(1)) * spo
                     rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2)-params_acm%u_mean_set(2)) * spo
@@ -1811,7 +1827,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
-    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq
+    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply(1:ncolors)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
     real(kind=rk) :: ux, uy, uz,&
     usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
@@ -1831,6 +1847,10 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     dz2_inv = 1.0_rk / (dx(3)**2)
 
     nu = params_acm%nu
+
+    ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
+    C_eta_apply = params_acm%C_eta
+    C_eta_apply(params_acm%penalization_startup_colors:) = params_acm%C_eta_temp
 
     !-----------------------------------------------------------------------
     ! passive scalar equations: loop over all scalars and compute RHS
@@ -1867,9 +1887,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         if (masksource > 1.0d-6) then
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
-                            ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / params_acm%C_eta
-                            source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / params_acm%C_eta
-                            ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                            ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
+                            source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
+                            ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         endif
                     end do
                 end do
@@ -1888,7 +1908,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         if ( R <= R0sq ) then
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
-                            source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) / params_acm%C_eta
+                            source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         endif
                     end do
                 end do
@@ -1901,7 +1921,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         x = x0(1) + dble(ix-(g+1))*dx(1)
                         if ( x <= params_acm%widthsource(iscalar) ) then
                             ! INFLOW
-                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
                         endif
                     end do
                 end do
@@ -1914,11 +1934,11 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         x = x0(1) + dble(ix-(g+1))*dx(1)
                         if ( x <= params_acm%widthsource(iscalar) ) then
                             ! INFLOW
-                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
                         endif
                         if ( x >= params_acm%domain_size(1)-params_acm%widthsource(iscalar) ) then
                             ! OUTFLOW
-                            source(ix,iy,iz) = (0.0_rk - phi(ix,iy,iz,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                            source(ix,iy,iz) = (0.0_rk - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
                         endif
                     end do
                 end do
@@ -1943,7 +1963,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     do ix = g+1, Bs(1)+g
                         ! for the source term, we use the usual dirichlet C_eta
                         ! to force scalar to 1
-                        source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) / params_acm%C_eta
+                        source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) / params_acm%C_sponge
                     end do
                 end do
             enddo
@@ -2027,7 +2047,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         ! easy RHS for dirichlet BC
                         rhs(ix,iy,iz,j) = -ux*phi_dx -uy*phi_dy -uz*phi_dz &
                         + kappa*(phi_dxdx + phi_dydy + phi_dzdz) &
-                        - chi*(phi(ix,iy,iz,j) - 0.0_rk) / params_acm%C_eta & ! Dirichlet penalization for obstacle mask (instead of Neumann penalization)
+                        - chi*(phi(ix,iy,iz,j) - 0.0_rk) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) & ! Dirichlet penalization for obstacle mask (instead of Neumann penalization)
                         + source(ix, iy, iz) ! source term is actually a dirichlet penalization term as well
                     enddo
                 enddo
@@ -2076,7 +2096,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     integer(kind=ik) :: ix, iy, iscalar, j
 
-    real(kind=rk) :: kappa, x, y, masksource, nu, R
+    real(kind=rk) :: kappa, x, y, masksource, nu, R, C_eta_apply(1:ncolors)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv
     real(kind=rk) :: ux, uy, usx, usy, wx, wy, gx, gy, D, chi, chidx, chidy, D_dx, D_dy, gxx, gyy
     real(kind=rk) :: phi_dx, phi_dy, phi_dxdx, phi_dydy
@@ -2099,6 +2119,10 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     dy2_inv = 1.0_rk / (dx(2)**2)
 
     nu = params_acm%nu
+
+    ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
+    C_eta_apply = params_acm%C_eta
+    C_eta_apply(params_acm%penalization_startup_colors:) = params_acm%C_eta_temp
 
     !-----------------------------------------------------------------------
     ! passive scalar equations: loop over all scalars and compute RHS
@@ -2130,8 +2154,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     if (masksource > 1.0d-6) then
                         ! for the source term, we use the usual dirichlet C_eta
                         ! to force scalar to 1
-                        source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) / params_acm%C_eta
-                        ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / params_acm%C_eta
+                        source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
+                        ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                     endif
                 end do
             end do
@@ -2143,19 +2167,23 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     x = x0(1) + dble(ix-(g+1))*dx(1)
                     if ( x <= params_acm%widthsource(iscalar) ) then
                         ! INFLOW
-                        source(ix,iy,1) = (1.0_rk - phi(ix,iy,1,j)) / params_acm%C_eta ! for the source term, we use the usual dirichlet C_eta
+                        source(ix,iy,1) = (1.0_rk - phi(ix,iy,1,j)) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
 
                     elseif ( x >= params_acm%domain_size(1)-params_acm%widthsource(iscalar) ) then
                         ! OUTFLOW
-                        source(ix,iy,1) = (0.0_rk - phi(ix,iy,1,j)) / params_acm%C_eta
+                        source(ix,iy,1) = (0.0_rk - phi(ix,iy,1,j)) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
                     endif
                 end do
             end do
 
         case ("mask_color_emission")
-            where ( abs(mask(:,:,:,5) - params_acm%widthsource(iscalar)) <=1.0e-8 )
-                source = -mask(:,:,:,5)*(phi(:,:,:,j)-1.d0) / params_acm%C_eta
-            end where
+            do iy = g+1, Bs(2)+g
+                 do ix = g+1, Bs(1)+g
+                     if ( abs(mask(ix,iy,1,5) - params_acm%widthsource(iscalar)) <=1.0e-8 ) then
+                        source(ix,iy,1) = -mask(ix,iy,1,5)*(phi(ix,iy,1,j)-1.d0) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
+                     endif
+                 end do
+             end do
 
         case ("none", "empty")
             ! do nothing.
@@ -2172,7 +2200,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                 do ix = g+1, Bs(1)+g
                     ! for the source term, we use the usual dirichlet C_eta
                     ! to force scalar to 0
-                    source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / params_acm%C_eta
+                    source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
                 end do
             end do
         endif
@@ -2243,7 +2271,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     ! easy RHS for dirichlet BC
                     rhs(ix,iy,1,j) = -ux*phi_dx -uy*phi_dy &
                                    + kappa*(phi_dxdx + phi_dydy) &
-                                   - chi*(phi(ix,iy,1,j) - 0.0_rk) / params_acm%C_eta & ! Dirichlet penalization for obstacle mask
+                                   - chi*(phi(ix,iy,1,j) - 0.0_rk) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) ) & ! Dirichlet penalization for obstacle mask
                                    + source(ix, iy, 1) ! source term is actually a dirichlet penalization term as well
                 end do
             end do

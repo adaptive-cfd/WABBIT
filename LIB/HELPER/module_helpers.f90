@@ -1097,7 +1097,7 @@ contains
                 end if
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
                     write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
                 endif
 
@@ -1146,12 +1146,12 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302018, "Failed to convert to INTEGER.")
                 endif
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1204,12 +1204,12 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to DOUBLE.")
                 endif
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1279,13 +1279,13 @@ contains
                 elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.".or.args=="F".or.args=="f") then
                     value = .false.
                 else
-                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to LOGICAL.")
                 endif
 
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1296,7 +1296,7 @@ contains
                 value = .true.
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1306,7 +1306,7 @@ contains
 
         value = default
         if (rank == 0) then
-            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+            write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",L1," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
         endif
 
     end subroutine

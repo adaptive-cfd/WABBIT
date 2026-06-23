@@ -55,7 +55,8 @@ module module_nspp
   ! and the like. only visible here.
   type :: type_params_nspp
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
-    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, C_eta_ring, penalization_startup_tau
+    real(kind=rk) :: C_eta, beta, C_eta_temp, C_eta_start, C_eta_ring, penalization_startup_tau, penalization_startup_time
+    integer(kind=ik) :: penalization_startup_colors
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
     ! this is the force and moment that is applied on the insect from the fluid, it will be computed during RHS computations
     ! as it is computed by the physics module, it was designed to be a member of the physics module at first
@@ -262,11 +263,20 @@ contains
     call read_param_mpi(FILE, 'VPM', 'penalization', params_nspp%penalization, .true.)
     ! store the same value in two variables
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_nspp%C_eta, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'C_eta', params_nspp%C_eta_const, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_nspp%C_eta_start, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_nspp%C_eta_ring, params_nspp%C_eta)
-    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_nspp%penalization_startup_tau, 0.20_rk)
-    call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_nspp%soft_penalization_startup, .false.)
+    params_nspp%C_eta_temp = params_nspp%C_eta  ! C_eta is sometimes modified, so here we store the actual constant value
+    call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_nspp%soft_penalization_startup, .false.)  ! if soft_penalization is used at all
+    if (params_nspp%soft_penalization_startup) then
+        call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_nspp%penalization_startup_tau, 0.20_rk)  ! how long the penalization startup is happening
+        call read_param_mpi(FILE, 'VPM', 'penalization_startup_time', params_nspp%penalization_startup_time, 0.0_rk)  ! when the penalization startup starts
+        call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_nspp%C_eta_start, 1.0_rk)  ! the c_eta with which we start with soft-approach
+        call read_param_mpi(FILE, 'VPM', 'penalization_startup_colors', params_nspp%penalization_startup_colors, 1)  ! all colors >= this get the soft startup approach applied
+    else
+        params_nspp%penalization_startup_tau = 0.0_rk
+        params_nspp%penalization_startup_time = 0.0_rk
+        params_nspp%C_eta_start = params_nspp%C_eta_temp
+        params_nspp%penalization_startup_colors = 1
+    endif
+    call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_nspp%C_eta_ring, params_nspp%C_eta)  ! C_eta for ring in lamballais test-case
 
     ! geometry read_in: first we check if only one geometry should be set. This is in parity with the old ini-files
     ! if not, we read in an array of geometries and can sert in several geometry files or strings

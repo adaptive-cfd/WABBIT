@@ -24,7 +24,7 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
     if ( params_acm%penalization .eqv. .false.) then
-        mask = 0.0_rk
+        ! mask is reset outside of this routine, so we literally do nothing
         return
     endif
 
@@ -151,7 +151,7 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
             endif
 
         case ('none')
-            mask = 0.0_rk
+            ! nothin happens, resetting is done before
 
         case default
             call abort(120001,"ERROR: geometry for 3d VPM is unknown: "//params_acm%geometries(i_geom))
@@ -199,8 +199,6 @@ subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
         call abort(634840, "mask: wrong array size, there's pirates, captain!")
     endif
-
-    mask = 0.0_rk
 
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
@@ -299,7 +297,7 @@ subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
             endif
 
         case ('none')
-            mask = 0.0_rk
+            ! nothin happens, resetting is done before
 
         case default
             call abort(120002,"ERROR: geometry for 2d VPM is unknown: "//params_acm%geometries(i_geom))
@@ -475,9 +473,6 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
     ! Computers & Fluids 75, 103–111, 2013 
 
-    ! reset mask array
-    mask = 0.0_rk
-
     ! parameter for smoothing function (width)
     dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
@@ -647,9 +642,6 @@ subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g, i_geom )
     ! a mask for the reproduction of the following paper:
     ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
     ! Computers & Fluids 75, 103–111, 2013 
-
-    ! reset mask array
-    mask = 0.0_rk
 
     ! parameter for smoothing function (width)
     dx_min = params_acm%dx_min
@@ -855,9 +847,6 @@ subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id, i_geom )
     ! ini-parameters:
     ! [FreeFlightSolver]::use_free_flight_solver=1
 
-    ! reset mask array
-    mask = 0.0_rk
-
     ! parameter for smoothing function (width)
     h = Insects(insect_id)%C_smooth*minval(dx(1:2))
 
@@ -922,10 +911,6 @@ subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id, i_geom )
     ! ini-parameters:
     ! [FreeFlightSolver]::use_free_flight_solver=1
 
-
-    ! reset mask array
-    mask = 0.0_rk
-
     ! parameter for smoothing function (width)
     h = Insects(insect_id)%C_smooth*minval(dx(1:2))
 
@@ -985,9 +970,6 @@ subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id, i_geom )
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
-    ! reset mask array
-    mask = 0.0_rk
-
     ! parameter for smoothing function (width)
     h = Insects(insect_id)%C_smooth*minval(dx)
 
@@ -1039,9 +1021,6 @@ subroutine draw_channel(x0, dx, Bs, g, mask, i_geom )
     if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
-
-    ! reset mask array
-    mask = 0.0_rk
 
      ! parameter for smoothing function (width)
     dx_min = params_acm%dx_min
@@ -1197,10 +1176,6 @@ subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g, i_geom )
     x00 = params_acm%x_cntr(1) + dcos(alpha)*radius
     y00 = params_acm%x_cntr(2) + dsin(alpha)*radius
 
-
-    ! reset mask array
-    mask = 0.0_rk
-
     ! parameter for smoothing function (width)
     dx_min = params_acm%dx_min
     h = 1.5_rk * dx_min
@@ -1266,8 +1241,6 @@ subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g, i_geom )
     endif
     nfft_y0 = wingsections(1)%nfft_y0
     if (.not. allocated(mu)) allocate(mu(nfft_y0))
-    ! reset mask array
-    mask = 0.0_rk
     mask1 = 0.0_rk
     mask2 = 0.0_rk
     !---------------------------------------------------------------------------------------------
@@ -1399,8 +1372,6 @@ subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g, i_geom)
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
-    ! reset mask array
-    mask = 0.0_rk
     mask_wing_r = 0.0_rk ! right wing
     mask_wing_l = 0.0_rk ! left wing
     mask_body = 0.0_rk
@@ -1527,9 +1498,6 @@ subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g, i_geom)
     real (kind=rk) :: x2, y2, vx2, vy2, vx2t, vy2t, anglez2, omz2, omz2t, x00, y00
     real (kind=rk) :: x, y, xref, yref, xlev, ylev, tmp, N, rref, rmax, hsmth, Am, alpham
     real (kind=rk) :: Af, Sxf, Syf, Jf, forcex, forcey, torquez
-
-    ! reset everything
-    mask = 0.0_rk
 
     N = params_acm%C_smooth ! smoothing coefficient
     hsmth = N*minval(dx) ! smoothing layer thickness

@@ -18,7 +18,7 @@ module module_t_files
     integer(kind=ik), parameter :: max_parallel_files = 80
     integer(kind=ik), parameter :: max_columns = 80
     integer(kind=ik), save :: mpirank = 7
-    character(len=1), parameter :: tfile_separator = ";"
+    character(len=1), public, parameter :: tfile_separator = ";"
 
     ! variables
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)

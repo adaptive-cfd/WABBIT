@@ -52,6 +52,8 @@ contains
         real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
 
         mask = 0.0_rk
+        ! color is resetted to 1
+        mask(:,:,:,5) = 1.0_rk
 
         select case ( physics )
         case ('ACM-new')

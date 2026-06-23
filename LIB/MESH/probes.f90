@@ -75,13 +75,13 @@ subroutine init_probes_file(params, overwrite)
             open(newunit=iu, file='probes.t', status='replace', action='write')
 
             ! write time
-            write(iu, '(A15)', advance='no') '%          time'
+            write(iu, '(A)', advance='no') '% time'
             ! write entries for every variable as "probeID:varname", right aligned in 15 characters
             do ip = 1, params%n_probes
                 do iv = 1, params%N_probe_variables
                     write(column_format, '(A,I0,A)') '(i0.', digits, ',A,A)'
                     write(column_name, column_format) ip, ':', trim(adjustl(params%probe_variables(iv)))
-                    write(iu, '(1x, A15)', advance='no') column_name(1:min(len_trim(column_name), 15))
+                    write(iu, '(A,A)', advance='no') tfile_separator, trim(adjustl(column_name))
                 enddo
             enddo
             ! write entries for every line probe point as "lineID:probeID:varname", right aligned in 15 characters
@@ -90,12 +90,12 @@ subroutine init_probes_file(params, overwrite)
                     do iv = 1, params%N_probe_variables
                         write(column_format, '(A,I0,A,I0,A)') '(i0.', digits_lines, ',A,i0.', digits_line_points, ',A,A)'
                         write(column_name, column_format) il, ':', ip, ':', trim(adjustl(params%probe_variables(iv)))
-                        write(iu, '(1x, A15)', advance='no') column_name(1:min(len_trim(column_name), 15))
+                        write(iu, '(A,A)', advance='no') tfile_separator, trim(adjustl(column_name))
                     enddo
                 enddo
             enddo
             ! end line
-            write(iu,*)
+            write(iu,'(A)') ""
 
             close(iu)
             iu = -1

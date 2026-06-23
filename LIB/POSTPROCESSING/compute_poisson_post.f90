@@ -231,7 +231,7 @@ subroutine compute_poisson_post(params)
         params_nspp%compute_flow = .true.
         params_nspp%n_ghosts = g
         params_nspp%penalization = (fname_mask /= "---")  ! True if mask file provided
-        params_nspp%C_eta_const = params_nspp%C_eta
+        params_nspp%C_eta_temp = params_nspp%C_eta
         params_nspp%domain_size = params%domain_size
         params_nspp%periodic_BC = params%periodic_BC
         params_nspp%symmetry_BC = params%symmetry_BC
@@ -270,10 +270,12 @@ subroutine compute_poisson_post(params)
     ! Initialize mask to zero if not reading from file
     if (.not. read_mask) then
         hvy_mask = 0.0_rk
+        ! color to 1
+        hvy_mask(:,:,:,5,:) = 1.0_rk
     endif
 
     ! read input data
-    if (operator == "--press-from-vel") then
+    if (strings_are_similar(operator, "--press-from-vel")) then
         ! Read velocity components
         if (params%dim == 3) then
             call readHDF5vct_tree( (/file_in1, file_in2, file_in3/), params, hvy_block, tree_ID)
@@ -287,7 +289,7 @@ subroutine compute_poisson_post(params)
             call readHDF5vct_tree( (/fname_mask/), params, hvy_mask(:,:,:,1:1,:), tree_ID)
         endif
         
-    elseif (operator == "--vel-from-vor") then
+    elseif (strings_are_similar(operator, "--vel-from-vor")) then
         ! Read vorticity components
         if (params%dim == 3) then
             call readHDF5vct_tree( (/file_in1, file_in2, file_in3/), params, hvy_block, tree_ID)
@@ -298,7 +300,7 @@ subroutine compute_poisson_post(params)
     endif
 
     ! Perform the computation
-    if (operator == "--press-from-vel") then
+    if (strings_are_similar(operator, "--press-from-vel")) then
         !-----------------------------------------------------------------------
         ! Compute pressure from velocity
         !-----------------------------------------------------------------------
@@ -309,7 +311,7 @@ subroutine compute_poisson_post(params)
                trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, params%dim+1, params, hvy_block, tree_ID)
         
-    elseif (operator == "--vel-from-vor") then
+    elseif (strings_are_similar(operator, "--vel-from-vor")) then
         !-----------------------------------------------------------------------
         ! Compute velocity from vorticity
         !-----------------------------------------------------------------------

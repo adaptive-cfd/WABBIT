@@ -23,8 +23,6 @@ subroutine draw_2d_wingsections(time, mask, x0, dx, Bs, g, i_geom )
         call abort(777107, "mask: wrong array size, there's pirates, captain!")
     endif
 
-    ! reset mask block
-    mask = 0.0_rk
     nwings = 2
 
     do i = 1, nwings

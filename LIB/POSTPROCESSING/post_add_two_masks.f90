@@ -75,9 +75,9 @@ subroutine post_add_two_masks(params)
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
     call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-    if (mode=="--test_operations") then
+    if (strings_are_similar(mode, "--test-operations")) then
         params%number_blocks = ceiling(5.0*dble(max(N1,N2)) / dble(params%number_procs)) ! just to get some memory in case not provided, in theory we don't know how much we need
-    elseif(mode=="--grid1-to-grid2") then
+    elseif(strings_are_similar(mode, "--grid1-to-grid2")) then
         params%number_blocks = ceiling(  real(N1+N2)/real(params%number_procs) * 2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk) * 1.2_rk)+4 ! we only neet classical 8/7 for decomposition, but of both grids
     else
         params%number_blocks = ceiling(3.0*dble(max(N1,N2)) / dble(params%number_procs)) ! just to get some memory in case not provided, in theory we don't know how much we need
@@ -85,7 +85,7 @@ subroutine post_add_two_masks(params)
     params%domain_size = domain
     params%Jmax = max( tc_length2, tc_length1 )
     params%Jmin = 0
-    if (mode=="--add-same-grid" .or. mode=="--subtract-same-grid" .or. mode=="--multiply-same-grid" .or. mode=="--divide-same-grid") then
+    if (strings_are_similar(mode, "--add-same-grid") .or. strings_are_similar(mode, "--subtract-same-grid") .or. strings_are_similar(mode, "--multiply-same-grid") .or. strings_are_similar(mode, "--divide-same-grid")) then
         params%n_eqn = 2
     else
         params%n_eqn = 1
@@ -119,9 +119,9 @@ subroutine post_add_two_masks(params)
     hvy_n = 0
     tree_n = 0 ! reset number of trees in forest
 
-    if (mode == "--add-same-grid" .or. mode == "--subtract-same-grid" .or. mode == "--multiply-same-grid" .or. mode == "--divide-same-grid") then
+    if (strings_are_similar(mode, "--add-same-grid") .or. strings_are_similar(mode, "--subtract-same-grid") .or. strings_are_similar(mode, "--multiply-same-grid") .or. strings_are_similar(mode, "--divide-same-grid")) then
         call readHDF5vct_tree((/fname1, fname2/), params, hvy_block, tree_ID=1, verbosity=.true.)
-    else if (mode == "--noise-like-grid1") then
+    else if (strings_are_similar(mode, "--noise-like-grid1")) then
         call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.true.)
     else
         call readHDF5vct_tree((/fname1/), params, hvy_block, tree_ID=1, verbosity=.true.)
@@ -130,7 +130,7 @@ subroutine post_add_two_masks(params)
 
     call createActiveSortedLists_forest(params)
 
-    select case(mode)
+    select case(standardize_string(mode))
     case ("--noise-like-grid1")
         do k = 1, hvy_n(1)
             hvy_id = hvy_active(k, 1)
@@ -178,7 +178,7 @@ subroutine post_add_two_masks(params)
         call refine_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
         hvy_block, hvy_tmp, tree_ID=1, ref_can_be_coarser=.false., verbosity=.true.)
 
-    case ("--test_operations")
+    case ("--test-operations")
         ! this tests inplace vs out of place operations
         ! z = x*y + x
         ! norm(w)

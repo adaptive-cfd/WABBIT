@@ -550,10 +550,10 @@ module module_ini_files_parser
             call GetValue(PARAMS, section, keyword, value)
 
             if (value .ne. '') then
-                params_string = value
+                params_string = trim(adjustl(value))
             else
                 value = trim(adjustl(defaultvalue))//" (default!)"
-                params_string = defaultvalue
+                params_string = trim(adjustl(defaultvalue))
             endif
 
             ! sometimes we read in file-names. If the file is not there, then quirky things happen, so lets check that here

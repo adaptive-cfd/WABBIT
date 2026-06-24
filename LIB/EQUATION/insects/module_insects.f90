@@ -13,7 +13,7 @@ module module_insects
    PRIVATE
 
    ! functions
-   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_All_Insects, insects_array_init, insect_init, &
+   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, insect_geometry_indicator, Update_All_Insects, insects_array_init, insect_init, &
       insect_clean, draw_active_grid_winglets, init_insect_data, write_insect_data, &
       aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_rhs, &
       BodyMotion, FlappingMotionWrap, StrokePlane, mask_from_pointcloud, &
@@ -178,6 +178,8 @@ module module_insects
       !-------------------------------------------------------------
       real(kind=rk) :: time=0.0_rk
       real(kind=rk), allocatable :: RHS(:,:)
+      ! this is the force and moment that is applied on the insect from the fluid, it will be computed and stored during RHS computations
+      real(kind=rk), dimension(1:3) :: force_g=0.0_rk, moment_g=0.0_rk
       real(kind=rk), dimension(1:20) :: STATE=0.0_rk
       ! STATE(1) : x-position of body
       ! STATE(2) : y-position of body
@@ -728,7 +730,87 @@ contains
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
    end subroutine Draw_Insect
 
+   !-------------------------------------------------------------------------------
+   ! check if this block contains part of the insect
+   !-------------------------------------------------------------------------------
+   subroutine insect_geometry_indicator(time, insect_id, BS, g, x0, dx, geometry_in_block)
+      implicit none
+      real(kind=rk), intent(in) :: time
+      integer(kind=ik), intent(in) :: insect_id
+      integer, intent(in) :: BS(1:3), g
+      real(kind=rk), intent(in) :: x0(1:3), dx(1:3)  ! positions of block from WABBIT, so situated at g+1
+      logical, intent(out) :: geometry_in_block
 
+      real(kind=rk) :: xend(1:3), block_extent(1:3), char_length, vec(1:3)
+
+      ! compute end of blocks
+      block_extent = dx * real(BS, kind=rk)
+      xend = x0 + block_extent
+
+      ! check if body center is contained - it is located around xc_body_g
+      if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
+         geometry_in_block = .true.
+      endif
+
+      ! Now, this point might be included but we only want to resolve the boundary, so we check if we resolve a body with sufficient size, say 8 points
+      ! This is very arbitrary for different insects (and sometimes hardcoded), so I just try a simple check
+      select case (trim(standardize_string(Insects(insect_id)%BodyType)))
+         case ("nobody")
+            ! body is not present, wings might be but then yet again we don't really know about any sizes - just return and be sad
+            geometry_in_block = .false.
+            return
+         case ("suzuki-thin-rod")
+            char_length = 0.5_rk  ! this is the length of the rod
+
+         case ("superstl")
+            ! just take maximum extent
+            char_length = maxval(Insects(insect_id)%body_superSTL_g(:,1))-minval(Insects(insect_id)%body_superSTL_g(:,1))
+            char_length = max(char_length, maxval(Insects(insect_id)%body_superSTL_g(:,2))-minval(Insects(insect_id)%body_superSTL_g(:,2)))
+            char_length = max(char_length, maxval(Insects(insect_id)%body_superSTL_g(:,3))-minval(Insects(insect_id)%body_superSTL_g(:,3)))
+
+         case ("jerry")
+            char_length = 1.0_rk  ! L_body of Jerry
+
+         case ("hawkmoth")
+            char_length = 1.0_rk  ! L_body of Hawkmoth
+
+         case ("platicle")
+            char_length = 1.0_rk  ! L_body of Platicle
+
+         case ("coin")
+            char_length = 0.5_rk  ! R of the coin
+
+         case ("sphere")
+            char_length = Insects(insect_id)%L_body
+
+         case ("drosophila_maeda","drosophila_slim")
+            char_length = 1.0_rk  ! I didn't understand this one, but I think 1 is good
+
+         case ("bumblebee")
+            char_length = 1.0_rk  ! I think 1 is a good fit
+
+         case ("emundus")
+            char_length = 1.0_rk  ! 1 should work
+
+         case ("paratuposa_simple")
+            char_length = 0.84_rk ! body length relative to wings
+
+         case ("mosquito_iams")
+            char_length = 0.2628_rk ! thorax parameter for triaxial ellipsiod
+
+         case ("cone")
+            char_length = Insects(insect_id)%b_body
+
+         case default
+            char_length = 1.0_rk  ! default, if we don't know anything about the insect
+      end select
+      ! now check if the characteristic length is resolved by 8 points or less - then we refine further
+      geometry_in_block = geometry_in_block .and. ( (char_length <= 8.0_rk*dx(1)) )
+
+      ! Check if wing is contained - this is tricky, as we usually only have the pivot point (which often outside the wing) and complex shapes
+      ! so for now, I skip this and hope that (fingers cross), resolving the body is enough to draw the wings as well
+
+   end subroutine insect_geometry_indicator
 
    !-------------------------------------------------------
    ! Compute angle from coefficients provided by Maeda

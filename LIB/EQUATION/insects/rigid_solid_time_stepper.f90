@@ -43,7 +43,7 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     rhs = 0.0_rk
 
     if (Insect%BodyMotion /= "free_flight") then
-        call abort(900,"Insect%BodyMotion"//trim(adjustl(Insect%BodyMotion))//" but using free-flight?")
+        call abort(900,"Insect%BodyMotion="//trim(adjustl(Insect%BodyMotion))//" but using free-flight? Überbestimmtes System")
     endif
 
     ! copy some shortcuts (this is easier to code)

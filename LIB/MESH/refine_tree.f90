@@ -52,7 +52,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
 
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
-    call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
+    call refinementIndicator_tree( params, hvy_block, tree_ID, indicator, time )
     call toc( "refine_tree (refinementIndicator_tree)", 141, MPI_Wtime()-t1 )
 
 

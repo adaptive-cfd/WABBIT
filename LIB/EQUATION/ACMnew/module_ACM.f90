@@ -28,7 +28,7 @@ module module_acm
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, create_mask_2D_ACM, &
-  create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
+  create_mask_3D_ACM, geometry_indicator_acm, PREPARE_THRESHOLDFIELD_ACM, &
   INITIALIZE_ASCII_FILES_ACM
   !**********************************************************************************************
 
@@ -56,12 +56,9 @@ module module_acm
   type :: type_params_acm
     real(kind=rk) :: CFL, T_end, CFL_eta, CFL_nu=0.094
     real(kind=rk) :: c_0
-    real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, C_eta_ring, penalization_startup_tau
+    real(kind=rk) :: C_eta, beta, C_eta_temp, C_eta_start, C_eta_ring, penalization_startup_tau, penalization_startup_time
+    integer(kind=ik) :: penalization_startup_colors
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
-    ! this is the force and moment that is applied on the insect from the fluid, it will be computed during RHS computations
-    ! as it is computed by the physics module, it was designed to be a member of the physics module at first
-    ! ToDo: the insects should contain the information themselves
-    real(kind=rk), allocatable :: force_insect_g(:, :), moment_insect_g(:, :)
     ! nu
     real(kind=rk) :: nu, nu_p=0.0_rk, nu_bulk=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
@@ -86,7 +83,8 @@ module module_acm
 
     ! channel flow
     logical :: use_channel_forcing = .false.
-    real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk
+    real(kind=rk), allocatable :: mask_volume(:)
+    real(kind=rk) :: meanflow_channel(1:3) = 0.0_rk
 
     logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0
@@ -142,9 +140,9 @@ module module_acm
     ! stuff for lamballais cylinder
     real(kind=rk) :: R0, R1, R2
     character(len=clong) :: file_usx, file_usy, file_usp
-    character(len=cshort) :: smoothing_type
-    integer(kind=ik) :: smoothing_type_int
-    real(kind=rk) :: smoothing_width, smoothing_safety
+    character(len=cshort), allocatable :: smoothing_type(:)
+    integer(kind=ik), allocatable :: smoothing_type_int(:)
+    real(kind=rk), allocatable :: smoothing_width(:), smoothing_safety(:)
     real(kind=rk), allocatable :: u_lamballais(:,:,:)
 
     logical :: initialized = .false.
@@ -272,11 +270,20 @@ contains
     call read_param_mpi(FILE, 'VPM', 'penalization', params_acm%penalization, .true.)
     ! store the same value in two variables
     call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'C_eta', params_acm%C_eta_const, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)
-    call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_acm%C_eta_ring, params_acm%C_eta)
-    call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.20_rk)
-    call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
+    params_acm%C_eta_temp = params_acm%C_eta  ! C_eta is sometimes modified, so here we store the actual constant value
+    call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)  ! if soft_penalization is used at all
+    if (params_acm%soft_penalization_startup) then
+        call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.20_rk)  ! how long the penalization startup is happening
+        call read_param_mpi(FILE, 'VPM', 'penalization_startup_time', params_acm%penalization_startup_time, 0.0_rk)  ! when the penalization startup starts
+        call read_param_mpi(FILE, 'VPM', 'C_eta_start', params_acm%C_eta_start, 1.0_rk)  ! the c_eta with which we start with soft-approach
+        call read_param_mpi(FILE, 'VPM', 'penalization_startup_colors', params_acm%penalization_startup_colors, 1)  ! all colors >= this get the soft startup approach applied
+    else
+        params_acm%penalization_startup_tau = 0.0_rk
+        params_acm%penalization_startup_time = 0.0_rk
+        params_acm%C_eta_start = params_acm%C_eta_temp
+        params_acm%penalization_startup_colors = 1
+    endif
+    call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_acm%C_eta_ring, params_acm%C_eta)  ! C_eta for ring in lamballais test-case
 
     ! geometry read_in: first we check if only one geometry should be set. This is in parity with the old ini-files
     ! if not, we read in an array of geometries and can sert in several geometry files or strings
@@ -295,13 +302,16 @@ contains
         allocate(params_acm%geometry_colors(params_acm%n_geometries))
         params_acm%geometries(:) = "none"
         call read_param_mpi(FILE, 'VPM', 'geometries', params_acm%geometries, defaultvalue=params_acm%geometries )
-        params_acm%geometry_files = ""
-        params_acm%geometry_string = ""
-        call read_param_mpi(FILE, 'VPM', 'geometry_files', params_acm%geometry_files, defaultvalue=params_acm%geometry_files )
-        call read_param_mpi(FILE, 'VPM', 'geometry_string', params_acm%geometry_string, defaultvalue=params_acm%geometry_string )
-        params_acm%geometry_colors(:) = 1
-        call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_acm%geometry_colors, defaultvalue=params_acm%geometry_colors )
     endif
+    params_acm%geometry_files = ""
+    params_acm%geometry_string = ""
+    call read_param_mpi(FILE, 'VPM', 'geometry_files', params_acm%geometry_files, defaultvalue=params_acm%geometry_files )
+    call read_param_mpi(FILE, 'VPM', 'geometry_string', params_acm%geometry_string, defaultvalue=params_acm%geometry_string )
+    ! make colors to be steadily increasing from 0
+    do i=1,params_acm%n_geometries
+        params_acm%geometry_colors(i) = i
+    enddo
+    call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_acm%geometry_colors, defaultvalue=params_acm%geometry_colors )
     
     ! fixed geometry parameters. They are read only once and are the same for all geometries
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
@@ -318,17 +328,21 @@ contains
     call read_param_mpi(FILE, 'VPM', 'file_usx', params_acm%file_usx, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usy', params_acm%file_usy, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usp', params_acm%file_usp, 'none')
-    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, 'cos')
-    select case(params_acm%smoothing_type)
-        case("cos", "cosine")
-            params_acm%smoothing_type_int = STEP_METHOD_COSINE
-        case("hester")
-            params_acm%smoothing_type_int = STEP_METHOD_HESTER
-        case("dis", "disc", "discontinuous")
-            params_acm%smoothing_type_int = STEP_METHOD_DISC
-        case default
-            call abort(62371118, "unknown smoothing type: "//params_acm%smoothing_type)
-    end select
+    allocate(params_acm%smoothing_type(1:params_acm%n_geometries), params_acm%smoothing_type_int(1:params_acm%n_geometries), params_acm%smoothing_width(1:params_acm%n_geometries), params_acm%smoothing_safety(1:params_acm%n_geometries) )
+    params_acm%smoothing_type(:) = "cos"
+    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, params_acm%smoothing_type )
+    do i=1,params_acm%n_geometries
+        select case(params_acm%smoothing_type(i))
+            case("cos", "cosine")
+                params_acm%smoothing_type_int(i) = STEP_METHOD_COSINE
+            case("hester")
+                params_acm%smoothing_type_int(i) = STEP_METHOD_HESTER
+            case("dis", "disc", "discontinuous")
+                params_acm%smoothing_type_int(i) = STEP_METHOD_DISC
+            case default
+                call abort(62371118, "unknown smoothing type: "//params_acm%smoothing_type(i))
+        end select
+    enddo
 
     ! stuff for channel flow
     call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )
@@ -450,19 +464,21 @@ contains
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
 
     ! compute some settings for VPM
-    select case(params_acm%smoothing_type)
-        case("cos", "cosine")
-            params_acm%smoothing_width = dx_min * params_acm%C_smooth
-            params_acm%smoothing_safety = 1.0_rk * params_acm%smoothing_width
-        case ("hester")
-            params_acm%smoothing_width = sqrt(params_acm%nu * params_acm%C_eta)
-            params_acm%smoothing_safety = max(5.0_rk * params_acm%smoothing_width, 2*maxval( ddx(1:params_acm%dim) ))
-        case("discontinuous", "dis")
-            params_acm%smoothing_width = dx_min * params_acm%C_smooth
-            params_acm%smoothing_safety = 3.0_rk * params_acm%smoothing_width
-        case default
-            call abort(260602, "Never heard of the smoothing type "//trim(params_acm%smoothing_type))
-    end select
+    do i=1,params_acm%n_geometries
+        select case(params_acm%smoothing_type(i))
+            case("cos", "cosine")
+                params_acm%smoothing_width(i) = dx_min * params_acm%C_smooth
+                params_acm%smoothing_safety(i) = 1.0_rk * params_acm%smoothing_width(i)
+            case ("hester")
+                params_acm%smoothing_width(i) = sqrt(params_acm%nu * params_acm%C_eta)
+                params_acm%smoothing_safety(i) = max(5.0_rk * params_acm%smoothing_width(i), 2*maxval( ddx(1:params_acm%dim) ))
+            case("discontinuous", "dis")
+                params_acm%smoothing_width(i) = dx_min * params_acm%C_smooth
+                params_acm%smoothing_safety(i) = 3.0_rk * params_acm%smoothing_width(i)
+            case default
+                call abort(260602, "Never heard of the smoothing type "//trim(params_acm%smoothing_type(i)))
+        end select
+    enddo
 
     ! print some time-step related information
     if (params_acm%c_0 > 0.0_rk) then
@@ -506,15 +522,14 @@ contains
 
     ! before we init the insects, we have to count how many there are
     do i=1,params_acm%n_geometries
-        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
-        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_acm%geometries(i), "insect") .or. strings_are_similar(params_acm%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_acm%geometries(i), "plate-free")) then
             n_insects = n_insects + 1
         endif
     enddo
     ! now we initialize all the insects
     call insects_array_init(n_insects)
-    allocate( params_acm%force_insect_g(1:3, 0:n_insects))
-    allocate( params_acm%moment_insect_g(1:3, 0:n_insects))
 
     ! Loop over all geometries and do geometry-specific initialization
     ncolors = 1
@@ -525,8 +540,9 @@ contains
         ! if used, setup insect. Note active grid is part of the insects: they require the same init module
         !
         ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
-        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
-        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_acm%geometries(i), "insect") .or. strings_are_similar(params_acm%geometries(i), "active_grid") .or. &
+            strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_acm%geometries(i), "plate-free")) then
             ! when computing passive scalars, we require derivatives of the mask function, which
             ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
             ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
@@ -535,14 +551,19 @@ contains
             call get_insect_id( i, insect_id )
             if (params_acm%set_mask_on_ghost_nodes) then
                 call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
-                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type, N_ghost_nodes=0, colors_default=(/params_acm%n_geometries + 5*insect_id,params_acm%n_geometries+1+5*insect_id,params_acm%n_geometries+2+5*insect_id,params_acm%n_geometries+3+5*insect_id,params_acm%n_geometries+4+5*insect_id, params_acm%geometry_colors(i)/))
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1),params_acm%n_geometries+5+5*(insect_id-1), params_acm%geometry_colors(i)/))
             else
                 call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
-                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type, N_ghost_nodes=g, colors_default=(/params_acm%n_geometries + 5*insect_id,params_acm%n_geometries+1+5*insect_id,params_acm%n_geometries+2+5*insect_id,params_acm%n_geometries+3+5*insect_id,params_acm%n_geometries+4+5*insect_id, params_acm%geometry_colors(i)/))
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=g, colors_default=(/params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1),params_acm%n_geometries+5+5*(insect_id-1), params_acm%geometry_colors(i)/))
             endif
 
             ! compute maximum color
             ncolors = max( ncolors, int(maxval((/ insects(insect_id)%color_body, insects(insect_id)%color_l, insects(insect_id)%color_r, insects(insect_id)%color_l2, insects(insect_id)%color_r2/)), kind=ik) )
+
+            ! check if this insect is in free-flight mode but we did not activate free flight for physics
+            if (.not. params_acm%use_free_flight_solver .and. strings_are_similar(insects(insect_id)%BodyMotion, "free_flight")) then
+                call abort(62371118, "You seem to use an insect in free-flight mode, but you did not activate the free-flight solver in the physics settings. Please check your ini-file.")
+            endif
         endif
 
         if (params_acm%geometries(i)=="2D-wingsection" .or. params_acm%geometries(i)=="two-moving-cylinders") then
@@ -582,7 +603,7 @@ contains
     enddo
 
     ! now initialze force arrays for colors at last, because we know how many colors we have
-    allocate( params_acm%force_color(1:3, 0:ncolors), params_acm%moment_color(1:3, 0:ncolors) )
+    allocate( params_acm%force_color(1:3, 1:ncolors), params_acm%moment_color(1:3, 1:ncolors), params_acm%mask_volume(1:ncolors) )
 
     params_acm%initialized = .true.
   end subroutine READ_PARAMETERS_ACM
@@ -743,8 +764,9 @@ contains
       character(len=cshort) :: headers(1:100)  ! we can use this to create headers
 
       is_insect = .false.
-      if (any(params_acm%geometries(:) == "Insect").or.any(params_acm%geometries(:)=="active_grid") &
-        .or. any(params_acm%geometries(:)=="cylinder-free").or.any(params_acm%geometries(:)=="sphere-free").or.any(params_acm%geometries(:)=="plate-free")) is_insect = .true.
+      if (any(strings_are_similar(params_acm%geometries(:), "insect")) .or. any(strings_are_similar(params_acm%geometries(:), "active-grid")) .or. &
+        any(strings_are_similar(params_acm%geometries(:), "cylinder-free")) .or. any(strings_are_similar(params_acm%geometries(:), "sphere-free")) .or. &
+        any(strings_are_similar(params_acm%geometries(:), "plate-free"))) is_insect = .true.
 
       has_two_wings = .false.
       do i_insect = 1, n_insects
@@ -824,31 +846,34 @@ contains
 
             ! headers for state vector file
             do i_insect = 1, n_insects
-                write(headers((i_insect-1)*23 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
-                write(headers((i_insect-1)*23 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
-                write(headers((i_insect-1)*23 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
-                write(headers((i_insect-1)*23 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
-                write(headers((i_insect-1)*23 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
-                write(headers((i_insect-1)*23 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
-                write(headers((i_insect-1)*23 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
-                write(headers((i_insect-1)*23 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
-                write(headers((i_insect-1)*23 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
-                write(headers((i_insect-1)*23 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
-                write(headers((i_insect-1)*23 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
-                write(headers((i_insect-1)*23 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
-                write(headers((i_insect-1)*23 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
-                write(headers((i_insect-1)*23 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
-                write(headers((i_insect-1)*23 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
-                write(headers((i_insect-1)*23 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
-                write(headers((i_insect-1)*23 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
-                write(headers((i_insect-1)*23 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
-                write(headers((i_insect-1)*23 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
-                write(headers((i_insect-1)*23 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
-                write(headers((i_insect-1)*23 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
-                write(headers((i_insect-1)*23 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
-                write(headers((i_insect-1)*23 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
+                write(headers((i_insect-1)*26 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
+                write(headers((i_insect-1)*26 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
+                write(headers((i_insect-1)*26 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
+                write(headers((i_insect-1)*26 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
+                write(headers((i_insect-1)*26 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
+                write(headers((i_insect-1)*26 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
+                write(headers((i_insect-1)*26 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
+                write(headers((i_insect-1)*26 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
+                write(headers((i_insect-1)*26 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
+                write(headers((i_insect-1)*26 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
+                write(headers((i_insect-1)*26 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
+                write(headers((i_insect-1)*26 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
+                write(headers((i_insect-1)*26 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
+                write(headers((i_insect-1)*26 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
+                write(headers((i_insect-1)*26 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
+                write(headers((i_insect-1)*26 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
+                write(headers((i_insect-1)*26 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
+                write(headers((i_insect-1)*26 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
+                write(headers((i_insect-1)*26 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
+                write(headers((i_insect-1)*26 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
+                write(headers((i_insect-1)*26 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
+                write(headers((i_insect-1)*26 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
+                write(headers((i_insect-1)*26 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
+                write(headers((i_insect-1)*26 + 25),"(A,i0.2,A)") "I", i_insect, ":moment-g-x"
+                write(headers((i_insect-1)*26 + 26),"(A,i0.2,A)") "I", i_insect, ":moment-g-y"
+                write(headers((i_insect-1)*26 + 27),"(A,i0.2,A)") "I", i_insect, ":moment-g-z"
             enddo
-            call init_t_file('insect_state_vector.t', overwrite, headers(1:23*n_insects+1) )
+            call init_t_file('insect_state_vector.t', overwrite, headers(1:26*n_insects+1) )
 
             if (has_two_wings) then
                 call init_t_file('forces_leftwing2.t', overwrite)
@@ -859,7 +884,11 @@ contains
 
             call init_insect_data(overwrite)
         endif
-        call init_t_file('mask_volume.t', overwrite)
+        do i_color = 1, ncolors
+            write(headers(i_color+1),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+        enddo
+        headers(ncolors+2) = "sponge_volume"
+        call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+2) )
         call init_t_file('u_residual.t', overwrite)
         call init_t_file('forces_rk.t', overwrite)
         call init_t_file('penal_power.t', overwrite, (/&
@@ -881,8 +910,9 @@ contains
     integer :: i, count_insects
     count_insects = 0
     do i = 1, i_geom
-        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
-        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+        if (strings_are_similar(params_acm%geometries(i), "insect") .or. strings_are_similar(params_acm%geometries(i), "active-grid") .or. &
+            strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
+            strings_are_similar(params_acm%geometries(i), "plate-free")) then
             count_insects = count_insects + 1
         endif
     enddo

@@ -52,7 +52,7 @@ subroutine rhs_operator_reconstruction(params)
     if (mode=='--help' .or. mode=='--h' .or. mode=='-h') then
         if (params%rank==0) then
             write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --OP-rhs u_001.h5 inifile.ini --memory=10GB"
+            write(*,*) "./wabbit-post --op-rhs u_001.h5 inifile.ini --memory=10GB"
             write(*,*) "------------------------------------------------------------------"
             write(*,*) " This function computes the linearised RHS operator A (Ngrid x Ngrid)"
             write(*,*) " arround the given statevector (here u_001)!"

@@ -10,7 +10,7 @@
 ! ********************************************************************************************
 
 subroutine coarseningIndicator_block( params, block_data, block_work, indicator, &
-    refinement_status, norm, level, input_is_WD, block_mask, indices, verbose_check)
+    refinement_status, norm, level, input_is_WD, indices, verbose_check)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -18,13 +18,6 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     type (type_params), intent(in)      :: params
     !> heavy data - this routine is called on one block only, not on the entire grid. hence th 4D array.
     real(kind=rk), intent(inout)        :: block_data(:, :, :, :)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
-    ! NOTE: Here, the mask is required only if grid adaptation is also done on the mask.
-    real(kind=rk), intent(inout), optional :: block_mask(:, :, :, :)
     !> heavy work data array (expected to hold the VORTICITY if thresholding is applied to vorticity)
     real(kind=rk), intent(inout)        :: block_work(:, :, :, :)
     !> how to choose blocks for refinement
@@ -111,39 +104,5 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
         call abort(87455214,"ERROR: unknown coarsening operator: "//trim(adjustl(indicator)))
 
     end select
-
-
-    ! mask thresholding on top of regular thresholding?
-    ! it can be useful to also use the mask function (if penalization is used) for grid adaptation.
-    ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
-    ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
-    ! not available, the option is useless but can cause errors.
-    ! NOTE: since lifted wavelets are expensive, we use an alternative method to detect the gradient.
-    if (params%threshold_mask .and. present(block_mask)) then
-        ! t0 = MPI_Wtime()
-        ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
-        refinement_status_mask = -1_ik ! default we coarsen
-        mask_max = 0.0_rk
-        mask_min = 2.0_rk
-
-        ! check if any interface point is within the block
-        ! merge selects 2D or 3D bounds depending on params%dim
-        if (any(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) > 1.0e-9_rk .and. &
-                block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1) < 1.0_rk-1.0e-9_rk)) then
-            refinement_status_mask = 0_ik
-        endif
-        mask_max = maxval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1))
-        mask_min = minval(block_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1))
-
-        ! maybe the resolution is so coarse no point on the smoothing layer exists
-        ! in that case if both 1 and 0 are in a mask it also has to contain an interface
-        if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
-
-        ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
-        refinement_status = max(refinement_status, refinement_status_mask)
-
-        ! timing for debugging - block based so should not be deployed for productive versions
-        ! call toc( "coarseningIndicator_block (mask_comp)", 1001, MPI_Wtime()-t0 )
-    endif
 
 end subroutine coarseningIndicator_block

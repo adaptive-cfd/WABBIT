@@ -44,7 +44,7 @@ program main_post
     call get_command_argument( 1, mode )
     if (rank==0) write(*,'("Starting postprocessing in ", a20, " mode")') mode
 
-    select case(mode)
+    select case(trim(standardize_string(mode)))
     case ("--wing-pressure-interpolation")
         call post_pressure_interpolation(params)
         
@@ -66,10 +66,10 @@ program main_post
     case ("--analyse-sisters", "--analyse-levels")
         call post_meta_analyse(params)
 
-    case ("--OP")
+    case ("--op")
         call operator_reconstruction(params)
 
-    case ("--OP-rhs")
+    case ("--op-rhs")
         call rhs_operator_reconstruction(params)
 
     case ("--prune-tree")
@@ -78,7 +78,7 @@ program main_post
     case ("--superstl")
         call post_superstl(params)
 
-    case ("--add", "--subtract", "--multiply", "--divide", "--add-same-grid", "--subtract-same-grid", "--multiply-same-grid", "--divide-same-grid", "--test_operations", "--grid1-to-grid2", "--noise-like-grid1")
+    case ("--add", "--subtract", "--multiply", "--divide", "--add-same-grid", "--subtract-same-grid", "--multiply-same-grid", "--divide-same-grid", "--test-operations", "--grid1-to-grid2", "--noise-like-grid1")
         call post_add_two_masks(params)
 
     case ("--stl2dist")
@@ -120,9 +120,9 @@ program main_post
         call dense_to_sparse(params)
 
     case("--dry-run")
-        call post_dry_run()
+        call post_dry_run(params)
 
-    case("--vorticity", "--vorx", "--vory", "--vorz", "--divergence", "--vor-abs", "--helicity", "--hel-abs", "--Q", "--dissipation", "--copy", "--vorticity-stretching", "--energy")
+    case("--vorticity", "--vorx", "--vory", "--vorz", "--divergence", "--vor-abs", "--vorabs", "--helicity", "--hel-abs", "--helabs", "--q", "--dissipation", "--copy", "--vorticity-stretching", "--energy")
         call compute_vorticity_post(params)
 
     case("--press-from-vel", "--vel-from-vor")
@@ -148,22 +148,22 @@ program main_post
     case ("--flusi-to-wabbit")
         call flusi_to_wabbit(params)
 
-    case ("--POD")
+    case ("--pod")
         call post_POD(params)
 
     case ("--filter")
         call post_filtertest(params)
 
-    case ("--POD-reconstruct")
+    case ("--pod-reconstruct")
         call post_reconstruct(params)
 
-    case ("--POD-error")
+    case ("--pod-error")
         call post_PODerror(params)
 
-    case ("--POD-time")
+    case ("--pod-time")
         call post_timecoef_POD(params)
 
-    case ("--generate_forest")
+    case ("--generate-forest")
         call post_generate_forest(params)
 
     case ("--create-grid")
@@ -203,20 +203,20 @@ program main_post
             write(*, '(A)') "--hel-abs"
             write(*, '(A)') "--divergence"
             write(*, '(A)') "--dissipation"
-            write(*, '(A)') "--Q"
+            write(*, '(A)') "--q"
             write(*, '(A)') "--press-from-vel"
             write(*, '(A)') "--vel-from-vor"
-            write(*, '(A)') "--OP-rhs"
-            write(*, '(A)') "--OP"
+            write(*, '(A)') "--op-rhs"
+            write(*, '(A)') "--op"
             write(*, '(A)') "--gradient"
             write(*, '(A)') "--keyvalues"
             write(*, '(A)') "--dry-run"
             write(*, '(A)') "--compare-keys"
             write(*, '(A)') "--flusi-to-wabbit"
-            write(*, '(A)') "--POD"
-            write(*, '(A)') "--POD-reconstruct"
-            write(*, '(A)') "--POD-error"
-            write(*, '(A)') "--POD-time"
+            write(*, '(A)') "--pod"
+            write(*, '(A)') "--pod-reconstruct"
+            write(*, '(A)') "--pod-error"
+            write(*, '(A)') "--pod-time"
             write(*, '(A)') "--stl2dist"
             write(*, '(A)') "--add"
             write(*, '(A)') "--subtract"
@@ -229,9 +229,9 @@ program main_post
             write(*, '(A)') "--mult-mask"
             write(*, '(A)') "--mult-mask-direct"
             write(*, '(A)') "--mult-mask-inverse"
-            write(*, '(A)') "--post_rhs"
+            write(*, '(A)') "--post-rhs"
             write(*, '(A)') "--average"
-            write(*, '(A)') "--generate_forest"
+            write(*, '(A)') "--generate-forest"
             write(*, '(A)') "--create-grid"
             write(*, '(A)') "--evaluate-wavelet-thresholding"
             write(*, '(A)') "--refine-everywhere"

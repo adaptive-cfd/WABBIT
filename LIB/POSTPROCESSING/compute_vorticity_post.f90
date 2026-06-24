@@ -55,20 +55,27 @@ subroutine compute_vorticity_post(params)
             write(*, '(A)') "./wabbit-post --vorticity source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
             write(*, '(A)') " Computes 3 (3D) or 1 (2D) vorticity component, saves in "
             write(*, '(A)') " vorx_*.h5 [vory_*.h5] [vorz_*.h5]"
-            write(*, '(A)') " order = 2 or 4"
             write(*, '(A)') "-----------------------------------------------------------"
             write(*, '(A)') " --vor-abs"
             write(*, '(A)') "./wabbit-post --vor-abs source_ux.h5 source_uy.h5 source_uz.h5 [ORDER]"
-            write(*, '(A)') " Computes vorticity magnitude of 3D velocity field, saves in "
-            write(*, '(A)') " vorabs_*.h5"
+            write(*, '(A)') " Computes vorticity magnitude of 3D velocity field, saves in vorabs_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --helicity / --hel-abs"
+            write(*, '(A)') "./wabbit-post --helicity source_ux.h5 source_uy.h5 source_uz.h5 [ORDER]"
+            write(*, '(A)') " Computes helicity or helicity magnitude of 3D velocity field, saves in "
+            write(*, '(A)') " helx_*.h5, hely_*.h5, helz_*.h5 or helabs_*.h5"
             write(*, '(A)') "-----------------------------------------------------------"
             write(*, '(A)') " --divergence"
             write(*, '(A)') "./wabbit-post --divergence source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
-            write(*, '(A)') " Computes divergence of 2D/3D velocity field, saves in "
-            write(*, '(A)') " divu_*.h5"
+            write(*, '(A)') " Computes divergence of 2D/3D velocity field, saves in divu_*.h5"
             write(*, '(A)') "-----------------------------------------------------------"
-            write(*, '(A)') " --Q"
-            write(*, '(A)') "./wabbit-post --Q source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*, '(A)') " --dissipation"
+            write(*, '(A)') "./wabbit-post --dissipation source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
+            write(*, '(A)') " Computes numerical dissipation of 2D/3D velocity field as u_j*laplace(u_j),"
+            write(*, '(A)') " saves in dissipation_*.h5"
+            write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " --q"
+            write(*, '(A)') "./wabbit-post --q source_ux.h5 source_uy.h5 [source_uz.h5] [ORDER]"
             write(*, '(A)') " Computes Q-criterion of 2D/3D velocity field, saves in "
             write(*, '(A)') " Qcrit_*.h5"
             write(*, '(A)') "-----------------------------------------------------------"
@@ -83,6 +90,11 @@ subroutine compute_vorticity_post(params)
             write(*, '(A)') " Computes kinetic energy per unit mass E = 0.5*(ux^2 + uy^2 + uz^2)"
             write(*, '(A)') " Saves in energy_*.h5"
             write(*, '(A)') "-----------------------------------------------------------"
+            write(*, '(A)') " ORDER is the order of the finite difference stencil used for computing derivatives."
+            write(*, '(A)') " Valid options are: 2 (FD_2nd_central), 4 (FD_4th_central), 6 (FD_6th_central), 8 (FD_8th_central),"
+            write(*, '(A)') " 4op (FD_4th_central_optimized), 3_comp_12 (FD_3rd_cop_1_2), 4_comp_13 (FD_4th_comp_1_3), 4_comp_04 (FD_4th_comp_0_4),"
+            write(*, '(A)') " 5_comp_23 (FD_5th_comp_2_3), 6_comp_24 (FD_6th_comp_2_4), 6_comp_15 (FD_6th_comp_1_5), 6_comp_06 (FD_6th_comp_0_6),"
+            write(*, '(A)') " 7_comp_34 (FD_7th_comp_3_4), 8_comp_35 (FD_8th_comp_3_5)"
         end if
         return
     endif
@@ -184,7 +196,7 @@ subroutine compute_vorticity_post(params)
     params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
 
     nwork = 1
-    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz" .or. operator == "--helicity") then
+    if (strings_are_similar(operator, "--vorticity") .or. strings_are_similar(operator, "--vorx") .or. strings_are_similar(operator, "--vory") .or. strings_are_similar(operator, "--vorz") .or. strings_are_similar(operator, "--helicity")) then
         nwork = 3
     endif
 
@@ -207,49 +219,49 @@ subroutine compute_vorticity_post(params)
         call hvy2lgt(lgtID, hvyID, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgtID, x0, dx )
 
-        if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
+        if (strings_are_similar(operator, "--vorticity") .or. strings_are_similar(operator, "--vorx") .or. strings_are_similar(operator, "--vory") .or. strings_are_similar(operator, "--vorz")) then
             call compute_vorticity(hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvyID))
 
-        elseif (operator=="--vor-abs") then
+        elseif (strings_are_similar(operator, "--vor-abs") .or. strings_are_similar(operator, "--vorabs")) then
             call compute_vorticity_abs(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        elseif (operator=="--helicity") then
+        elseif (strings_are_similar(operator, "--helicity")) then
             call compute_helicity(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1:3,hvyID))
 
-        elseif (operator=="--hel-abs") then
+        elseif (strings_are_similar(operator, "--hel-abs") .or. strings_are_similar(operator, "--helabs")) then
             call compute_helicity_abs(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        elseif (operator=="--vorticity-stretching") then
+        elseif (strings_are_similar(operator, "--vorticity-stretching")) then
             call compute_vorticity_stretching(hvy_block(:,:,:,1:3,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        elseif (operator == "--divergence") then
+        elseif (strings_are_similar(operator, "--divergence")) then
             call compute_divergence( hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        ! elseif (operator == "--laplace") then
+        ! elseif (strings_are_similar(operator, "--laplace")) then
         !     call compute_divergence( hvy_block(:,:,:,1,hvyID), &
         !     hvy_block(:,:,:,2,hvyID), &
         !     hvy_block(:,:,:,3,hvyID),&
         !     dx, Bs, g, &
         !     params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        elseif (operator == "--Q") then
+        elseif (strings_are_similar(operator, "--q")) then
             call compute_Qcriterion( hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        elseif (operator == "--copy") then
+        elseif (strings_are_similar(operator, "--copy")) then
             hvy_tmp(:,:,:,1,hvyID) = hvy_block(:,:,:,1,hvyID)
         
-        elseif (operator == "--dissipation") then
+        elseif (strings_are_similar(operator, "--dissipation")) then
             call compute_dissipation( hvy_block(:,:,:,1:params%dim,hvyID), &
             dx, Bs, g, params%order_discretization, hvy_tmp(:,:,:,1,hvyID))
 
-        elseif (operator == "--energy") then
+        elseif (strings_are_similar(operator, "--energy")) then
             ! Compute kinetic energy: E = 0.5 * (ux^2 + uy^2 + uz^2)
             if (params%dim == 3) then
                 hvy_tmp(:,:,:,1,hvyID) = 0.5_rk * ( hvy_block(:,:,:,1,hvyID)**2 &
@@ -266,29 +278,29 @@ subroutine compute_vorticity_post(params)
         endif
     end do
 
-    if (operator == "--vorticity" .or. operator == "--vorx" .or. operator == "--vory" .or. operator == "--vorz") then
-        if (operator /= "--vory" .and. operator /= "--vorz") then
+    if (strings_are_similar(operator, "--vorticity") .or. strings_are_similar(operator, "--vorx") .or. strings_are_similar(operator, "--vory") .or. strings_are_similar(operator, "--vorz")) then
+        if (.not. strings_are_similar(operator, "--vory") .and. .not. strings_are_similar(operator, "--vorz")) then
             write( fname,'(a, "_", a, ".h5")') 'vorx', trim(adjustl(timestr(time)))
             call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
         end if
 
         if (params%dim == 3) then
-            if (operator /= "--vorx" .and. operator /= "--vorz") then
+            if (.not. strings_are_similar(operator, "--vorx") .and. .not. strings_are_similar(operator, "--vorz")) then
                 write( fname,'(a, "_", a, ".h5")') 'vory', trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, iteration, 2, params, hvy_tmp, tree_ID)
             end if
-            if (operator /= "--vorx" .and. operator /= "--vory") then
+            if (.not. strings_are_similar(operator, "--vorx") .and. .not. strings_are_similar(operator, "--vory")) then
                 write( fname,'(a, "_", a, ".h5")') 'vorz', trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID)
             end if
         end if
 
-    elseif (operator == "--vor-abs") then
+    elseif (strings_are_similar(operator, "--vor-abs") .or. strings_are_similar(operator, "--vorabs")) then
         write( fname,'(a, "_", a, ".h5")') 'vorabs', trim(adjustl(timestr(time)))
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
-    elseif (operator=="--helicity") then
+    elseif (strings_are_similar(operator, "--helicity")) then
         write( fname,'(a, "_", a, ".h5")') 'helx', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
         write( fname,'(a, "_", a, ".h5")') 'hely', trim(adjustl(timestr(time)))
@@ -296,34 +308,34 @@ subroutine compute_vorticity_post(params)
         write( fname,'(a, "_", a, ".h5")') 'helz', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 3, params, hvy_tmp, tree_ID )
     
-    elseif (operator=="--hel-abs") then
+    elseif (strings_are_similar(operator, "--hel-abs") .or. strings_are_similar(operator, "--helabs")) then
         write( fname,'(a, "_", a, ".h5")') 'helabs', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
-    elseif (operator=="--vorticity-stretching") then
+    elseif (strings_are_similar(operator, "--vorticity-stretching")) then
         write( fname,'(a, "_", a, ".h5")') 'vorstretch', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
-    elseif (operator=="--divergence") then
+    elseif (strings_are_similar(operator, "--divergence")) then
         write( fname,'(a, "_", a, ".h5")') 'divu', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
-    elseif (operator=="--Q") then
+    elseif (strings_are_similar(operator, "--q")) then
         write( fname,'(a, "_", a, ".h5")') 'Qcrit', trim(adjustl(timestr(time)))
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
-    elseif (operator=="--dissipation") then
+    elseif (strings_are_similar(operator, "--dissipation")) then
         write( fname,'(a, "_", a, ".h5")') 'dissipation', trim(adjustl(timestr(time)))
 
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
 
-    elseif (operator=="--copy") then
+    elseif (strings_are_similar(operator, "--copy")) then
 
         write( fname,'(a, "_", a, ".h5")') 'copyUx', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     
-    elseif (operator=="--energy") then
+    elseif (strings_are_similar(operator, "--energy")) then
         write( fname,'(a, "_", a, ".h5")') 'energy', trim(adjustl(timestr(time)))
         call saveHDF5_tree(fname, time, iteration, 1, params, hvy_tmp, tree_ID )
     endif

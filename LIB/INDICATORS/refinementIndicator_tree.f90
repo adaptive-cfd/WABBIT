@@ -11,18 +11,20 @@
 !! -2 block will refine and be merged with her sisters
 ! ********************************************************************************************
 
-subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
+subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
+    use module_physics_metamodule, only : geometry_indicator_meta  ! this is unfortunate
     implicit none
     type (type_params), intent(in)      :: params
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
+    real(kind=rk), intent(in), optional :: time  !> current simulation time, used for mask checking
 
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
-    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level
-    real(kind=rk) :: a, b
+    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level, ref_status
+    real(kind=rk) :: a, b, x0(1:3), dx(1:3)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -56,10 +58,21 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         do k = 1, hvy_n(tree_ID)
             ! hvy_id of the block we're looking at
             hvy_id = hvy_active(k, tree_ID)
-
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             level = lgt_block( lgt_id, IDX_MESH_LVL)
+            ! get block spacing and origin for the geometry indicator
+            call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+                params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
+
+            ! sometimes, no point of the mask is contained in the block, so we check for the actual geometries as well - this is a task for the physics modules, as they know about the geometries
+            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "refinement")
+            
+            if (ref_status == +1) then
+                ! block has to refine, no need to check mask point-wise
+                lgt_block(lgt_id, IDX_REFINE_STS) = +1
+                cycle
+            endif
 
             ! do not use normalizaiton (mask is inherently normalized to 0...1)
             nnorm = 1.0_rk
@@ -98,9 +111,16 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         do k = 1, hvy_n(tree_ID)
             ! hvy_id of the block we're looking at
             hvy_id = hvy_active(k, tree_ID)
-
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+            ! sometimes, no point of the mask is contained in the block, so we check for the actual geometries as well - this is a task for the physics modules, as they know about the geometries
+            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "refinement")
+            if (ref_status == +1) then
+                ! block has to refine, no need to check mask point-wise
+                lgt_block(lgt_id, IDX_REFINE_STS) = +1
+                cycle
+            endif
 
             ! merge selects 2D or 3D bounds depending on params%dim
             if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 0.0_rk)) then

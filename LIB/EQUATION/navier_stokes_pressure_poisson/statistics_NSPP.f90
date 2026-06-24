@@ -43,9 +43,9 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
     
     ! local variables
     integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3), x1,x2,y1,y2,z1,z2
-    real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2, meanflow_channel_block(1:3)
-    real(kind=rk) :: force_block(1:3, 0:ncolors), moment_block(1:3, 0:ncolors), x_glob(1:3), x_lev(1:3)
-    real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal(1:n_insects), apowtotal(1:n_insects)
+    real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, mask_volume(1:ncolors), sponge_volume, meanflow_channel_block(1:3)
+    real(kind=rk) :: force_block(1:3, 1:ncolors), moment_block(1:3, 1:ncolors), x_glob(1:3), x_lev(1:3)
+    real(kind=rk) :: x0_moment(1:3, 1:ncolors), ipowtotal(1:n_insects), apowtotal(1:n_insects)
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
     real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), V_channel
     real(kind=rk) :: dxyz(1:3), iwmoment(1:n_insects, 1:3,1:5)
@@ -166,8 +166,8 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
         moment_block = 0.0_rk
         residual_block = 0.0_rk
         ekin_block = 0.0_rk
-        tmp_volume = 0.0_rk
-        tmp_volume2 = 0.0_rk
+        mask_volume = 0.0_rk
+        sponge_volume = 0.0_rk
         penal_power_block = 0.0_rk
         scalar_removal_block = 0.0_rk
 
@@ -217,10 +217,8 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
 
         ! penalization part
         if (params_nspp%penalization .or. params_nspp%use_sponge) then
-            ! volume of mask (useful to see if it is properly generated)
-            tmp_volume = sum(mask(x1:x2, y1:y2, z1:z2, 1))
             ! volume of sponge
-            if (params_nspp%use_sponge) tmp_volume2 = sum(mask(x1:x2, y1:y2, z1:z2, 6))
+            if (params_nspp%use_sponge) sponge_volume = sum(mask(x1:x2, y1:y2, z1:z2, 6))
 
             ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
             ! energy input from solid : (usx * (u-uxs) + usy * (v-usy) + usz * (w-usz)) * chi / C_eta
@@ -273,6 +271,9 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
 
                         color = int( mask(ix, iy, iz, 5), kind=2 )
 
+                        ! mask volume
+                        mask_volume(color) = mask_volume(color) + mask(ix,iy,iz,1)
+
                         ! penalization term
                         penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
@@ -296,8 +297,9 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
                         if (is_insect .and. params_nspp%dim == 3) then
                             do i_insect = 1, n_insects
                                 if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
-                                    ! in the geometry color of the insect, we compute the total force and moment for the whole
+                                    ! in the geometry color of the insect, we compute the total mask volume, force and moment for the whole
                                     ! insect wrt the center point (body+wings)
+                                    mask_volume(insects(i_insect)%color_geometry) = mask_volume(insects(i_insect)%color_geometry) + mask(ix,iy,iz,1)
                                     force_block(1:params_nspp%dim, insects(i_insect)%color_geometry) = force_block(1:params_nspp%dim, insects(i_insect)%color_geometry) - penal(1:params_nspp%dim)
                                     x_lev(1:3) = (/x, y, z/) - Insects(1)%xc_body_g(1:3)
                                     moment_block(:,insects(i_insect)%color_geometry)  = moment_block(:,insects(i_insect)%color_geometry) - cross(x_lev, penal)
@@ -324,8 +326,8 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
         params_nspp%u_residual     = params_nspp%u_residual     + residual_block * dV
         params_nspp%mean_flow      = params_nspp%mean_flow      + meanflow_block * dV
         params_nspp%meanflow_channel = params_nspp%meanflow_channel + meanflow_channel_block * dV
-        params_nspp%mask_volume    = params_nspp%mask_volume    + tmp_volume * dV
-        params_nspp%sponge_volume  = params_nspp%sponge_volume  + tmp_volume2 * dV
+        params_nspp%mask_volume    = params_nspp%mask_volume    + mask_volume * dV
+        params_nspp%sponge_volume  = params_nspp%sponge_volume  + sponge_volume * dV
         params_nspp%force_color    = params_nspp%force_color    + force_block * dV
         params_nspp%moment_color   = params_nspp%moment_color   + moment_block * dV
         params_nspp%e_kin          = params_nspp%e_kin          + ekin_block * dV
@@ -380,7 +382,7 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
         if (params_nspp%penalization .or. params_nspp%use_sponge) then
             !-------------------------------------------------------------------------
             ! volume of mask (useful to see if it is properly generated)
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%mask_volume, size(params_nspp%mask_volume), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             ! volume of sponge
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
@@ -433,12 +435,12 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
         if (is_insect) then
             do i_insect = 1, n_insects
                 ! store moments for the insect (so that it can compute the aerodynamic power) - body, wing_l, wing_r, (wing_l2, wing_r2)
-                Insects(i_insect)%PartIntegrals( 1 )%Torque = params_nspp%moment_color(1:3, 1 )
-                Insects(i_insect)%PartIntegrals( 2 )%Torque = params_nspp%moment_color(1:3, 2 )
-                Insects(i_insect)%PartIntegrals( 3 )%Torque = params_nspp%moment_color(1:3, 3 )
+                Insects(i_insect)%PartIntegrals( 1 )%Torque = params_nspp%moment_color(1:3, Insects(i_insect)%color_body )
+                Insects(i_insect)%PartIntegrals( 2 )%Torque = params_nspp%moment_color(1:3, Insects(i_insect)%color_l )
+                Insects(i_insect)%PartIntegrals( 3 )%Torque = params_nspp%moment_color(1:3, Insects(i_insect)%color_r )
                 if (Insects(i_insect)%second_wing_pair) then
-                    Insects(i_insect)%PartIntegrals( 4 )%Torque = params_nspp%moment_color(1:3, 4 )
-                    Insects(i_insect)%PartIntegrals( 5 )%Torque = params_nspp%moment_color(1:3, 5 )
+                    Insects(i_insect)%PartIntegrals( 4 )%Torque = params_nspp%moment_color(1:3, Insects(i_insect)%color_l2 )
+                    Insects(i_insect)%PartIntegrals( 5 )%Torque = params_nspp%moment_color(1:3, Insects(i_insect)%color_r2 )
                 endif
 
                 call aero_power (Insects(i_insect), apowtotal(i_insect))
@@ -464,9 +466,9 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
 
             call append_t_file( 'div.t', (/time, params_nspp%div_max, params_nspp%div_min/) )
             if (params_nspp%penalization .or. params_nspp%use_sponge) then
-                ! total force (excluding zero color)
-                call append_t_file( 'forces.t', (/time, sum(params_nspp%force_color(1,1:ncolors)), &
-                sum(params_nspp%force_color(2,1:ncolors)), sum(params_nspp%force_color(3,1:ncolors)) /) )
+                ! total force (excluding insect parts, they are considered by the full geometry, otherwise we count them twice)
+                call append_t_file( 'forces.t', (/time, sum(params_nspp%force_color(1,1:params_nspp%n_geometries)), &
+                sum(params_nspp%force_color(2,1:params_nspp%n_geometries)), sum(params_nspp%force_color(3,1:params_nspp%n_geometries)) /) )
 
                 ! forces/moment for individual colors.
                 ! This is what we should have done in the first place. For the insects below,
@@ -486,33 +488,33 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
                     ! information for each insect
                     do i_insect = 1, n_insects
                         ! total moment w.r.t body center is computed in zeroth color slot:
-                        color = 0_2
+                        color = insects(i_insect)%color_geometry
                         call append_t_file( 'moments.t', (/time, params_nspp%moment_color(:,color), dble(i_insect)/) )
 
                         ! body
-                        color = 1_2
+                        color = insects(i_insect)%color_body
                         call append_t_file( 'forces_body.t', (/time, params_nspp%force_color(:,color), dble(i_insect)/) )
                         call append_t_file( 'moments_body.t', (/time, params_nspp%moment_color(:,color), dble(i_insect)/) )
 
                         ! left wing
-                        color = 2_2
+                        color = insects(i_insect)%color_l
                         call append_t_file( 'forces_leftwing.t', (/time, params_nspp%force_color(:,color), dble(i_insect)/) )
                         call append_t_file( 'moments_leftwing.t', (/time, params_nspp%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
                         ! right wing
-                        color = 3_2
+                        color = insects(i_insect)%color_r
                         call append_t_file( 'forces_rightwing.t', (/time, params_nspp%force_color(:,color), dble(i_insect)/) )
                         call append_t_file( 'moments_rightwing.t', (/time, params_nspp%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
                         ! kinematics data ('kinematics.t')
                         if (Insects(i_insect)%second_wing_pair) then
                             ! second left wing
-                            color = 4_2
+                            color = insects(i_insect)%color_l2
                             call append_t_file( 'forces_leftwing2.t', (/time, params_nspp%force_color(:,color), dble(i_insect)/) )
                             call append_t_file( 'moments_leftwing2.t', (/time, params_nspp%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
                             ! second right wing
-                            color = 5_2
+                            color = insects(i_insect)%color_r2
                             call append_t_file( 'forces_rightwing2.t', (/time, params_nspp%force_color(:,color), dble(i_insect)/) )
                             call append_t_file( 'moments_rightwing2.t', (/time, params_nspp%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
@@ -520,7 +522,7 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
                     enddo
                 endif
 
-                call append_t_file( 'mask_volume.t', (/time, params_nspp%mask_volume, params_nspp%sponge_volume/) )
+                call append_t_file( 'mask_volume.t', (/time, params_nspp%mask_volume(1:ncolors), params_nspp%sponge_volume/) )
                 call append_t_file( 'penal_power.t', (/time, params_nspp%penal_power/) )
                 call append_t_file( 'u_residual.t', (/time, params_nspp%u_residual/) )    
             endif

@@ -23,32 +23,32 @@ subroutine timeStep_tree(time, dt, iteration, params, hvy_block, hvy_work, hvy_m
     endif
 
 
-    select case (params%time_step_method)
-    case ("Krylov")
+    select case (trim(standardize_string(params%time_step_method)))
+    case ("krylov")
         !-----------------------------------------------------------------------
         ! krylov scheme
         !-----------------------------------------------------------------------
         ! use krylov time stepping
         call krylov_time_stepper(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
 
-    case("RungeKuttaChebychev")
+    case("rungekuttachebychev")
         !-----------------------------------------------------------------------
         ! runge-kutta chebychev scheme
         !-----------------------------------------------------------------------
         call RungeKuttaChebychev(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
 
-    case("RungeKuttaGeneric")
+    case("rungekuttageneric")
         !-----------------------------------------------------------------------
         ! runge-kutta scheme
         !-----------------------------------------------------------------------
         call RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
 
-    case("RungeKuttaGeneric-FSI")
+    case("rungekuttageneric-fsi")
         ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They
         ! are applicable only for ACM module currently
         call RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)
 
-    case("RungeKuttaChebychev-FSI")
+    case("rungekuttachebychev-fsi")
         ! FSI versions of RK schemes advance a solid model simultaneously with the fluid. They
         ! are applicable only for ACM module currently
         call RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_work, hvy_mask, hvy_tmp, tree_ID)

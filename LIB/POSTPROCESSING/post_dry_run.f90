@@ -1,4 +1,4 @@
-subroutine post_dry_run
+subroutine post_dry_run(params)
 
     use mpi
     use module_helpers
@@ -19,14 +19,14 @@ subroutine post_dry_run
     integer(kind=ik)                    :: ierr             ! MPI error variable
     integer(kind=ik)                    :: number_procs     ! number of processes
     real(kind=rk)                       :: t0, t1, t2       ! cpu time variables for running time calculation
-    type (type_params)                  :: params           ! user defined parameter structure
+    type (type_params), intent(inout)   :: params           ! user defined parameter structure
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)               :: filename, fname, grid_list
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration
-    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final
-    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, include_tfinal
+    character(len=cshort)               :: filename, fname, grid_list, headers(1:100)
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz
+    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
+    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -70,6 +70,7 @@ subroutine post_dry_run
         write(*,*) ""
         write(*,*) " --save-us Save, in addition to mask_*.h5, also the solid velocity field us (a vector field)"
         write(*,*) " --save-color Save, in addition to mask_*.h5, also the color field (a scalar field)"
+        write(*,*) " --save-sponge Save, in addition to mask_*.h5, also the sponge field (a scalar field)"
         write(*,*) ""
         write(*,*) " --tstart: Start mask generation at this time."
         write(*,*) " --tfinal: End mask generation at this time, overwriting that from INI file"
@@ -95,6 +96,7 @@ subroutine post_dry_run
     call get_cmd_arg( "--pruned", pruned, default=.false. )
     call get_cmd_arg( "--save-color", save_color, default=.false. )
     call get_cmd_arg( "--save-us", save_us, default=.false. )
+    call get_cmd_arg( "--save-sponge", save_sponge, default=.false. )
     call get_cmd_arg( "--Jmin", Jmin_equi, default=params%Jmin )
     call get_cmd_arg( "--grid-list", grid_list, default="none" )
     call get_cmd_arg( "--tstart", time_start, default=0.0_rk )
@@ -103,22 +105,27 @@ subroutine post_dry_run
     params%time_max = time_final
     
 
-    ! for the dry run we dont need to use the fancy wavelets
+    ! for the dry run we dont need to use the fancy wavelets, as we do not sync
     params%wavelet = "CDF20"
-    call setup_wavelet(params)
+    call setup_wavelet(params, params%g)
     ! nor high-order discretization
     params%order_discretization = "FD_2nd_central"
+    if (params%rank==0) write(*,'(A)') "DRY-RUN: wavelet set to CDF20, order_discretization set to FD_2nd_central"
 
     ! modifications to parameters (because we use hvy_block instead of hvy_mask, NEQN set
     ! in ini file is not correct)
     deallocate( params%butcher_tableau )
     allocate( params%butcher_tableau(1,1) )
     ! mask, usx,usy,usz, color, sponge = 6 components
-    params%n_eqn = 6
+    if (save_sponge) then
+        params%n_eqn = 6
+    else
+        params%n_eqn = 5
+    endif
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = 0
-    params%threshold_state_vector_component(1) = 1
+    params%threshold_state_vector_component(1) = 1  ! old: threshold after mask
 
     deallocate(params%symmetry_vector_component)
     allocate(params%symmetry_vector_component(1:params%n_eqn))
@@ -130,20 +137,18 @@ subroutine post_dry_run
     params%force_maxlevel_dealiasing = .false.
     ! output this to user, because elsewise it might be confusing. This overwrites the PARAMS-file but is not output to the log-file elsewise
     if (params%force_maxlevel_dealiasing) then
-        if (params%rank==0) write(*,'(A)') "Force maxlevel dealiasing set to TRUE"
+        if (params%rank==0) write(*,'(A)') "DRY-RUN: Force maxlevel dealiasing set to TRUE"
     else
-        if (params%rank==0) write(*,'(A)') "Force maxlevel dealiasing set to FALSE"
+        if (params%rank==0) write(*,'(A)') "DRY-RUN: Force maxlevel dealiasing set to FALSE"
     endif
 
     params%eps = 1.0e-6
-    params%coarsening_indicator = "threshold-state-vector"
-    params%refinement_indicator = "mask-threshold"
+    params%coarsening_indicator = "threshold-state-vector"  ! we only want the real mask checking, so wavelet thresholding is ignored
+    params%refinement_indicator = "mask-threshold"  ! refine everywhere, where we have a mask interface
+    params%threshold_mask = .true.  ! we want to refine based on the mask value
 
     if (params%rank==0) then
-        write(*,'(A)') "DRY-RUN: creating mask function. Please note that the params"
-        write(*,'(A)') "         eps=1.0e-5, force_maxlevel_dealiasing=false and"
-        write(*,'(A)') "         threshold_state_vector_component are hard-coded"
-        write(*,'(A)') "         and thus NOT read from the INI file."
+        write(*,'(A)') "DRY-RUN: hardcoding eps=1.0e-6, threshold_state_vector_component(:)=1 and threshold_mask=T"
     endif
 
     Bs = params%Bs
@@ -155,16 +160,30 @@ subroutine post_dry_run
 
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
+
     ! have the pysics module read their own parameters
     call init_physics_modules( params, filename, params%N_mask_components )
+    params_acm%use_sponge = save_sponge
+    if (params%rank == 0) write(*,'(A,L1)') "DRY-RUN: sponge overwritten as use_sponge=", save_sponge
 
     ! allocate memory for heavy, light, work and neighbor data
-    call allocate_forest(params, hvy_mask, hvy_tmp=hvy_tmp, neqn_hvy_tmp=6)
+    call allocate_forest(params, hvy_mask, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn)
 
     ! The ghost nodes will call their own setup on the first call, but for cleaner output
     ! we can also just do it now.
     call init_ghost_nodes( params )
 
+    ! init t-file for mask volume - we assume 20 values
+    headers(1) = "time"
+    do k=1,20
+        write(headers(k+2),"(A,i0.3,A)") "c", k, ":mask_volume"
+    end do
+    if (save_sponge) then
+        headers(22) = "sponge_volume"
+        call init_t_file( 'mask_volume.t', overwrite=.true., header=headers(1:22) )
+    else
+        call init_t_file( 'mask_volume.t', overwrite=.true., header=headers(1:21) )
+    endif
 
     !-----------------------------------
     call init_insect_data(overwrite=.true.)
@@ -187,7 +206,7 @@ subroutine post_dry_run
             endif
 
             ! generate complete mask on the initial equidistant grid
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
 
 
             ! refine the grid near the interface and re-generate the mask function.
@@ -209,17 +228,15 @@ subroutine post_dry_run
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
                 ! on new grid, create the mask again
-                call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
                 Nmask = lgt_n(tree_ID_flow)
 
-                ! note we do not pass hvy_mask in the last argument, so the switch params%threshold_mask
-                ! is effectively ignored. It seems redundant; if we set a small eps (done independent
-                ! of the parameter file), this yields the same result
+                ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
                 call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
                 lgt_n_new = lgt_n(tree_ID_flow)
 
                 ! on new grid, create the mask again
-                call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
 
                 ! current finest level is:
                 Jnow = maxActiveLevel_tree(tree_ID_flow)
@@ -248,11 +265,38 @@ subroutine post_dry_run
             enddo
 
             ! on new grid, create the mask again
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
             Nmask = lgt_n(tree_ID_flow)
 
             ! write the kinematics file for the insects
             call write_insect_data(time)
+
+            ! we compute the mask (and sponge) volume for each color and write it to a file
+            mask_volume(:) = 0.0_rk
+            sponge_volume = 0.0_rk
+            do k=1,hvy_n(tree_ID_flow)
+                hvy_id = hvy_active(k,tree_ID_flow)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                call get_block_spacing_origin( params, lgt_id, x0, dx )
+                ! loop over all points
+                do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2); do iy = g+1,Bs(1)+g; do ix = g+1,Bs(1)+g
+                    ! add volume of this point to the correct color
+                    mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) = mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
+                enddo; enddo; enddo
+                if (save_sponge) then
+                    ! sponge volume is in 6th entry
+                    sponge_volume = sponge_volume + sum(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, g+1, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 6, hvy_id)) * product(dx(1:params%dim))
+                endif
+            enddo
+            ! allreduce to get the total volume for each color
+            call MPI_ALLREDUCE(MPI_IN_PLACE, mask_volume, 100, MPI_REAL, MPI_SUM, WABBIT_COMM, ierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, sponge_volume, 1, MPI_REAL, MPI_SUM, WABBIT_COMM, ierr)
+            ! usually, the physics module know how many colors there are, but we do not have access to it. So let's just assume 20 and write 20 values plus sponge volume
+            if (save_sponge) then
+                call append_t_file( 'mask_volume.t', (/time, mask_volume(1:20), sponge_volume/) )
+            else
+                call append_t_file( 'mask_volume.t', (/time, mask_volume(1:20)/) )
+            endif
 
             ! before (possible) pruning, we sync the ghosts
             call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
@@ -302,7 +346,7 @@ subroutine post_dry_run
             call readHDF5vct_tree( (/fname/), params, hvy_mask, tree_ID_flow, time=time)
 
             ! create the mask
-            call createMask_tree(params, time, hvy_mask, hvy_mask, .false.)
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
 
             ! as we intend to create the mask on a given grid, pruning makes no sense
 
@@ -324,6 +368,11 @@ subroutine post_dry_run
             if (save_color) then
                 write( fname,'(a, "_", a, ".h5")') "color", trim(adjustl(timestr(time)))
                 call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
+            endif
+
+            if (save_sponge) then
+                write( fname,'(a, "_", a, ".h5")') "sponge", trim(adjustl(timestr(time)))
+                call saveHDF5_tree(fname, time, -1_ik, 6, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
         enddo
         close (14)

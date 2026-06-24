@@ -76,7 +76,9 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
     ! compute k_1, k_2, .... (coefficients for final stage)
     do j = 2, size(rk_coeffs, 1) - 1
         t_stage = MPI_wtime()
+        !-----------------------------------------------------------------------
         ! prepare input for the RK substep
+        !-----------------------------------------------------------------------
         ! gives back the input for the RHS (from which in the final stage the next
         ! time step is computed).\n
         !
@@ -109,6 +111,9 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
             end do
         end do
 
+        !-----------------------------------------------------------------------
+        ! RK substep
+        !-----------------------------------------------------------------------
         ! synchronize ghost nodes for new input
         t_call = MPI_wtime()
         call sync_ghosts_RHS_tree( params, hvy_block(:,:,:,1:Neqn_RHS,:), tree_ID, g_minus=grhs, g_plus=grhs )

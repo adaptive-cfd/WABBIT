@@ -283,7 +283,8 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statis
 
 $(OBJDIR)/module_NSPP.o: module_NSPP.f90 rhs_NSPP.f90 create_mask.f90 save_data_NSPP.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_NSPP.f90 time_statistics_NSPP.f90 inicond_NSPP.f90 boundcond_NSPP.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o \
+	statistics_NSPP.f90 time_statistics_NSPP.f90 inicond_NSPP.f90 boundcond_NSPP.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_timing.o: module_timing.f90
@@ -324,7 +325,8 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_wavelets.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_wavelets.o $(OBJDIR)/module_physics_metamodule.o \
+	refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 rotation_matrices.f90

@@ -21,7 +21,7 @@ module module_params
         real(kind=rk) :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
         real(kind=rk) :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
-        character(len=cshort) :: time_step_method="RungeKuttaGeneric"
+        character(len=cshort) :: time_step_method="rungekuttageneric"
         character(len=cshort) :: krylov_subspace_dimension="fixed"
         logical :: RKC_custom_scheme=.false.
         real(kind=rk), dimension(1:60) :: RKC_mu=0.0_rk, RKC_mu_tilde=0.0_rk, RKC_nu=0.0_rk, RKC_gamma_tilde=0.0_rk, RKC_c=0.0_rk

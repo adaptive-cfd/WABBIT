@@ -16,6 +16,10 @@ module module_helpers
         module procedure step_disc2, step_disc4
     end interface
 
+    interface strings_are_similar
+        module procedure strings_are_similar_char, strings_are_similar_char_array
+    end interface
+
     interface get_cmd_arg
         module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
     end interface
@@ -864,13 +868,24 @@ contains
 
     !-------------------------------------------------------------------------!
     !> @brief compare if strings are similar, so allow for upper-lower case and "-" or "_" to be the same
-    logical function strings_are_similar(str1, str2)
+    logical function strings_are_similar_char(str1, str2)
         implicit none
         character(len=*), intent(in) :: str1, str2
 
-        strings_are_similar = (standardize_string(str1) == standardize_string(str2))
+        strings_are_similar_char = (standardize_string(str1) == standardize_string(str2))
 
-    end function strings_are_similar
+    end function strings_are_similar_char
+    !> Array overload of the above function, compares each element of the array to the string and gives back an array of logicals
+    function strings_are_similar_char_array(str1, str2)
+        implicit none
+        character(len=*), intent(in) :: str1(:), str2
+        logical :: strings_are_similar_char_array(size(str1))
+        integer :: i
+        do i = 1, size(str1)
+            strings_are_similar_char_array(i) = (standardize_string(str1(i)) == standardize_string(str2))
+        enddo
+
+    end function strings_are_similar_char_array
 
     !-------------------------------------------------------------------------!
     !> @brief standardize string by setting it to all lower-case and changing "_" to "-"
@@ -1082,7 +1097,7 @@ contains
                 end if
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," length=",i2)') trim(adjustl(name)), n
                     write(*,'(A,1x)') ( trim(adjustl(value(k))), k=1, n)
                 endif
 
@@ -1131,12 +1146,12 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302018, "Failed to convert to INTEGER.")
                 endif
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",i8)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1189,12 +1204,12 @@ contains
                 read(args, *, iostat=iostat) value
 
                 if (iostat /= 0) then
-                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to DOUBLE.")
                 endif
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",g15.8)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1264,13 +1279,13 @@ contains
                 elseif (args=="false".or.args=="0".or.args=="no".or.args=="FALSE".or.args=="n".or.args==".false.".or.args=="F".or.args=="f") then
                     value = .false.
                 else
-                    write(*,'(A)') " COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
+                    write(*,'(A)') "COMMAND-LINE-PARAMETER: read "//trim(adjustl(name))//" = "//trim(adjustl(args))
                     call abort(200302017, "Failed to convert to LOGICAL.")
                 endif
 
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1281,7 +1296,7 @@ contains
                 value = .true.
 
                 if (rank == 0) then
-                    write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
+                    write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",L1)') trim(adjustl(name)), value
                 endif
 
                 return
@@ -1291,7 +1306,7 @@ contains
 
         value = default
         if (rank == 0) then
-            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",L1," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+            write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",L1," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
         endif
 
     end subroutine

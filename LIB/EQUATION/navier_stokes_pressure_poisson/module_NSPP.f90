@@ -58,10 +58,6 @@ module module_nspp
     real(kind=rk) :: C_eta, beta, C_eta_temp, C_eta_start, C_eta_ring, penalization_startup_tau, penalization_startup_time
     integer(kind=ik) :: penalization_startup_colors
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
-    ! this is the force and moment that is applied on the insect from the fluid, it will be computed during RHS computations
-    ! as it is computed by the physics module, it was designed to be a member of the physics module at first
-    ! ToDo: the insects should contain the information themselves
-    real(kind=rk), allocatable :: force_insect_g(:, :), moment_insect_g(:, :)
     ! nu
     real(kind=rk) :: nu
     real(kind=rk) :: dx_min = -1.0_rk
@@ -517,8 +513,6 @@ contains
     enddo
     ! now we initialize the insects array
     call insects_array_init(n_insects)
-    allocate( params_nspp%force_insect_g(1:3, 0:n_insects))
-    allocate( params_nspp%moment_insect_g(1:3, 0:n_insects))
 
     ! Loop over all geometries and do geometry-specific initialization
     ncolors = 1
@@ -829,33 +823,35 @@ contains
             call init_t_file('moments_rightwing.t', overwrite)
             
             ! headers for state vector file
-            headers(1) = "           time"
             do i_insect = 1, n_insects
-                write(headers((i_insect-1)*23 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
-                write(headers((i_insect-1)*23 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
-                write(headers((i_insect-1)*23 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
-                write(headers((i_insect-1)*23 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
-                write(headers((i_insect-1)*23 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
-                write(headers((i_insect-1)*23 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
-                write(headers((i_insect-1)*23 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
-                write(headers((i_insect-1)*23 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
-                write(headers((i_insect-1)*23 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
-                write(headers((i_insect-1)*23 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
-                write(headers((i_insect-1)*23 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
-                write(headers((i_insect-1)*23 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
-                write(headers((i_insect-1)*23 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
-                write(headers((i_insect-1)*23 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
-                write(headers((i_insect-1)*23 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
-                write(headers((i_insect-1)*23 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
-                write(headers((i_insect-1)*23 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
-                write(headers((i_insect-1)*23 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
-                write(headers((i_insect-1)*23 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
-                write(headers((i_insect-1)*23 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
-                write(headers((i_insect-1)*23 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
-                write(headers((i_insect-1)*23 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
-                write(headers((i_insect-1)*23 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
+                write(headers((i_insect-1)*26 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
+                write(headers((i_insect-1)*26 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
+                write(headers((i_insect-1)*26 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
+                write(headers((i_insect-1)*26 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
+                write(headers((i_insect-1)*26 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
+                write(headers((i_insect-1)*26 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
+                write(headers((i_insect-1)*26 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
+                write(headers((i_insect-1)*26 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
+                write(headers((i_insect-1)*26 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
+                write(headers((i_insect-1)*26 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
+                write(headers((i_insect-1)*26 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
+                write(headers((i_insect-1)*26 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
+                write(headers((i_insect-1)*26 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
+                write(headers((i_insect-1)*26 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
+                write(headers((i_insect-1)*26 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
+                write(headers((i_insect-1)*26 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
+                write(headers((i_insect-1)*26 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
+                write(headers((i_insect-1)*26 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
+                write(headers((i_insect-1)*26 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
+                write(headers((i_insect-1)*26 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
+                write(headers((i_insect-1)*26 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
+                write(headers((i_insect-1)*26 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
+                write(headers((i_insect-1)*26 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
+                write(headers((i_insect-1)*26 + 25),"(A,i0.2,A)") "I", i_insect, ":moment-g-x"
+                write(headers((i_insect-1)*26 + 26),"(A,i0.2,A)") "I", i_insect, ":moment-g-y"
+                write(headers((i_insect-1)*26 + 27),"(A,i0.2,A)") "I", i_insect, ":moment-g-z"
             enddo
-            call init_t_file('insect_state_vector.t', overwrite, headers(1:23*n_insects+1) )
+            call init_t_file('insect_state_vector.t', overwrite, headers(1:26*n_insects+1) )
 
             if (has_two_wings) then
                 call init_t_file('forces_leftwing2.t', overwrite)

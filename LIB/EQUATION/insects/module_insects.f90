@@ -178,6 +178,8 @@ module module_insects
       !-------------------------------------------------------------
       real(kind=rk) :: time=0.0_rk
       real(kind=rk), allocatable :: RHS(:,:)
+      ! this is the force and moment that is applied on the insect from the fluid, it will be computed and stored during RHS computations
+      real(kind=rk), dimension(1:3) :: force_g=0.0_rk, moment_g=0.0_rk
       real(kind=rk), dimension(1:20) :: STATE=0.0_rk
       ! STATE(1) : x-position of body
       ! STATE(2) : y-position of body

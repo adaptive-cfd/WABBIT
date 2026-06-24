@@ -48,11 +48,10 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         z2 = Bs(3)+g
     endif
 
-    ! ToDo: Make this possible for NSPP as well, we should move the forces and stuff to the insects for that
-    if (.not. params%physics_type=="ACM-new") then
-        call abort(1202211,"this special FSI time stepper works only with the ACM")
+    if (.not. (params%physics_type=="ACM-new" .or. params%physics_type=="NSPP")) then
+        call abort(1202211,"this special FSI time stepper works only with ACM or NSPP for now")
     endif
-    if (.not. allocated(state_vector_write)) allocate(state_vector_write(1:23 * n_insects + 1))
+    if (.not. allocated(state_vector_write)) allocate(state_vector_write(1:26 * n_insects + 1))
 
     do i_insect = 1,n_insects
         if (.not. allocated(Insects(i_insect)%rhs)) then
@@ -95,11 +94,11 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), hvy_mask, hvy_tmp, tree_ID)
     call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
-    ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
+    ! the rhs wrapper has computed insects(i_insect)%force_g and moment_g
     t_call = MPI_wtime()
     do i_insect = 1, n_insects
         call rigid_solid_rhs( time + dt*rk_coeffs(1,1), iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,2), &
-        params_acm%force_insect_g(:,i_insect), params_acm%moment_insect_g(:,i_insect), Insects(i_insect) )
+        insects(i_insect)%force_g, insects(i_insect)%moment_g, Insects(i_insect) )
     enddo
     call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
 
@@ -164,11 +163,11 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp, tree_ID)
         call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
-        ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
+        ! the rhs wrapper has computed insects(i_insect)%force_g and moment_g
         t_call = MPI_wtime()
         do i_insect = 1, n_insects
             call rigid_solid_rhs(t, iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,j+1), &
-            params_acm%force_insect_g(:,i_insect), params_acm%moment_insect_g(:,i_insect), Insects(i_insect))
+            insects(i_insect)%force_g, insects(i_insect)%moment_g, Insects(i_insect))
         enddo
         call toc( "timestep (RHS rigid solid)", 22, MPI_wtime()-t_call)
 
@@ -218,7 +217,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
     state_vector_write = 0.0_rk
     state_vector_write(1) = time + dt
     do i_insect = 1, n_insects
-        state_vector_write( (i_insect-1)*23 + 2 : i_insect*23 + 1) = (/ Insects(i_insect)%STATE, params_acm%force_insect_g(:,i_insect) /)
+        state_vector_write( (i_insect-1)*26 + 2 : i_insect*26 + 1) = (/ Insects(i_insect)%STATE, insects(i_insect)%force_g, insects(i_insect)%moment_g /)
     enddo
     call append_t_file( 'insect_state_vector.t', state_vector_write )
 

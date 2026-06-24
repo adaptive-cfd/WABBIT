@@ -119,8 +119,10 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
 
         if (params_nspp%use_free_flight_solver) then
             ! reset forces, we compute their value now
-            params_nspp%force_insect_g(:, :) = 0.0_rk
-            params_nspp%moment_insect_g(:, :) = 0.0_rk
+            do i_insect = 1, n_insects
+                Insects(i_insect)%force_g = 0.0_rk
+                Insects(i_insect)%moment_g = 0.0_rk
+            enddo
         endif
 
     case ("integral_stage")
@@ -177,70 +179,41 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
 
         ! if (params_nspp%geometry == "Insect".and. params_nspp%use_free_flight_solver) then
         if (params_nspp%use_free_flight_solver) then
-            if (dim == 2) then
-                dV = dx(1)*dx(2)
-                f_block = 0.0_rk
-
-                do i_insect = 1, n_insects
+            dV = product(dx(1:params_nspp%dim))
+            f_block = 0.0_rk
+            do i_insect = 1, n_insects
+                do iz = merge(1, g+1, params_nspp%dim == 2), merge(1, Bs(3)+g, params_nspp%dim == 2)
+                    if (params_nspp%dim == 2) then
+                        z = 0.0_rk
+                    else
+                        z = x0(3) + dble(iz-(g+1)) * dx(3) - Insects(i_insect)%xc_body_g(3)
+                    endif
                     do iy = g+1, Bs(2)+g
                         y = x0(2) + dble(iy-(g+1)) * dx(2) - Insects(i_insect)%xc_body_g(2)
                         do ix = g+1, Bs(1)+g
                             x = x0(1) + dble(ix-(g+1)) * dx(1) - Insects(i_insect)%xc_body_g(1)
 
                             ! get this points color
-                            color = int( mask(ix, iy, 1, 5), kind=2 )
+                            color = int( mask(ix, iy, iz, 5), kind=2 )
 
-                            ! exclude walls, trees, etc... (they have color 0)
-                            ! if (color>0_2 .and. color < 6_2) then
-                            ! penalization term
-                            penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) / C_eta_apply(color)
+                            ! only include parts of the insect
+                            if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
+                                ! penalization term
+                                penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) / C_eta_apply(color)
 
-                            f_block = f_block - penal
-                            f_block(3) = 0.0_rk
+                                f_block(1:params_nspp%dim) = f_block(1:params_nspp%dim) - penal(1:params_nspp%dim)
 
-                            ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
 
-                            ! moments. For insects, we compute the total moment wrt to the body center
-                            ! params_nspp%moment_insect_g = params_nspp%moment_insect_g - cross((/x, y, z/), penal)*dV
-                            ! endif
+                                ! moments. For insects, we compute the total moment wrt to the body center
+                                insects(i_insect)%moment_g = insects(i_insect)%moment_g - cross((/x, y, z/), penal)*dV
+                            endif
                         enddo
                     enddo
-
-                    params_nspp%force_insect_g(:, i_insect) = params_nspp%force_insect_g(:, i_insect) + f_block*dV
                 enddo
-            else
-                dV = dx(1)*dx(2)*dx(3)
-                f_block = 0.0_rk
-
-                do i_insect = 1, n_insects
-                    do iz = g+1, Bs(3)+g
-                        z = x0(3) + dble(iz-(g+1)) * dx(3) - Insects(i_insect)%xc_body_g(3) ! note: x-xc insect
-                        do iy = g+1, Bs(2)+g
-                            y = x0(2) + dble(iy-(g+1)) * dx(2) - Insects(i_insect)%xc_body_g(2)
-                            do ix = g+1, Bs(1)+g
-                                x = x0(1) + dble(ix-(g+1)) * dx(1) - Insects(i_insect)%xc_body_g(1)
-
-                                ! get this points color
-                                color = int( mask(ix, iy, iz, 5), kind=2 )
-
-                                ! exclude walls, trees, etc... (they have color 0)
-                                if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
-                                    ! penalization term
-                                    penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) / C_eta_apply(color)
-
-                                    f_block = f_block - penal
-
-                                    ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
-
-                                    ! moments. For insects, we compute the total moment wrt to the body center
-                                    params_nspp%moment_insect_g(:, i_insect) = params_nspp%moment_insect_g(:, i_insect) - cross((/x, y, z/), penal)*dV
-                                endif
-                            enddo
-                        enddo
-                    enddo
-                    params_nspp%force_insect_g(:, i_insect) = params_nspp%force_insect_g(:, i_insect) + f_block*dV
-                enddo
-            endif ! NOTE: MPI_SUM is perfomed in the post_stage.
+                insects(i_insect)%force_g = insects(i_insect)%force_g + f_block*dV
+            enddo
+            ! NOTE: MPI_SUM is perfomed in the post_stage.
 
         endif
 
@@ -261,8 +234,10 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
         endif
 
         if (params_nspp%use_free_flight_solver) then
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%force_insect_g, 3*n_insects, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%moment_insect_g, 3*n_insects, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            do i_insect = 1, n_insects
+                call MPI_ALLREDUCE(MPI_IN_PLACE, insects(i_insect)%force_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+                call MPI_ALLREDUCE(MPI_IN_PLACE, insects(i_insect)%moment_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            enddo
         endif
 
     case ("local_stage")

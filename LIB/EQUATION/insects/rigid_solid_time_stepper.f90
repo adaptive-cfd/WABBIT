@@ -144,6 +144,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
     real(kind=rk), ALLOCATABLE :: array(:,:)
     integer :: mpicode, n_lines, n_cols, n_header, it, n_candidates
     real(kind=rk), dimension(0:3) :: ep
+    logical :: file_exists
 
     Insect%time = time
     Insect%STATE = 0.0_rk
@@ -153,7 +154,11 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
     if (root) write(*,'("rigid solid init at time=",es12.4)')  Insect%time
     if (root) write(*,'(A)') "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
 
-    if (resume_backup) then
+    ! check if the backup file exists, if not, we do not resume from backup
+    if (root) inquire(file='insect_state_vector.t', exist=file_exists)
+    call MPI_BCAST(file_exists, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpicode)
+
+    if (resume_backup .and. file_exists) then
         ! resuming the rigid solid solver from a backup
         ! NOTE: in old versions, this read a single *.fsi_bckp file which contained the state vector.
         ! In WABBIT, we write the state vector to *.t file in every time step, and so we look for the
@@ -199,6 +204,12 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
         call MPI_BCAST( Insect%STATE, size(Insect%STATE), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
 
     else ! no backup
+        if (root) then
+            write(*,'(A, es16.8)') "Rigid solid solver is initializing from parameter file"
+            if (resume_backup .and. .not. file_exists) then
+                write(*,'(A)') "WARNING: Rigid solver resumes simulation at later time, but ./insect_state_vector.t was not found. We initialize from parameter file instead. This might be correct, if you insert a free_flying insect at a later time."
+            endif
+        endif
 
         ! free flight solver based on quaternions. the task here is to initialize
         ! the "attitude" quaternion (Insect%quaternion) from yaw, pitch and roll

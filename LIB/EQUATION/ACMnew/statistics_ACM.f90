@@ -472,7 +472,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
                 ! store simplified insect state (which is NOT the same as the state vector that we use in free_flight simulations)
                 call append_t_file( 'insect_state.t', (/time, Insects(i_insect)%xc_body_g(1:3), Insects(i_insect)%vc_body_g(1:3), &
-                    Insects(i_insect)%psi, Insects(i_insect)%beta, Insects(i_insect)%gamma /) )
+                    Insects(i_insect)%gamma, Insects(i_insect)%beta, Insects(i_insect)%psi /) )
             enddo
         endif
 

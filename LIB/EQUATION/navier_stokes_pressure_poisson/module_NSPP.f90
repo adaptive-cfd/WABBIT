@@ -821,37 +821,53 @@ contains
             call init_t_file('moments_leftwing.t', overwrite)
             call init_t_file('forces_rightwing.t', overwrite)
             call init_t_file('moments_rightwing.t', overwrite)
+
+            ! headers for insect state (which is not the one used by free flight)
+            do i_insect = 1, n_insects
+                write(headers((i_insect-1)*9 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
+                write(headers((i_insect-1)*9 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
+                write(headers((i_insect-1)*9 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
+                write(headers((i_insect-1)*9 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
+                write(headers((i_insect-1)*9 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
+                write(headers((i_insect-1)*9 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
+                write(headers((i_insect-1)*9 + 8),"(A,i0.2,A)") "I", i_insect, ":yaw"
+                write(headers((i_insect-1)*9 + 9),"(A,i0.2,A)") "I", i_insect, ":pitch"
+                write(headers((i_insect-1)*9 + 10),"(A,i0.2,A)") "I", i_insect, ":roll"
+            enddo
+            call init_t_file('insect_state.t', overwrite, headers(1:9*n_insects+1) )
             
             ! headers for state vector file
-            do i_insect = 1, n_insects
-                write(headers((i_insect-1)*26 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
-                write(headers((i_insect-1)*26 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
-                write(headers((i_insect-1)*26 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
-                write(headers((i_insect-1)*26 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
-                write(headers((i_insect-1)*26 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
-                write(headers((i_insect-1)*26 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
-                write(headers((i_insect-1)*26 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
-                write(headers((i_insect-1)*26 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
-                write(headers((i_insect-1)*26 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
-                write(headers((i_insect-1)*26 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
-                write(headers((i_insect-1)*26 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
-                write(headers((i_insect-1)*26 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
-                write(headers((i_insect-1)*26 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
-                write(headers((i_insect-1)*26 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
-                write(headers((i_insect-1)*26 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
-                write(headers((i_insect-1)*26 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
-                write(headers((i_insect-1)*26 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
-                write(headers((i_insect-1)*26 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
-                write(headers((i_insect-1)*26 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
-                write(headers((i_insect-1)*26 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
-                write(headers((i_insect-1)*26 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
-                write(headers((i_insect-1)*26 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
-                write(headers((i_insect-1)*26 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
-                write(headers((i_insect-1)*26 + 25),"(A,i0.2,A)") "I", i_insect, ":moment-g-x"
-                write(headers((i_insect-1)*26 + 26),"(A,i0.2,A)") "I", i_insect, ":moment-g-y"
-                write(headers((i_insect-1)*26 + 27),"(A,i0.2,A)") "I", i_insect, ":moment-g-z"
-            enddo
-            call init_t_file('insect_state_vector.t', overwrite, headers(1:26*n_insects+1) )
+            if (params_nspp%use_free_flight_solver) then
+                do i_insect = 1, n_insects
+                    write(headers((i_insect-1)*26 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
+                    write(headers((i_insect-1)*26 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
+                    write(headers((i_insect-1)*26 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
+                    write(headers((i_insect-1)*26 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
+                    write(headers((i_insect-1)*26 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
+                    write(headers((i_insect-1)*26 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
+                    write(headers((i_insect-1)*26 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
+                    write(headers((i_insect-1)*26 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
+                    write(headers((i_insect-1)*26 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
+                    write(headers((i_insect-1)*26 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
+                    write(headers((i_insect-1)*26 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
+                    write(headers((i_insect-1)*26 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
+                    write(headers((i_insect-1)*26 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
+                    write(headers((i_insect-1)*26 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
+                    write(headers((i_insect-1)*26 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
+                    write(headers((i_insect-1)*26 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
+                    write(headers((i_insect-1)*26 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
+                    write(headers((i_insect-1)*26 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
+                    write(headers((i_insect-1)*26 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
+                    write(headers((i_insect-1)*26 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
+                    write(headers((i_insect-1)*26 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
+                    write(headers((i_insect-1)*26 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
+                    write(headers((i_insect-1)*26 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
+                    write(headers((i_insect-1)*26 + 25),"(A,i0.2,A)") "I", i_insect, ":moment-g-x"
+                    write(headers((i_insect-1)*26 + 26),"(A,i0.2,A)") "I", i_insect, ":moment-g-y"
+                    write(headers((i_insect-1)*26 + 27),"(A,i0.2,A)") "I", i_insect, ":moment-g-z"
+                enddo
+                call init_t_file('insect_state_vector.t', overwrite, headers(1:26*n_insects+1) )
+            endif
 
             if (has_two_wings) then
                 call init_t_file('forces_leftwing2.t', overwrite)

@@ -132,14 +132,19 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/="threshold-cvs" .and. indicator/="threshold-image-denoise" .and. indicator/="undo_refinement") then
         t0 = MPI_Wtime()
-        if ( .not. consider_hvy_tmp .and. .not. input_is_WD) then
-            ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
-            call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
+        if (all(params%eps_normalized_hardcode(:) == 0.0_rk)) then
+            if ( .not. consider_hvy_tmp .and. .not. input_is_WD) then
+                ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
+                call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
+            else
+                ! use derived qtys instead (hvy_tmp) or pre-saved values for leaf-wise loop
+                ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and original values copied to hvy_tmp
+                ! norm is computed from original values, not WD values
+                call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            endif
         else
-            ! use derived qtys instead (hvy_tmp) or pre-saved values for leaf-wise loop
-            ! For adapt_tree leaf-wise we ensure that at this spot all blocks are wavelet decomposed and original values copied to hvy_tmp
-            ! norm is computed from original values, not WD values
-            call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
+            ! use hardcoded values for the norm
+            norm(1:N_thresholding_components) = params%eps_normalized_hardcode(1:N_thresholding_components)
         endif
 
         ! HACK

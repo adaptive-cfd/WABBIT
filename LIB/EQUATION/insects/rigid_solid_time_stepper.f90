@@ -147,7 +147,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
 
     Insect%time = time
     Insect%STATE = 0.0_rk
-    n_header = 0
+    n_header = 1
 
     if (root) write(*,'(A)') "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
     if (root) write(*,'("rigid solid init at time=",es12.4)')  Insect%time
@@ -160,8 +160,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
         ! data in this file. As simulations may fail and be resumed from a different time step, we use the
         ! last suitable entry in this file.
         if (root) then
-            write(*,'(A)') "Rigid solid solver is resuming from file: we read Insect%STATE from ./insect_state_vector.t"
-            write(*,*) "time=", time
+            write(*,'(A, es16.8)') "Rigid solid solver is resuming from file: we read Insect%STATE from ./insect_state_vector.t, time=",time
 
             call count_lines_in_ascii_file('insect_state_vector.t', n_lines, n_header)
             call count_cols_in_ascii_file('insect_state_vector.t', n_cols, n_header)
@@ -169,6 +168,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
             if (n_cols < 21) call abort(202117021, "For some reason insect_state_vector.t contains not enough columns....something is wrong?")
 
             allocate( array(1:n_lines, 1:n_cols) )
+            array = 0.0_rk
             call read_array_from_ascii_file('insect_state_vector.t', array, n_header)
 
             n_candidates = 0
@@ -176,7 +176,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
                 if ( abs(array(it,1)-time) <= 1.0e-6 ) n_candidates = n_candidates +1
             end do
 
-            write(*,*) "In insect_state_vector.t we found ", n_candidates, "possible time stamps and we use the last one!"
+            write(*,'(A, i0, A)') "In insect_state_vector.t we found ", n_candidates, " possible time stamps and we use the last one!"
 
             if (n_candidates == 0) then
                 call abort(20210291, "Resuming from insect_state_vector.t was impossible as no time stamp is sufficiently close to what we need.")
@@ -186,7 +186,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
                 if ( abs(array(it,1)-time) <= 1.0e-6 ) then
                     ! each insect does 23 entries in state-vector: 20 state vector and 3 forces
                     Insect%STATE = array(it,2+23*(Insect_ID-1):21+23*(Insect_ID-1))
-                    write(*,*) "Found suitable entry in line=", it, " time=", array(it,1)
+                    write(*,'(A, i0, A, es16.8)') "Found suitable entry in line=", it, " time=", array(it,1)
                     write(*,'("Insect%STATE=(",20(es15.8,1x),")")')  Insect%STATE
                     exit
                 endif

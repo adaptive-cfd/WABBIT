@@ -58,6 +58,7 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk) :: eps=0.0_rk
         logical :: eps_normalized = .false.
+        real(kind=rk), allocatable, dimension(:) :: eps_normalized_hardcode
         integer :: azzalini_iterations = 1
         logical :: threshold_wc = .false.
         character(len=cshort) :: eps_norm="Linfty"

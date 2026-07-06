@@ -73,10 +73,8 @@ module module_MPI
     ! As we always loop over hvy_id, only one block needs to be filtered at a time, so if we filter a
     ! new block we delete the old filtered values from the previous one.
     real(kind=rk), allocatable :: hvy_restricted(:, :, :, :)
-    real(kind=rk), allocatable :: hvy_predicted(:, :, :, :)
     ! We need to save which block currently is filtered
     integer(kind=ik) :: restricted_hvy_ID
-    integer(kind=ik) :: predicted_hvy_ID
 
 
 
@@ -148,10 +146,17 @@ subroutine init_ghost_nodes( params )
             write(*,'("GHOST-INIT: g= ",i2, " , g_RHS= ", i2)') params%g, params%g_rhs
         endif
 
-        if (params%Jmax>params%Jmin) then 
-            ! if thats not the case, the run is equidistant
+        ! for adaptive grids, we need to synch g from finer neighbors and the stencil reach is twice as large
+        if (params%Jmin /= params%Jmax) then
             if (g>=(Bs(1)+1)/2 .or. g>=(Bs(2)+1)/2 .or. (g>=(Bs(3)+1)/2 .and. params%dim==3)) then
                 call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1)/2 (in at least one direction) which implies &
+                & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
+                & number_ghost_nodes or increase number_block_nodes.")
+            endif
+        else
+	        ! for equidistant grids, we do not have level differences and therefore just need to ensure that g fits in the block
+            if (g>=(Bs(1)+1) .or. g>=(Bs(2)+1) .or. (g>=(Bs(3)+1) .and. params%dim==3)) then
+                call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1) (in at least one direction) which implies &
                 & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
                 & number_ghost_nodes or increase number_block_nodes.")
             endif
@@ -305,21 +310,11 @@ subroutine xfer_ensure_correct_buffer_size(params, hvy_block)
 
     ! initialize that no block is currently filtered
     restricted_hvy_ID = -1
-    predicted_hvy_ID = -1
 
     if (allocated(hvy_restricted)) then
         if (nc > size(hvy_restricted, 4)) deallocate(hvy_restricted)
     endif
     if (.not. allocated(hvy_restricted)) allocate(hvy_restricted(1:nx, 1:ny, 1:nz, 1:nc) )
-
-    if (allocated(hvy_predicted)) then
-        if (nc > size(hvy_predicted, 4)) deallocate(hvy_predicted)
-    endif
-    if (.not. allocated(hvy_restricted)) then
-        if (params%dim == 3) allocate(hvy_restricted(1:nx*2, 1:ny*2, 1:nz*2, 1:nc) )
-        if (params%dim == 2) allocate(hvy_restricted(1:nx*2, 1:ny*2, 1, 1:nc) )
-    endif
-
 
 end subroutine
 
@@ -327,15 +322,20 @@ end subroutine
 ! setup the ghost patches (i.e. the indices of the sender/receiver parts
 ! for any neighborhood relation), where a smaller subset of the ghost nodes
 ! can be synced (the g you pass must be <= params%g)
-subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file)
+subroutine ghosts_setup_patches(params, gminus, gplus, output_to_file, set_order_predictor)
     implicit none
     type (type_params), intent(in) :: params
     integer(kind=ik), intent(in) :: gminus, gplus
     logical, intent(in) :: output_to_file
+    character(len=cshort), intent(in), optional :: set_order_predictor  !< if present, this overwrites params%order_predictor
 
     integer(kind=ik) :: N_neighbors, lvl_diff, neighborhood, i, j, k
     integer(kind=ik) :: ijk_recv(2,3), ijk_send(2,3), ijk_buff(2,3)
     logical :: debug_to_file
+    character(len=cshort) :: order_predictor
+
+    order_predictor = params%order_predictor
+    if (present(set_order_predictor)) order_predictor = set_order_predictor
 
     ! full reset of all patch definitions. Note we set 1 not 0
     ijkPatches = 1

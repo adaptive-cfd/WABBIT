@@ -20,19 +20,20 @@ module module_convdiff_new
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_convdiff, PREPARE_SAVE_DATA_convdiff, RHS_convdiff, GET_DT_BLOCK_convdiff, &
-  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff
+  INICOND_convdiff, FIELD_NAMES_convdiff, STATISTICS_convdiff, TIME_STATISTICS_convdiff, INITIALIZE_ASCII_FILES_convdiff
   !**********************************************************************************************
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
-    real(kind=rk) :: domain_size(3)=0.0_rk, scalar_integral=0.0_rk,w0(3)=0.0_rk, scalar_max=0.0_rk
-    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary
+    real(kind=rk) :: domain_size(3)=0.0_rk,w0(3)=0.0_rk
+    real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary, scalar_integral, scalar_max
     real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
     logical :: time_statistics = .false.
     integer(kind=ik) :: N_time_statistics = 0
+    real(kind=rk), allocatable :: time_statistics_mean(:), time_statistics_maxabs(:)
     character(len=cshort), allocatable :: names(:), inicond(:), velocity(:), time_statistics_names(:)
     character(len=cshort) :: discretization,boundary_type
     logical,dimension(3):: periodic_BC=(/.true.,.true.,.true./)
@@ -90,6 +91,8 @@ contains
     allocate( params_convdiff%inicond(1:params_convdiff%N_scalars))
     allocate( params_convdiff%velocity(1:params_convdiff%N_scalars))
 
+    allocate( params_convdiff%scalar_integral(1:params_convdiff%N_scalars) )
+    allocate( params_convdiff%scalar_max(1:params_convdiff%N_scalars) )
 
 
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'nu', params_convdiff%nu )
@@ -125,6 +128,8 @@ contains
     if (params_convdiff%time_statistics) then
         call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_convdiff%N_time_statistics, 1)
         allocate( params_convdiff%time_statistics_names(1:params_convdiff%N_time_statistics) )
+        allocate( params_convdiff%time_statistics_mean(1:params_convdiff%N_time_statistics) )
+        allocate( params_convdiff%time_statistics_maxabs(1:params_convdiff%N_time_statistics) )
         call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_convdiff%time_statistics_names, (/"none"/))
     endif
 
@@ -179,7 +184,7 @@ contains
   ! NOTE that as we have way more work arrays than actual state variables (typically
   ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
   !-----------------------------------------------------------------------------
-  subroutine PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work )
+  subroutine PREPARE_SAVE_DATA_convdiff( time, u, g, x0, dx, work, names_override )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -200,8 +205,11 @@ contains
     ! output in work array.
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
+    ! if you want to save something that is not in the default list of variables, you can specify a list of names here.
+    character(len=*), optional, intent(in) :: names_override(:)
+
     ! local variables
-    integer(kind=ik) :: neqn, nwork, i_var, k, i_time_statistics
+    integer(kind=ik) :: neqn, nwork, i_var, k, i_time_statistics, n_names
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -209,8 +217,22 @@ contains
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    do k = 1, size(params_convdiff%names,1)
-        name = params_convdiff%names(k)
+    if (present(names_override)) then
+        n_names = size(names_override)
+    else
+        n_names = size(params_convdiff%names,1)
+    endif
+
+    if (size(work,4) < n_names) then
+        call abort(2505201, "ACM: PREPARE_SAVE_DATA_ACM: work array has insufficient components for requested names list")
+    endif
+
+    do k = 1, n_names
+        if (present(names_override)) then
+            name = names_override(k)
+        else
+            name = params_convdiff%names(k)
+        endif
         
         ! saving of phi, read if it starts with "phi" and has no "-" in there for time statistics
         if (name(1:3) == "phi" .and. index(name, "-") == 0) then
@@ -254,7 +276,7 @@ contains
         endif
 
         ! if any of those endings is in the name, then it is a timestatistics variable
-        if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
+        if (index(name, "-avg") > 0 .or. index(name, "-var") > 0 &
             .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0 .or. index(name, "-cov") > 0) then
             ! now we have to find the index of it
             do i_time_statistics = 1, params_convdiff%N_time_statistics
@@ -285,7 +307,7 @@ contains
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=cshort), intent(out) :: name
+    character(len=clong), intent(out) :: name
 
     if (allocated(params_convdiff%names)) then
       name = params_convdiff%names(N)
@@ -548,6 +570,26 @@ contains
 
 
   end subroutine INICOND_convdiff
+
+
+  subroutine INITIALIZE_ASCII_FILES_convdiff( time, overwrite )
+    implicit none
+
+    ! it may happen that some source terms have an explicit time-dependency
+    ! therefore the general call has to pass time
+    real(kind=rk), intent (in) :: time
+    logical, intent(in) :: overwrite
+    
+    call init_t_file('scalar_integral.t', overwrite)
+    call init_t_file('scalar_max.t', overwrite)
+
+    if (params_convdiff%time_statistics) then
+        call init_t_file('time_statistics_mean.t', overwrite)
+        call init_t_file('time_statistics_maxabs.t', overwrite)
+    endif
+
+  end subroutine INITIALIZE_ASCII_FILES_convdiff
+
 
 
 

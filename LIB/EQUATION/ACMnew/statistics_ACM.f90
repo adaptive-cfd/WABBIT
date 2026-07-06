@@ -42,19 +42,15 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
     
     ! local variables
-    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3)
+    integer(kind=ik) :: mpierr, ix, iy, iz, k, Bs(1:3), x1,x2,y1,y2,z1,z2
     real(kind=rk) :: meanflow_block(1:3), residual_block(1:3), ekin_block, tmp_volume, tmp_volume2, meanflow_channel_block(1:3)
     real(kind=rk) :: force_block(1:3, 0:ncolors), moment_block(1:3, 0:ncolors), x_glob(1:3), x_lev(1:3)
-    real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal=0.0_rk, apowtotal=0.0_rk
+    real(kind=rk) :: x0_moment(1:3, 0:ncolors), ipowtotal(1:n_insects), apowtotal(1:n_insects)
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
-    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0
-    real(kind=rk) :: V_channel, u_bulk, tol, weight_trapez, y_lower, y_upper
-    real(kind=rk), dimension(3) :: dxyz
-    real(kind=rk), dimension(1:3,1:5) :: iwmoment
+    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0, V_channel, u_bulk, tol, weight_trapez, y_lower, y_upper
+    real(kind=rk) :: dxyz(1:3), iwmoment(1:n_insects, 1:3,1:5)
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
-    ! we have quite some of these work arrays in the code, but they are very small,
-    ! only one block. They're ngeligible in front of the lgt_block array.
-    real(kind=rk), allocatable, save :: div(:,:,:)
+    ! Color defines which objects belong together, default values are:
     ! Color         Description
     !   0           Boring parts (channel walls, cavity)
     !   1           Interesting parts (e.g. a cylinder), for the insects this is BODY
@@ -62,9 +58,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     !   3           For the insects, this is RIGHT WING
     !   4           Other parts, for the insects, this is 2ND LEFT WING
     !   5           For the insects, this is 2ND RIGHT WING
-    integer(kind=2), allocatable, save :: mask_color(:,:,:)
     integer(kind=2) :: color
-    logical :: is_insect, use_color
+    logical :: is_insect, has_two_wings
+    integer :: i_insect
     character(len=64) :: fname
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
@@ -75,25 +71,33 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     Bs(2) = size(u,2) - 2*g
     if (params_acm%dim == 3) Bs(3) = size(u,3) - 2*g
 
+    ! block interior slicing excluding ghost points, for easier reading
+    x1 = g+1
+    x2 = Bs(1)+g
+    y1 = g+1
+    y2 = Bs(2)+g
+    if (params_acm%dim==3) then
+        z1 = g+1
+        z2 = Bs(3)+g
+    else
+        z1 = 1
+        z2 = 1
+    endif
+    dV = product(dx(1:params_acm%dim))
+
     C_eta_inv    = 1.0_rk / params_acm%C_eta
     C_sponge_inv = 1.0_rk / params_acm%C_sponge
     C_0          = params_acm%C_0
 
-    if (params_acm%dim==3) then
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-        if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1:Bs(3)+2*g))
-        dV = dx(1)*dx(2)*dx(3)
-    else
-        if (.not. allocated(mask_color)) allocate(mask_color(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-        if (.not. allocated(div)) allocate(div(1:Bs(1)+2*g, 1:Bs(2)+2*g, 1))
-        dV = dx(1)*dx(2)
-    endif
-
     ! save some computing time by using a logical and not comparing every time
     is_insect = .false.
-    use_color = .false.
-    if (params_acm%geometry == "Insect") is_insect = .true.
-    if (params_acm%geometry == "two-moving-cylinders") use_color = .true.
+    if (any(params_acm%geometries(:) == "Insect").or.any(params_acm%geometries(:)=="active_grid") &
+        .or. any(params_acm%geometries(:)=="cylinder-free").or.any(params_acm%geometries(:)=="sphere-free").or.any(params_acm%geometries(:)=="plate-free")) is_insect = .true.
+
+    has_two_wings = .false.
+    do i_insect = 1, n_insects
+        has_two_wings = has_two_wings .or. (insects(i_insect)%second_wing_pair)
+    enddo
 
 
 
@@ -110,6 +114,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%moment_color = 0.0_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
+        params_acm%max_vort = 0.0_rk
         params_acm%helicity = 0.0_rk
         params_acm%mask_volume = 0.0_rk
         params_acm%sponge_volume = 0.0_rk
@@ -121,12 +126,15 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%dissipation = 0.0_rk
         params_acm%umag = 0.0_rk
         params_acm%ACM_energy = 0.0_rk
+        if (params_acm%time_statistics) then
+            params_acm%time_statistics_mean = 0.0_rk
+            params_acm%time_statistics_maxabs = 0.0_rk
+        endif
 
         dx_min = 90.0e9_rk
 
-        if (is_insect) then
-            call Update_Insect(time, Insect)
-        endif
+        ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+        call Update_All_Insects(time)
 
     case ("integral_stage")
         ! minium spacing of current grid, not smallest possible one.
@@ -139,8 +147,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! called for each block.
 
         do k = 1, size(u,4)
-            if (maxval(abs(u(:,:,:,k))) > 1.0e12_rk) then
-                write(*,'("Statistics: maxval in u(:,:,:,",i2,") = ", es10.4, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es8.2))') k, maxval(abs(u(:,:,:,k))), x0, dx
+            if (maxval(abs(u(:,:,:,k))) > LIM_DIVERGED) then
+                write(*,'("Statistics: maxval in u(:,:,:,",i2,") = ", es10.3, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es9.2))') k, maxval(abs(u(:,:,:,k))), x0, dx
 
                 call dump_block_fancy(u(:,:,:,k:k), "block_ACM_diverged_statistics.txt", Bs, g)
 
@@ -167,194 +175,118 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ACM_energy_block = 0.0_rk
 
         ! default for moment computation is the centre point of the object (=lever)
+        ! In general, this is not block-dependent, but it's cheap to compute anyways, so I won't make it persistent
         x0_moment(1,:) = params_acm%x_cntr(1)
         x0_moment(2,:) = params_acm%x_cntr(2)
         x0_moment(3,:) = params_acm%x_cntr(3)
         ! in insects, other levers are used
         ! some preparations that we do not want to compute each time within the loop
-        if (is_insect) then
+        do i_insect = 1, n_insects
             ! body moment
-            x0_moment(1:3, Insect%color_body) = Insect%xc_body_g
+            x0_moment(1:3, Insects(i_insect)%color_body) = Insects(i_insect)%xc_body_g
             ! left wing
-            x0_moment(1:3, Insect%color_l) = Insect%x_pivot_l_g
+            x0_moment(1:3, Insects(i_insect)%color_l) = Insects(i_insect)%x_pivot_l_g
             ! right wing
-            x0_moment(1:3, Insect%color_r) = Insect%x_pivot_r_g
+            x0_moment(1:3, Insects(i_insect)%color_r) = Insects(i_insect)%x_pivot_r_g
             ! second left and second right wings
-            if (Insect%second_wing_pair) then
-                x0_moment(1:3, Insect%color_l2) = Insect%x_pivot_l2_g
-                x0_moment(1:3, Insect%color_r2) = Insect%x_pivot_r2_g
+            if (Insects(i_insect)%second_wing_pair) then
+                x0_moment(1:3, Insects(i_insect)%color_l2) = Insects(i_insect)%x_pivot_l2_g
+                x0_moment(1:3, Insects(i_insect)%color_r2) = Insects(i_insect)%x_pivot_r2_g
             endif
-        endif
+        enddo
 
-        if (params_acm%dim == 2) then
-            ! --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D --- --- 2D ---
-            call compute_divergence( u(:,:,:,1:2), dx, Bs, g, params_acm%discretization, div)
+        ! most integral quantities can be computed with block-wise function calls
+        ! compute mean flow for output in statistics
+        do k = 1, params_acm%dim
+            meanflow_block(k) = sum(u(x1:x2, y1:y2, z1:z2, k))
+        enddo
 
-            ! mask divergence inside the solid body
-            where (mask(:,:,:,1)>0.0_rk)
-                div = 0.00_rk
-            end where
+        ! kinetic energy
+        ekin_block = 0.5_rk*sum( u(x1:x2, y1:y2, z1:z2,1:params_acm%dim)**2 )
 
-            ! most integral quantities can be computed with block-wise function calls
-            ! compute mean flow for output in statistics
-            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
-            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 2))
+        ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty,
+        ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
+        ACM_energy_block = 0.5_rk*sum( u(x1:x2, y1:y2, z1:z2,params_acm%dim+1)**2 )/C_0**2 + ekin_block
 
-            ! kinetic energy
-            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1:2)**2 )
+        ! square of maximum of velocity in the field
+        params_acm%umag = max( params_acm%umag, maxval(sum(u(x1:x2, y1:y2, z1:z2,1:params_acm%dim)**2, dim=4)))
 
-            ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty, 
-            ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 3)**2 )/C_0**2 + ekin_block
+        ! maximum/min divergence in velocity field
+        call compute_divergence( u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
 
-            ! square of maximum of velocity in the field
-            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g,:,1:2)**2, dim=4)))
+        ! mask divergence inside the solid body
+        where (mask(:,:,:,1)>0.0_rk)
+            work(:,:,:,1) = 0.00_rk
+        end where
+        params_acm%div_max = max( params_acm%div_max, maxval(work(x1:x2, y1:y2, z1:z2,1)))
+        params_acm%div_min = min( params_acm%div_min, minval(work(x1:x2, y1:y2, z1:z2,1)))
 
-            ! maximum/min divergence in velocity field
-            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
-            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, 1)))
-
+        ! penalization part
+        if (params_acm%penalization .or. params_acm%use_sponge) then
             ! volume of mask (useful to see if it is properly generated)
-            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1))
+            tmp_volume = sum(mask(x1:x2, y1:y2, z1:z2, 1))
             ! volume of sponge
-            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 6))
+            if (params_acm%use_sponge) tmp_volume2 = sum(mask(x1:x2, y1:y2, z1:z2, 6))
 
-            ! some computations need point-wise loops
-            do iy = g+1, Bs(2)+g
-                do ix = g+1, Bs(1)+g
-                    color = int( mask(ix, iy, 1, 5), kind=2 )
+            ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
+            ! energy input from solid : (usx * (u-uxs) + usy * (v-usy) + usz * (w-usz)) * chi / C_eta
+            penal_power_block(1) = sum( &
+                 (mask(x1:x2, y1:y2, z1:z2, 2)*(u(x1:x2, y1:y2, z1:z2,1)-mask(x1:x2, y1:y2, z1:z2, 2)) &
+                + mask(x1:x2, y1:y2, z1:z2, 3)*(u(x1:x2, y1:y2, z1:z2,2)-mask(x1:x2, y1:y2, z1:z2, 3))) &
+                * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv)
+            if (params_acm%dim == 3) then
+                penal_power_block(1) = penal_power_block(1) + sum( &
+                      mask(x1:x2, y1:y2, z1:z2, 4)*(u(x1:x2, y1:y2, z1:z2,3)-mask(x1:x2, y1:y2, z1:z2, 4)) &
+                    * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv )
+            endif
+            ! dissipation inside solid : ((u-uxs)**2 + (v-usy)**2 + (w-usz)**2) * chi / C_eta
+            penal_power_block(2) = sum( &
+                 ((u(x1:x2, y1:y2, z1:z2,1)-mask(x1:x2, y1:y2, z1:z2, 2))**2 &
+                + (u(x1:x2, y1:y2, z1:z2,2)-mask(x1:x2, y1:y2, z1:z2, 3))**2) &
+                * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv )
+            if (params_acm%dim == 3) then
+                penal_power_block(2) = penal_power_block(2) + sum(((u(x1:x2, y1:y2, z1:z2,3)-mask(x1:x2, y1:y2, z1:z2, 4))**2) * mask(x1:x2, y1:y2, z1:z2, 1)*C_eta_inv )
+            endif
+            ! sponge input : ( u*(u-ubar) + v*(v-vbar) + w*(w-wbar) ) * chi_sponge / C_sponge
+            ! attention division by C_sponge C0**2 because of the way the energy eqn is derived (it is divided by C_0**2
+            ! such that dp/dt 1/C0**2 is on the right side)
+            if (params_acm%use_sponge) then
+                penal_power_block(3) = sum( &
+                     (u(x1:x2, y1:y2, z1:z2,1)*(u(x1:x2, y1:y2, z1:z2,1)-params_acm%u_mean_set(1)) &
+                    + u(x1:x2, y1:y2, z1:z2,2)*(u(x1:x2, y1:y2, z1:z2,2)-params_acm%u_mean_set(2)) &
+                    + u(x1:x2, y1:y2, z1:z2,params_acm%dim+1)*(u(x1:x2, y1:y2, z1:z2,params_acm%dim+1)-0.0_rk)/C_0**2) &
+                    * mask(x1:x2, y1:y2, z1:z2, 6) * C_sponge_inv )
+                if (params_acm%dim == 3) then
+                    penal_power_block(3) = penal_power_block(3) + sum( &
+                        u(x1:x2, y1:y2, z1:z2,3)*(u(x1:x2, y1:y2, z1:z2,3)-params_acm%u_mean_set(3)) &
+                        * mask(x1:x2, y1:y2, z1:z2, 6) * C_sponge_inv )
+                endif
+            endif
 
-                    chi = mask(ix,iy,1,1) * C_eta_inv
-                    usx = mask(ix,iy,1,2)
-                    usy = mask(ix,iy,1,3)
-
-                    ! forces acting on body
-                    force_block(1, color) = force_block(1, color) + (u(ix,iy,1,1)-usx)*chi
-                    force_block(2, color) = force_block(2, color) + (u(ix,iy,1,2)-usy)*chi
-
-                    ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                    ! energy input from solid:
-                    penal_power_block(1) = penal_power_block(1) + (usx*(u(ix,iy,1,1)-usx) + usy*(u(ix,iy,1,2)-usy))*chi
-                    ! dissipation inside solid:
-                    penal_power_block(2) = penal_power_block(2) + ( (u(ix,iy,1,1)-usx)**2 + (u(ix,iy,1,2)-usy)**2) *chi
-                    ! sponge input:
-                    penal_power_block(3) = penal_power_block(3) + ( u(ix,iy,1,1)*(u(ix,iy,1,1)-params_acm%u_mean_set(1)) + u(ix,iy,1,2)*(u(ix,iy,1,2)-params_acm%u_mean_set(2))) *mask(ix,iy,1,6)
-
-
-                    ! residual velocity in the solid domain
-                    residual_block(1) = max( residual_block(1), (u(ix,iy,1,1)-usx) * mask(ix,iy,1,1))
-                    residual_block(2) = max( residual_block(2), (u(ix,iy,1,2)-usy) * mask(ix,iy,1,1))
-                enddo
+            ! residual velocity in the solid domain
+            do k = 1, params_acm%dim
+                residual_block(k) = maxval( abs(u(x1:x2, y1:y2, z1:z2,k)-mask(x1:x2, y1:y2, z1:z2, k+1)) * mask(x1:x2, y1:y2, z1:z2, 1) )
             enddo
 
-            ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
-            ! sense to keep track of this. however, note that with Neumann BC, that makes no
-            ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
-            if (params_acm%use_passive_scalar .and. params_acm%scalar_BC_type == "dirichlet") then
-                ! should we ever use more than 1 scalar seriously, this has to be adopted
-                ! because it uses only the 1st one (:,:,1,4)
-                ! assumes *homogeneous* dirichlet condition
-                scalar_removal_block = scalar_removal_block + sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 4)) * C_eta_inv
-            endif
-        else
-            ! --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D --- --- 3D ---
-            ! compute divergence on this block
-            call compute_divergence( u(:,:,:,1:3), dx, Bs, g, params_acm%discretization, div)
-
-            ! mask divergence inside the solid body
-            where (mask(:,:,:,1)>0.0_rk)
-                div = 0.00_rk
-            end where
-
-            ! block-wise function calls for quantities
-            ! compute mean flow for output in statistics
-            meanflow_block(1) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            meanflow_block(2) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 2))
-            meanflow_block(3) = sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 3))
-
-            tol = 1.0e-12_rk
-            y_lower = params_acm%h_channel
-            y_upper = params_acm%domain_size(2) - params_acm%h_channel
-
-            ! relevant in 3D only
-            if (params_acm%use_channel_forcing) then
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1)) * dx(2)
-
-                    if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
-
-                        if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
-                            weight_trapez = 0.5_rk
-                        else
-                            weight_trapez = 1.0_rk
-                        endif
-
-                        meanflow_channel_block(1) = meanflow_channel_block(1) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
-                        meanflow_channel_block(2) = meanflow_channel_block(2) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
-                        meanflow_channel_block(3) = meanflow_channel_block(3) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
-                    endif
-                enddo
-            endif
-
-            ! kinetic energy
-            ekin_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2 )
-
-            ! acm energy (kinetic energy + artificial pressure energy, 0.5*p**2/C0**2). As C0->\infty, 
-            ! the latter vanishes, just as in the incompressible limit, where we have only kinetic energy.
-            ACM_energy_block = 0.5_rk*sum( u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 4)**2 )/C_0**2 + ekin_block
-
-            ! square of maximum of velocity in the field
-            params_acm%umag = max( params_acm%umag, maxval(sum(u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2,dim=4)))
-
-            ! maximum/min divergence in velocity field
-            params_acm%div_max = max( params_acm%div_max, maxval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
-            params_acm%div_min = min( params_acm%div_min, minval(div(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g)))
-
-            ! volume of mask (useful to see if it is properly generated)
-            ! NOTE: in wabbit, mask is really the mask: it is not divided by C_eta yet.
-            tmp_volume = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1))
-            ! volume of sponge
-            tmp_volume2 = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 6))
-
-            ! point-wise loop for quantities
-            do iz = g+1, Bs(3)+g
-                z = x0(3) + dble(iz-(g+1)) * dx(3)
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1)) * dx(2)
-                    do ix = g+1, Bs(1)+g
+            ! some computations need point-wise loops, as we are picking the color of the points
+            do iz = z1,z2
+                if (params_acm%dim == 2) then
+                    z = 0.0_rk
+                else
+                    z = x0(3) + dble(iz-(g+1)) * dx(3)
+                endif
+                do iy = y1,y2
+                    y = x0(2) + dble(iy-(g+1)) * dx(2) 
+                    do ix = x1,x2
                         x = x0(1) + dble(ix-(g+1)) * dx(1)
 
-                        chi        = mask(ix,iy,iz,1) * C_eta_inv
-                        usx        = mask(ix,iy,iz,2)
-                        usy        = mask(ix,iy,iz,3)
-                        usz        = mask(ix,iy,iz,4)
-                        color      = int( mask(ix, iy, iz, 5), kind=2 )
-                        chi_sponge = mask(ix,iy,iz,6) * C_sponge_inv
+                        color = int( mask(ix, iy, iz, 5), kind=2 )
 
                         ! penalization term
                         penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
-                        ! residual velocity in the solid domain
-                        residual_block(1) = max( residual_block(1), (u(ix,iy,iz,1)-mask(ix,iy,iz,2))*mask(ix,iy,iz,1) )
-                        residual_block(2) = max( residual_block(2), (u(ix,iy,iz,2)-mask(ix,iy,iz,3))*mask(ix,iy,iz,1) )
-                        residual_block(3) = max( residual_block(3), (u(ix,iy,iz,3)-mask(ix,iy,iz,4))*mask(ix,iy,iz,1) )
-
-                        ! penalization power (input from solid motion), see Engels et al. J. Comput. Phys. 2015
-                        ! NOTE: as this is qty used to show the global energy budget, it includes ALL mask colors
-                        ! 1/ energy input from solid:
-                        penal_power_block(1) = penal_power_block(1) + (usx*(u(ix,iy,iz,1)-usx) + usy*(u(ix,iy,iz,2)-usy) + usz*(u(ix,iy,iz,3)-usz))*chi
-                        ! 2/ dissipation inside solid:
-                        penal_power_block(2) = penal_power_block(2) + ((u(ix,iy,iz,1)-usx)**2 + (u(ix,iy,iz,2)-usy)**2 + (u(ix,iy,iz,3)-usz)**2)*chi
-                        ! 3/ sponge input:
-                        ! attention division by C_sponge C0**2 because of the way the energy eqn is derived (it is divided by C_0**2
-                        ! such that dp/dt 1/C0**2 is on the right side)
-                        penal_power_block(3) = penal_power_block(3) + ( u(ix,iy,iz,1)*(u(ix,iy,iz,1)-params_acm%u_mean_set(1)) &
-                                                                      + u(ix,iy,iz,2)*(u(ix,iy,iz,2)-params_acm%u_mean_set(2)) &
-                                                                      + u(ix,iy,iz,3)*(u(ix,iy,iz,3)-params_acm%u_mean_set(3)) &
-                                                                      + u(ix,iy,iz,4)*(u(ix,iy,iz,4)-0.0_rk)/C_0**2 ) *chi_sponge 
-
                         ! forces acting on this color
-                        force_block(1:3, color) = force_block(1:3, color) - penal
+                        force_block(1:params_acm%dim, color) = force_block(1:params_acm%dim, color) - penal(1:params_acm%dim)
 
                         ! moment with color-dependent lever
                         x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
@@ -370,16 +302,42 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! moments. For insects, we compute the total moment wrt to the body center, and
                         ! the wing moments wrt to the hinge points. The latter two are used to compute the
                         ! aerodynamic power. Makes sense only in 3D.
-                        if ((is_insect).and.(color>0_2 .and. color < 6_2)) then ! Insect has colors (1,2,3,4,5) at most
-                            ! in the zeroth color, we compute the total moment for the whole
-                            ! insect wrt the center point (body+wings)
-                            x_lev(1:3) = (/x, y, z/) - Insect%xc_body_g(1:3)
-                            moment_block(:,0)  = moment_block(:,0) - cross(x_lev, penal)
+                        if (is_insect .and. params_acm%dim == 3) then
+                            do i_insect = 1, n_insects
+                                if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
+                                    ! in the geometry color of the insect, we compute the total force and moment for the whole
+                                    ! insect wrt the center point (body+wings)
+                                    force_block(1:params_acm%dim, insects(i_insect)%color_geometry) = force_block(1:params_acm%dim, insects(i_insect)%color_geometry) - penal(1:params_acm%dim)
+                                    x_lev(1:3) = (/x, y, z/) - Insects(1)%xc_body_g(1:3)
+                                    moment_block(:,insects(i_insect)%color_geometry)  = moment_block(:,insects(i_insect)%color_geometry) - cross(x_lev, penal)
+                                endif
+                            enddo
                         endif
-
                     enddo
                 enddo
             enddo
+
+			if (params_acm%use_channel_forcing) then
+				do iy = y1, y2 ! g+1, Bs(2)+g
+					y = x0(2) + dble(iy-(g+1)) * dx(2)
+					tol = 1.0e-12_rk
+					y_lower = params_acm%h_channel
+					y_upper = params_acm%domain_size(2) - params_acm%h_channel
+
+					if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
+
+						if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
+							weight_trapez = 0.5_rk
+						else
+							weight_trapez = 1.0_rk
+						endif
+
+						meanflow_channel_block(1) = meanflow_channel_block(1) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
+						meanflow_channel_block(2) = meanflow_channel_block(2) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
+						meanflow_channel_block(3) = meanflow_channel_block(3) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
+					endif
+				enddo
+			endif
 
             ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
             ! sense to keep track of this. however, note that with Neumann BC, that makes no
@@ -388,9 +346,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! should we ever use more than 1 scalar seriously, this has to be adopted
                 ! because it uses only the 1st one (:,:,:,5)
                 ! assumes *homogeneous* dirichlet condition
-                scalar_removal_block = sum(mask(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 5)) * C_eta_inv
+                scalar_removal_block = sum(mask(x1:x2, y1:y2, z1:z2, 1) * u(x1:x2, y1:y2, z1:z2, params_acm%dim+2)) * C_eta_inv
             endif
-
         endif
 
         ! we just computed the values on the current block, which we now add to the
@@ -413,17 +370,25 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call compute_vorticity(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,:))
 
         if (params_acm%dim == 2) then
-            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)**2)*dV
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(x1:x2, y1:y2, z1:z2, 1)**2)*dV
+            params_acm%max_vort = max( params_acm%max_vort, maxval( abs(work(x1:x2, y1:y2, z1:z2, 1)) ) )
         else
-            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3)**2)*dV
-            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3) * u(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1:3))*dV
+            params_acm%enstrophy = params_acm%enstrophy + 0.5_rk*sum(work(x1:x2, y1:y2, z1:z2, 1:3)**2)*dV
+            params_acm%max_vort = max( params_acm%max_vort, maxval( sqrt(sum( work(x1:x2, y1:y2, z1:z2, 1:3)**2, dim=4 )) ) )
+            params_acm%helicity = params_acm%helicity + 0.5_rk*sum(work(x1:x2, y1:y2, z1:z2, 1:3) * u(x1:x2, y1:y2, z1:z2, 1:3))*dV
         end if
 
-        call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
-        if (params_acm%dim == 2) then
-            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1)) * dV
-        else
-            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1)) * dV
+        if (params_acm%nu > 0.0_rk) then
+            call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,1))
+            params_acm%dissipation = params_acm%dissipation - params_acm%nu * sum(work(x1:x2, y1:y2, z1:z2, 1)) * dV
+        endif
+
+        ! we want to output some measurements for the timestatistics, just to see if everything is in order
+        if (params_acm%time_statistics) then
+            do k = 1, params_acm%n_time_statistics
+                params_acm%time_statistics_mean(k) = params_acm%time_statistics_mean(k) + dV * sum( u(x1:x2, y1:y2, z1:z2,params_acm%dim+1+params_acm%N_scalars+k) )
+                params_acm%time_statistics_maxabs(k) = max( params_acm%time_statistics_maxabs(k), maxval(abs(u(x1:x2, y1:y2, z1:z2,params_acm%dim+1+params_acm%N_scalars+k))) )
+            enddo
         endif
 
     case ("post_stage")
@@ -431,11 +396,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! 3rd stage: post_stage.
         !-------------------------------------------------------------------------
         ! this stage is called only once, NOT for each block.
-
-        ! volume of mask (useful to see if it is properly generated)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        ! volume of sponge
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         ! mean flow (in entire domain)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -445,18 +405,25 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! mean flow but only in fluid domain
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%meanflow_channel, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
-            ! include one additional grid spacing in y because the mean flow is averaged
-            ! over all discrete channel layers including both wall-aligned grid points
-            V_channel = params_acm%domain_size(1) * params_acm%domain_size(3) * (params_acm%domain_size(2) - 2.0_rk*params_acm%h_channel)
+			! analytically compute the volume of our channel (no numerical integration required, simple multiplication)
+            V_channel = params_acm%domain_size(1)*params_acm%domain_size(3)*(params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)
             params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
         endif
 
-        ! force & moment
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_color, size(params_acm%moment_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        ! residual velocity in solid domain
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        if (params_acm%penalization .or. params_acm%use_sponge) then
+            !-------------------------------------------------------------------------
+            ! volume of mask (useful to see if it is properly generated)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            ! volume of sponge
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+            ! force & moment
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_color, size(params_acm%moment_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            ! residual velocity in solid domain
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%u_residual, 3, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%penal_power, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
 
         !-------------------------------------------------------------------------
         ! scalar removal
@@ -467,42 +434,63 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         !-------------------------------------------------------------------------
         ! kinetic energy
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%ACM_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+
+        ! energy limiter (used for testing operator instability). If active, kills the simulation
+        ! if current energy exceeds 2.1 times the initial one.
+        if ( params_acm%use_energy_limiter) then
+            if (time<=1.0e-6_rk) then
+                params_acm%energy_start = params_acm%ACM_energy
+            elseif ((time>1.0e-4_rk).and.(params_acm%ACM_energy>0.0_rk)) then
+                if (params_acm%ACM_energy > 2.1_rk * params_acm%energy_start ) then
+                    call abort(888888, "Energy is doubled, leaving.")
+                endif
+            endif
+        endif
 
         !-------------------------------------------------------------------------
         ! divergence
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
-
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%div_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         !-------------------------------------------------------------------------
         ! kinetic enstrophy
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
+        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%max_vort, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%helicity, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
-        call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        if (params_acm%nu > 0.0_rk) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%dissipation, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+        endif
 
         ! minium spacing of current grid, not smallest possible one.
         call MPI_ALLREDUCE(MPI_IN_PLACE, dx_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
+        ! time statistics
+        if (params_acm%time_statistics) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_mean, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            params_acm%time_statistics_mean = params_acm%time_statistics_mean / product(params_acm%domain_size(1:params_acm%dim))
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_maxabs, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        endif
+
         umag = params_acm%umag
 
         ! compute aerodynamic power
         if (is_insect) then
-            ! store moments for the insect (so that it can compute the aerodynamic power)
-            Insect%PartIntegrals( Insect%color_body )%Torque = params_acm%moment_color(1:3, Insect%color_body )
-            Insect%PartIntegrals( Insect%color_l )%Torque = params_acm%moment_color(1:3, Insect%color_l )
-            Insect%PartIntegrals( Insect%color_r )%Torque = params_acm%moment_color(1:3, Insect%color_r )
-            if (Insect%second_wing_pair) then
-                Insect%PartIntegrals( Insect%color_l2 )%Torque = params_acm%moment_color(1:3, Insect%color_l2 )
-                Insect%PartIntegrals( Insect%color_r2 )%Torque = params_acm%moment_color(1:3, Insect%color_r2 )
-            endif
+            do i_insect = 1, n_insects
+                ! store moments for the insect (so that it can compute the aerodynamic power) - body, wing_l, wing_r, (wing_l2, wing_r2)
+                Insects(i_insect)%PartIntegrals( 1 )%Torque = params_acm%moment_color(1:3, 1 )
+                Insects(i_insect)%PartIntegrals( 2 )%Torque = params_acm%moment_color(1:3, 2 )
+                Insects(i_insect)%PartIntegrals( 3 )%Torque = params_acm%moment_color(1:3, 3 )
+                if (Insects(i_insect)%second_wing_pair) then
+                    Insects(i_insect)%PartIntegrals( 4 )%Torque = params_acm%moment_color(1:3, 4 )
+                    Insects(i_insect)%PartIntegrals( 5 )%Torque = params_acm%moment_color(1:3, 5 )
+                endif
 
-            call aero_power (Insect, apowtotal)
-            call inert_power(Insect, ipowtotal, iwmoment)
+                call aero_power (Insects(i_insect), apowtotal(i_insect))
+                call inert_power(Insects(i_insect), ipowtotal(i_insect), iwmoment(i_insect, :, :))
+            enddo
         endif
 
         !-------------------------------------------------------------------------
@@ -533,69 +521,56 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,1:ncolors)), &
                 sum(params_acm%force_color(2,1:ncolors)), sum(params_acm%force_color(3,1:ncolors)) /) )
 
-                ! forces/moment for individual colors.
+                ! forces/moment for individual colors all in one file
                 ! This is what we should have done in the first place. For the insects below,
                 ! some colors are (also) stored to different names. That's unfortunate but not a big deal.
-                do color = 0, ncolors
-                    ! save force for each color
-                    write(fname,'("forces_color",i1,".t")') color
-                    call append_t_file( fname, (/time, params_acm%force_color(:,color)/) )
+                ! Reshape flattens the array, so that we'd have for a(2,2): (/a(1,1), a(2,1), a(1,2), a(2,2)/)
+                call append_t_file( "forces_color.t", (/time, reshape(params_acm%force_color(:,:), (/ 3*ncolors/))/) )
 
-                    ! save moment for each color
-                    write(fname,'("moments_color",i1,".t")') color
-                    call append_t_file( fname, (/time, params_acm%moment_color(:,color)/) )
-                enddo
+                ! save moment for each color in one file
+                call append_t_file( "moments_color.t", (/time, reshape(params_acm%moment_color(:,:), (/ 3*ncolors/))/) )
 
                 if (is_insect) then
-                    call append_t_file( 'aero_power.t', (/time, apowtotal, ipowtotal/) )
+                    call append_t_file( 'aero_power.t', (/time, apowtotal(:), ipowtotal(:)/) )
 
-                    ! total moment w.r.t body center is computed in zeroth color slot:
-                    color = 0_2
-                    call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color)/) )
+                    ! kinematics
+                    call Write_insect_data( time )
 
-                    ! body
-                    color = Insect%color_body
-                    call append_t_file( 'forces_body.t', (/time, params_acm%force_color(:,color)/) )
-                    call append_t_file( 'moments_body.t', (/time, params_acm%moment_color(:,color)/) )
+                    ! information for each insect
+                    do i_insect = 1, n_insects
+                        ! total moment w.r.t body center is computed in zeroth color slot:
+                        color = 0_2
+                        call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color), dble(i_insect)/) )
 
-                    ! left wing
-                    color = Insect%color_l
-                    call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color)/) )
-                    call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                        ! body
+                        color = 1_2
+                        call append_t_file( 'forces_body.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
+                        call append_t_file( 'moments_body.t', (/time, params_acm%moment_color(:,color), dble(i_insect)/) )
 
-                    ! right wing
-                    color = Insect%color_r
-                    call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color)/) )
-                    call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                        ! left wing
+                        color = 2_2
+                        call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
+                        call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
-                    ! kinematics data ('kinematics.t')
-                    if (Insect%second_wing_pair) then
-                        ! second left wing
-                        color = Insect%color_l2
-                        call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color)/) )
-                        call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                        ! right wing
+                        color = 3_2
+                        call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
+                        call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
-                        ! second right wing
-                        color = Insect%color_r2
-                        call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color)/) )
-                        call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(:,color)/) )
+                        ! kinematics data ('kinematics.t')
+                        if (Insects(i_insect)%second_wing_pair) then
+                            ! second left wing
+                            color = 4_2
+                            call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
+                            call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
 
-                        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-                        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-                        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-                        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-                        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
-                        Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
-                        Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
-                        Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
-                        Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
-                    else
-                        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-                        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-                        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-                        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-                        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
-                    endif
+                            ! second right wing
+                            color = 5_2
+                            call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
+                            call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
+
+                        endif
+                    enddo
                 endif
 
                 call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume, params_acm%sponge_volume/) )
@@ -607,20 +582,28 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call append_t_file( 'scalar_removal.t', (/time, params_acm%scalar_removal/) )
             endif
             call append_t_file( 'e_kin.t', (/time, params_acm%e_kin, params_acm%ACM_energy/) )
-            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy/) )
+            call append_t_file( 'enstrophy.t', (/time, params_acm%enstrophy, params_acm%max_vort/) )
             if (params_acm%dim == 3) then
                 call append_t_file( 'helicity.t', (/time, params_acm%helicity/) )
             endif
-            call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
+            if (params_acm%nu > 0.0_rk)  then
+                call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
+            endif
 
             ! turbulent statistics - these are normed by the volume!
-            if (params_acm%nu*params_acm%enstrophy > 0.0_rk) then
+            if (params_acm%nu*params_acm%enstrophy > 0.0_rk .and. params_acm%HIT_linear_forcing) then
                 ! dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
                 dissipation = params_acm%dissipation/product(params_acm%domain_size(1:params_acm%dim))
                 u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
                 call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
+            endif
+
+            ! time statistics
+            if (params_acm%time_statistics) then
+                call append_t_file( 'time_statistics_mean.t', (/time, params_acm%time_statistics_mean/) )
+                call append_t_file( 'time_statistics_maxabs.t', (/time, params_acm%time_statistics_maxabs/) )
             endif
 
             ! this file is to simply keep track of simulations, should they be restarted with different parameters.

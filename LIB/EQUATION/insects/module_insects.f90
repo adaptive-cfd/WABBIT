@@ -4,6 +4,7 @@ module module_insects
    use module_insects_integration_flusi_wabbit
    use module_t_files
    use module_stl_file_reader
+   use module_geometry
 
    implicit none
 
@@ -12,8 +13,8 @@ module module_insects
    PRIVATE
 
    ! functions
-   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_Insect, insect_init, fractal_tree_init, &
-      insect_clean, draw_fractal_tree, draw_active_grid_winglets, &
+   PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, Update_All_Insects, insects_array_init, insect_init, &
+      insect_clean, draw_active_grid_winglets, init_insect_data, write_insect_data, &
       aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_rhs, &
       BodyMotion, FlappingMotionWrap, StrokePlane, mask_from_pointcloud, &
       body_rotation_matrix, wing_rotation_matrix
@@ -36,53 +37,12 @@ module module_insects
 
    ! size (global) of domain
    real(kind=rk) :: xl, yl, zl
-   ! viscosity (just for printing the Reynolds number)
+   ! viscosity (just for printing the Reynolds number), this can always be global because it is not insect-specific
    real(kind=rk) :: nu
 
    ! arrays for fourier coefficients are fixed size (avoiding issues with allocatable
    ! elements in derived datatypes) this is their length:
    integer, parameter :: nfft_max = 1024
-
-   ! Allocatable arrays used in Insect object
-   ! this will hold the surface markers and their normals used for particles:
-   real(kind=rk), allocatable, dimension(:,:) :: particle_points
-   ! wing thickness profile
-   real(kind=rk), allocatable, dimension(:,:,:) :: wing_thickness_profile
-   ! wing thickness profile array dimensions
-   integer, dimension(1:4), save :: wing_thickness_a, wing_thickness_b
-   ! wing corrugation profile
-   real(kind=rk), allocatable, dimension(:,:,:) :: corrugation_profile
-   ! wing corrugation profile array dimensions
-   integer, dimension(1:4), save :: corrugation_a, corrugation_b
-   ! wing damage mask
-   real(kind=rk), allocatable, dimension(:,:,:) :: damage_mask
-   ! wing damage mask array dimensions
-   integer, dimension(1:4), save :: damage_a, damage_b
-   !KVN-2025>>>>>
-   ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
-   real(kind=rk), allocatable, dimension(:,:,:) :: deformations
-   real(kind=rk), allocatable, dimension(:,:,:) :: deformation_profile
-   integer, dimension(1:4), save :: deformation_a, deformation_b, deformation_c
-   !KVN-2025<<<<<
-
-   ! wing signed distance function, if the 3d-interpolation approach is used.
-   ! This is useful for highly complex wings, where one generates the mask only once
-   ! and then interpolates the values to the global grid. note the data allocated
-   ! here is of course understood in the wing system, so the linear transformation
-   ! x_g -> x_w' is used, where x_w' is not a grid-aligned value x_w
-   real(kind=rk), allocatable, dimension(:,:,:), save :: mask_wing_complete
-   real(kind=rk), dimension(1:3), save :: mask_wing_xl, mask_wing_x0
-   integer, dimension(1:3), save :: mask_wing_nxyz
-   integer, save :: mask_wing_safety=4
-
-   !-----------------------------------------------------------------------------
-   ! stuff for the fractal tree
-   real(kind=rk), allocatable, save :: treedata(:,:)
-   real(kind=rk), allocatable, save :: treedata_boundingbox(:,:)
-   ! array for superSTL file for the body
-   real(kind=rk), allocatable, save :: body_superSTL_b(:,:)
-   real(kind=rk), allocatable, save :: body_superSTL_g(:,:)
-
 
    !-----------------------------------------------------------------------------
    ! TYPE DEFINITIONS
@@ -292,15 +252,6 @@ module module_insects
       logical :: damaged(1:4)
 
       !--------------------------------------------------------------
-      ! Fractal tree
-      !--------------------------------------------------------------
-      logical :: fractal_tree = .false.
-      character(len=clong) :: fractal_tree_file = "tree_data.in"
-      real(kind=rk), dimension(1:3) :: fractal_tree_x0 = (/0.0_rk, 0.0_rk, 0.0_rk/)
-      real(kind=rk) :: fractal_tree_scaling = 1.0_rk
-      logical :: fractal_tree_spheres = .true.
-
-      !--------------------------------------------------------------
       ! Wing kinematics
       !--------------------------------------------------------------
       ! wing kinematics Fourier coefficients
@@ -330,6 +281,10 @@ module module_insects
       real(kind=rk) :: b_top=0.0_rk, b_bot=0.0_rk, L_span=0.0_rk, WingThickness=0.0_rk
       ! this is a safety distance for smoothing:
       real(kind=rk) :: safety=0.0_rk, smooth=0.0_rk, C_smooth=1.0_rk, dx_reference=0.0_rk, C_shell_thickness=5.0_rk
+      ! some more VPM parameters will be stored in the insect, that can be individual
+      character(len=clong) :: smoothing_type=""
+      integer :: smoothing_type_int=0  ! in point-wise loops, we have to avoid character comparisons, so we use this integer
+      real(kind=rk) :: epsilon_hester=0.0_rk
       ! parameter for hovering:
       real(kind=rk) :: distance_from_sponge=0.0_rk
       ! Wings and body forces (1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing)
@@ -339,9 +294,60 @@ module module_insects
       ! parameters for mask coloring
       !-------------------------------------------------------------
       ! available color values
-      integer(kind=2) :: color_body=1, color_l=2, color_r=3, color_l2=4, color_r2=5
+      ! color_body - color of main body of the insect
+      ! color_l - color of left wing
+      ! color_r - color of right wing
+      ! color_l2 - color of second left wing, if it exists
+      ! color_r2 - color of second right wing, if it exists
+      ! color_geometry - color of the full insect, used for computing forces / moments wrt the full insect
+      integer(kind=2) :: color_body=1, color_l=2, color_r=3, color_l2=4, color_r2=5, color_geometry=0
+
+      !-------------------------------------------------------------
+      ! Allocatable arrays used in Insect object
+      !-------------------------------------------------------------
+
+      ! this will hold the surface markers and their normals used for particles:
+      real(kind=rk), allocatable, dimension(:,:) :: particle_points
+      ! wing thickness profile
+      real(kind=rk), allocatable, dimension(:,:,:) :: wing_thickness_profile
+      ! wing thickness profile array dimensions
+      integer, dimension(1:4) :: wing_thickness_a, wing_thickness_b
+      ! wing corrugation profile
+      real(kind=rk), allocatable, dimension(:,:,:) :: corrugation_profile
+      ! wing corrugation profile array dimensions
+      integer, dimension(1:4) :: corrugation_a, corrugation_b
+      ! wing damage mask
+      real(kind=rk), allocatable, dimension(:,:,:) :: damage_mask
+      ! wing damage mask array dimensions
+      integer, dimension(1:4) :: damage_a, damage_b
+      !KVN-2025>>>>>
+      ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
+      real(kind=rk), allocatable, dimension(:,:,:) :: deformations
+      real(kind=rk), allocatable, dimension(:,:,:) :: deformation_profile
+      integer, dimension(1:4) :: deformation_a, deformation_b, deformation_c
+      !KVN-2025<<<<<
+
+      ! wing signed distance function, if the 3d-interpolation approach is used.
+      ! This is useful for highly complex wings, where one generates the mask only once
+      ! and then interpolates the values to the global grid. note the data allocated
+      ! here is of course understood in the wing system, so the linear transformation
+      ! x_g -> x_w' is used, where x_w' is not a grid-aligned value x_w
+      real(kind=rk), allocatable, dimension(:,:,:) :: mask_wing_complete
+      real(kind=rk), dimension(1:3) :: mask_wing_xl, mask_wing_x0
+      integer, dimension(1:3) :: mask_wing_nxyz
+      integer :: mask_wing_safety=4
+
+      !-----------------------------------------------------------------------------
+      ! array for superSTL file for the body
+      real(kind=rk), allocatable :: body_superSTL_b(:,:)
+      real(kind=rk), allocatable :: body_superSTL_g(:,:)
    end type diptera
    !-----------------------------------------------------------------------------
+
+   ! this module contains the insects objects. All other routines have to implicitly call update routines of this module to work with them
+   ! It's a bit inconvenient that this is located underneath the type definition, but it is necessary
+   integer(kind=ik), public :: n_insects = 0
+   type(diptera), allocatable, public :: Insects(:)
 
 contains
 
@@ -358,7 +364,7 @@ contains
 #include "stroke_plane.f90"
 #include "kineloader.f90"
 #include "pointcloud.f90"
-#include "fractal_trees.f90"
+! #include "fractal_trees.f90"
 #include "active_grid_winglets.f90"
 !---------------------------------------
 
@@ -379,80 +385,80 @@ contains
 
       select case ( array_name )
        case ("wing_thickness_profile")
-         if (.not.allocated(wing_thickness_profile)) then
-            allocate(wing_thickness_profile(1:a,1:b,1:4))
+         if (.not.allocated(Insect%wing_thickness_profile)) then
+            allocate(Insect%wing_thickness_profile(1:a,1:b,1:4))
          else
-            a_old = size(wing_thickness_profile,1)
-            b_old = size(wing_thickness_profile,2)
+            a_old = size(Insect%wing_thickness_profile,1)
+            b_old = size(Insect%wing_thickness_profile,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = wing_thickness_profile(:,:,:)
-               deallocate(wing_thickness_profile)
-               allocate(wing_thickness_profile(1:a,1:b,1:4))
-               wing_thickness_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%wing_thickness_profile(:,:,:)
+               deallocate(Insect%wing_thickness_profile)
+               allocate(Insect%wing_thickness_profile(1:a,1:b,1:4))
+               Insect%wing_thickness_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif
        case ("corrugation_profile")
-         if (.not.allocated(corrugation_profile)) then
-            allocate(corrugation_profile(1:a,1:b,1:4))
+         if (.not.allocated(Insect%corrugation_profile)) then
+            allocate(Insect%corrugation_profile(1:a,1:b,1:4))
          else
-            a_old = size(corrugation_profile,1)
-            b_old = size(corrugation_profile,2)
+            a_old = size(Insect%corrugation_profile,1)
+            b_old = size(Insect%corrugation_profile,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = corrugation_profile(:,:,:)
-               deallocate(corrugation_profile)
-               allocate(corrugation_profile(1:a,1:b,1:4))
-               corrugation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%corrugation_profile(:,:,:)
+               deallocate(Insect%corrugation_profile)
+               allocate(Insect%corrugation_profile(1:a,1:b,1:4))
+               Insect%corrugation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif
        !KVN-2025>>>>>
        ! NOTE: prescribed wing deformation is untested work in progress! -TE 02/2026
        case ("deformations")
-         if (.not.allocated(deformations)) then
-            allocate(deformations(1:a,1:b,1:4))
+         if (.not.allocated(Insect%deformations)) then
+            allocate(Insect%deformations(1:a,1:b,1:4))
          else
-            a_old = size(deformations,1)
-            b_old = size(deformations,2)
+            a_old = size(Insect%deformations,1)
+            b_old = size(Insect%deformations,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = deformations(:,:,:)
-               deallocate(deformations)
-               allocate(deformations(1:a,1:b,1:4))
-               deformations(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%deformations(:,:,:)
+               deallocate(Insect%deformations)
+               allocate(Insect%deformations(1:a,1:b,1:4))
+               Insect%deformations(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif
        case ("deformation_profile")
-         if (.not.allocated(deformation_profile)) then
-            allocate(deformation_profile(1:a,1:b,1:4))
+         if (.not.allocated(Insect%deformation_profile)) then
+            allocate(Insect%deformation_profile(1:a,1:b,1:4))
          else
-            a_old = size(deformation_profile,1)
-            b_old = size(deformation_profile,2)
+            a_old = size(Insect%deformation_profile,1)
+            b_old = size(Insect%deformation_profile,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = deformation_profile(:,:,:)
-               deallocate(deformation_profile)
-               allocate(deformation_profile(1:a,1:b,1:4))
-               deformation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%deformation_profile(:,:,:)
+               deallocate(Insect%deformation_profile)
+               allocate(Insect%deformation_profile(1:a,1:b,1:4))
+               Insect%deformation_profile(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif
          !KVN-2025<<<<<
        case ("damage_mask")
-         if (.not.allocated(damage_mask)) then
-            allocate(damage_mask(1:a,1:b,1:4))
+         if (.not.allocated(Insect%damage_mask)) then
+            allocate(Insect%damage_mask(1:a,1:b,1:4))
          else
-            a_old = size(damage_mask,1)
-            b_old = size(damage_mask,2)
+            a_old = size(Insect%damage_mask,1)
+            b_old = size(Insect%damage_mask,2)
             if ( (a_old<a) .or. (b_old<b) ) then
                allocate(profile_tmp(1:a_old,1:b_old,1:4))
-               profile_tmp(:,:,:) = damage_mask(:,:,:)
-               deallocate(damage_mask)
-               allocate(damage_mask(1:a,1:b,1:4))
-               damage_mask(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
+               profile_tmp(:,:,:) = Insect%damage_mask(:,:,:)
+               deallocate(Insect%damage_mask)
+               allocate(Insect%damage_mask(1:a,1:b,1:4))
+               Insect%damage_mask(1:a_old,1:b_old,1:4) = profile_tmp(:,:,:)
                deallocate(profile_tmp)
             endif
          endif
@@ -461,6 +467,18 @@ contains
 
    end subroutine Allocate_Arrays
 
+   !> Wrapper to update all insects at once
+   subroutine Update_All_Insects( time )
+      implicit none
+
+      real(kind=rk), intent(in) :: time
+      integer :: i
+
+      do i=1,n_insects
+         call Update_Insect( time, Insects(i) )
+      enddo
+
+   end subroutine Update_All_Insects
 
    !-----------------------------------------------------------------------------
    ! Many parts of the insect mask generation are done only once per time step (i.e.
@@ -474,7 +492,7 @@ contains
       implicit none
 
       real(kind=rk), intent(in)   :: time
-      type(diptera),intent(inout) :: Insect
+      type(diptera), intent(inout) :: Insect
 
       logical, save :: first_call = .true.
       integer(kind=ik) :: i
@@ -551,26 +569,97 @@ contains
          ! The transformation is done here (and not in draw_body_superSTL) because it needs to be
          ! done only once, and draw_body_superSTL is called for every block. The speed-up, however,
          ! is of course limited.
-         do i = 1, size(body_superSTL_b, 1)
-            body_superSTL_g(i, 1:3)   = matmul(Insect%M_b2g, body_superSTL_b(i, 1:3)) + Insect%xc_body_g
-            body_superSTL_g(i, 4:6)   = matmul(Insect%M_b2g, body_superSTL_b(i, 4:6)) + Insect%xc_body_g
-            body_superSTL_g(i, 7:9)   = matmul(Insect%M_b2g, body_superSTL_b(i, 7:9)) + Insect%xc_body_g
-            body_superSTL_g(i, 10:12) = matmul(Insect%M_b2g, body_superSTL_b(i, 10:12))
-            body_superSTL_g(i, 13:15) = matmul(Insect%M_b2g, body_superSTL_b(i, 13:15))
-            body_superSTL_g(i, 16:18) = matmul(Insect%M_b2g, body_superSTL_b(i, 16:18))
-            body_superSTL_g(i, 19:21) = matmul(Insect%M_b2g, body_superSTL_b(i, 19:21))
-            body_superSTL_g(i, 22:24) = matmul(Insect%M_b2g, body_superSTL_b(i, 22:24))
-            body_superSTL_g(i, 25:27) = matmul(Insect%M_b2g, body_superSTL_b(i, 25:27))
-            body_superSTL_g(i, 28:30) = matmul(Insect%M_b2g, body_superSTL_b(i, 28:30))
+         do i = 1, size(Insect%body_superSTL_b, 1)
+            Insect%body_superSTL_g(i, 1:3)   = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 1:3)) + Insect%xc_body_g
+            Insect%body_superSTL_g(i, 4:6)   = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 4:6)) + Insect%xc_body_g
+            Insect%body_superSTL_g(i, 7:9)   = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 7:9)) + Insect%xc_body_g
+            Insect%body_superSTL_g(i, 10:12) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 10:12))
+            Insect%body_superSTL_g(i, 13:15) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 13:15))
+            Insect%body_superSTL_g(i, 16:18) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 16:18))
+            Insect%body_superSTL_g(i, 19:21) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 19:21))
+            Insect%body_superSTL_g(i, 22:24) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 22:24))
+            Insect%body_superSTL_g(i, 25:27) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 25:27))
+            Insect%body_superSTL_g(i, 28:30) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 28:30))
          enddo
       endif
 
    end subroutine Update_Insect
 
    !-------------------------------------------------------------------------------
+   ! Init kinematics log of all insects
+   !-------------------------------------------------------------------------------
+   subroutine Init_insect_data(overwrite)
+      implicit none
+
+      logical, intent(in) :: overwrite
+
+      integer :: i, i_check
+      logical :: do_init
+
+      do i=1,n_insects
+         do_init = .true.
+         ! check previous insects if this kinematics file was already initialized, if yes, skip initialization
+         do i_check = 1, i-1
+            if (Insects(i)%kinematics_file == Insects(i_check)%kinematics_file) do_init = .false.
+         enddo
+         if (.not. do_init) cycle
+
+         call init_t_file(Insects(i)%kinematics_file, overwrite, (/&
+          "           time", &
+          "    xc_body_g_x", "    xc_body_g_y", "    xc_body_g_z", &
+          "      psi (rad)", "     beta (rad)", "    gamma (rad)", "      eta (rad)", &
+          "  alpha_l (rad)", "    phi_l (rad)", "  theta_l (rad)", &
+          "  alpha_r (rad)", "    phi_r (rad)", "  theta_r (rad)", &
+          "  rot_rel_l_w_x", "  rot_rel_l_w_y", "  rot_rel_l_w_z", &
+          "  rot_rel_r_w_x", "  rot_rel_r_w_y", "  rot_rel_r_w_z", &
+          "   rot_dt_l_w_x", "   rot_dt_l_w_y", "   rot_dt_l_w_z", &
+          "   rot_dt_r_w_x", "   rot_dt_r_w_y", "   rot_dt_r_w_z", &
+          " alpha_l2 (rad)", "   phi_l2 (rad)", " theta_l2 (rad)", &
+          " alpha_r2 (rad)", "   phi_r2 (rad)", " theta_r2 (rad)", &
+          " rot_rel_l2_w_x", " rot_rel_l2_w_y", " rot_rel_l2_w_z", &
+          " rot_rel_r2_w_x", " rot_rel_r2_w_y", " rot_rel_r2_w_z", &
+          "  rot_dt_l2_w_x", "  rot_dt_l2_w_y", "  rot_dt_l2_w_z", &
+          "  rot_dt_r2_w_x", "  rot_dt_r2_w_y", "  rot_dt_r2_w_z", &
+          "      insect_id" /) )
+      enddo
+   end subroutine Init_insect_data
+
+   !-------------------------------------------------------------------------------
+   ! Write kinematics log of all insects
+   !-------------------------------------------------------------------------------
+   subroutine Write_insect_data( time )
+      implicit none
+      real(kind=rk), intent(in) :: time
+
+      integer :: i
+
+      do i=1,n_insects
+         if (Insects(i)%second_wing_pair) then
+            call append_t_file( Insects(i)%kinematics_file, (/time, Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
+            Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
+            Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
+            Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
+            Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
+            Insects(i)%alpha_l2, Insects(i)%phi_l2, Insects(i)%theta_l2, &
+            Insects(i)%alpha_r2, Insects(i)%phi_r2, Insects(i)%theta_r2, &
+            Insects(i)%rot_rel_wing_l2_w, Insects(i)%rot_rel_wing_r2_w, &
+            Insects(i)%rot_dt_wing_l2_w, Insects(i)%rot_dt_wing_r2_w, dble(i) /) )
+         else
+            call append_t_file( Insects(i)%kinematics_file, (/time, Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
+            Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
+            Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
+            Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
+            Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
+            0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, dble(i) /) )
+         endif
+      enddo
+   end subroutine Write_insect_data
+
+
+   !-------------------------------------------------------------------------------
    ! Main routine for drawing insects. Draws body and wings, parameters are in "INSECT"
    !-------------------------------------------------------------------------------
-   subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us )
+   subroutine Draw_Insect( time, Insect, xx0, ddx, mask, mask_color, us, delete )
       implicit none
 
       real(kind=rk), intent(in)      :: time
@@ -578,7 +667,8 @@ contains
       real(kind=rk), intent(in)      :: xx0(1:3), ddx(1:3)
       real(kind=rk), intent(inout)   :: mask(0:,0:,0:)
       real(kind=rk), intent(inout)   :: us(0:,0:,0:,1:)
-      integer(kind=2), intent(inout) :: mask_color(0:,0:,0:)
+      real(kind=rk), intent(inout)   :: mask_color(0:,0:,0:)
+      logical, intent(in)            :: delete  !< delete old mask?
 
       if ((dabs(Insect%time-time)>1.0d-10).and.root) then
          write(*,'("error! time=",es15.8," but Insect%time=",es15.8)') time, Insect%time
@@ -593,11 +683,16 @@ contains
       ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
       if (Insect%smoothing_thickness=="local") then
          Insect%smooth = Insect%C_smooth*maxval(ddx)
-         Insect%safety = 3.5_rk*Insect%smooth
+         if (Insect%smoothing_type == "hester") then
+            Insect%smooth = Insect%epsilon_hester
+            Insect%safety = max(5.0_rk*Insect%epsilon_hester, 2*maxval(ddx))
+        else
+            Insect%safety = 3.5_rk*Insect%smooth
+        end if
       endif
 
       ! delete old mask
-      call delete_old_mask( time, mask, mask_color, us, Insect )
+      if (delete) call delete_old_mask( time, mask, mask_color, us, Insect )
 
       !-----------------------------------------------------------------------------
       ! BODY. Now the body is special: if the insect does not move (or rotate), the
@@ -633,28 +728,6 @@ contains
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
    end subroutine Draw_Insect
 
-
-
-   !-------------------------------------------------------
-   ! short for the smooth step function.
-   ! the smooting is defined in Insect%smooth, here we need only x, and the
-   ! thickness (i.e., in the limit, steps=1 if x<t and steps=0 if x>t
-   !-------------------------------------------------------
-   real(kind=rk) function steps(x, t, h)
-      implicit none
-      real(kind=rk) :: x, t, h
-      ! f is 1 if x<=t-h
-      ! f is 0 if x>t+h
-      ! f is variable (smooth) in between
-      if (x<=t-h) then
-         steps = 1.0_rk
-      elseif (((t-h)<x).and.(x<(t+h))) then
-         steps = 0.5_rk*(1.0_rk+dcos((x-t+h)*pi/(2.0_rk*h)) )
-      else
-         steps = 0.0_rk
-      endif
-
-   end function
 
 
    !-------------------------------------------------------
@@ -710,9 +783,9 @@ contains
       type(diptera),intent(inout)::Insect
 
       ! colors for Diptera (one body, two wings)
-      color_body = Insect%color_body
-      color_l = Insect%color_l
-      color_r = Insect%color_r
+      color_body = 1  ! Insect%color_body
+      color_l = 2     ! Insect%color_l
+      color_r = 3     ! Insect%color_r
 
       ! body is not driven directly, therefore the power is set to zero
       Insect%PartIntegrals(color_body)%APow = 0.0_rk
@@ -756,8 +829,8 @@ contains
       !-----------
       if (Insect%second_wing_pair) then
          ! Colors
-         color_l2 = Insect%color_l2
-         color_r2 = Insect%color_r2
+         color_l2 = 4     ! Insect%color_l2
+         color_r2 = 5     ! Insect%color_r2
 
          ! left wing
          ! relative angular velocity, in global system
@@ -830,9 +903,9 @@ contains
       iwmoment_g = 0
 
       ! colors for Diptera (one body, two wings)
-      color_body = Insect%color_body
-      color_l = Insect%color_l
-      color_r = Insect%color_r
+      color_body = 1  ! Insect%color_body
+      color_l = 2     ! Insect%color_l
+      color_r = 3     ! Insect%color_r
 
       !-- LEFT WING
       a(1) = Insect%Jxx * Insect%rot_dt_wing_l_w(1) + Insect%Jxy * Insect%rot_dt_wing_l_w(2)
@@ -877,8 +950,8 @@ contains
       !-----------
       if (Insect%second_wing_pair) then
          ! colors
-         color_l2 = Insect%color_l2
-         color_r2 = Insect%color_r2
+         color_l2 = 4     ! Insect%color_l2
+         color_r2 = 5     ! Insect%color_r2
 
          ! second left wing
          a(1) = Insect%Jxx2 * Insect%rot_dt_wing_l2_w(1) + Insect%Jxy2 * Insect%rot_dt_wing_l2_w(2)
@@ -911,7 +984,7 @@ contains
          iwmoment(2,color_r2) = (a(2)+Insect%rot_rel_wing_r2_w(3)*b(1)-Insect%rot_rel_wing_r2_w(1)*b(3))
          iwmoment(3,color_r2) = (a(3)+Insect%rot_rel_wing_r2_w(1)*b(2)-Insect%rot_rel_wing_r2_w(2)*b(1))
 
-         Insect%PartIntegrals(color_r)%IPow = &
+         Insect%PartIntegrals(color_r2)%IPow = &
             Insect%rot_rel_wing_r2_w(1) * iwmoment(1,color_r2) + &
             Insect%rot_rel_wing_r2_w(2) * iwmoment(2,color_r2) + &
             Insect%rot_rel_wing_r2_w(3) * iwmoment(3,color_r2)
@@ -1092,6 +1165,8 @@ contains
       integer(kind=2) :: wingID
 
       dt = 1.0e-8_rk
+      ! ATTENTION: This is a deep copy in Fortran, it copies all allocatables, which can be expensive
+      ! Consider a new object that only copies parts that are necessary for the wing angular acceleration
       Insect2 = Insect
 
       Insect%rot_dt_wing_l_w = 0.0_rk
@@ -1155,6 +1230,8 @@ contains
    end subroutine wing_angular_accel
 
 
+   !> Delete the mask of the insect from the previous time step.
+   !! This routine first checks for the colors of the insects and deletes the mask where encessary
    subroutine delete_old_mask( time, mask, mask_color, us, Insect )
       implicit none
 
@@ -1162,7 +1239,7 @@ contains
       type(diptera),intent(in) :: Insect
       real(kind=rk),intent(inout) :: mask(0:,0:,0:)
       real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-      integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+      real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
       integer(kind=2) :: color_body, color_l, color_r, color_l2, color_r2
       logical, save :: cleaned_already_once = .false.
 
@@ -1178,21 +1255,34 @@ contains
       !-----------------------------------------------------------------------------
       if (Insect%body_moves=="no" .and. .not. grid_time_dependent .and. cleaned_already_once) then
          ! the body is at rest, so we will not draw it. Delete the wings, as they move.
-         where (mask_color==color_l .or. mask_color==color_r .or. &
-            mask_color==color_l2 .or. mask_color==color_r2)
+         ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
+         where (mask_color==dble(color_l) .or. mask_color==dble(color_r) .or. &
+            mask_color==dble(color_l2) .or. mask_color==dble(color_r2))
             mask = 0.0_rk
             mask_color = 0
          end where
          ! as the body rests it has no solid body velocity, which means we can safely
          ! reset the velocity everywhere (this step is actually unnessesary, but for
          ! safety we do it as well)
-         us = 0.0_rk
+         ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
+         where (mask_color==dble(color_body) .or. mask_color==dble(color_l) .or. mask_color==dble(color_r) .or. &
+            mask_color==dble(color_l2) .or. mask_color==dble(color_r2))
+            us(:,:,:,1) = 0.0_rk
+            us(:,:,:,2) = 0.0_rk
+            us(:,:,:,3) = 0.0_rk
+         end where
       else
          ! the body of the insect moves, so we will construct the entire insect in this
-         ! (and any other) call, and therefore we can safely reset the entire mask to zeros.
-         mask = 0.0_rk
-         mask_color = 0
-         us = 0.0_rk
+         ! (and any other) call, we need to reset the mask of the insect only
+         ! real comparison should usually be done with a tolerance, but since we only ever set color values and do no arithmetics, this is fine
+         where (mask_color==dble(color_body) .or. mask_color==dble(color_l) .or. mask_color==dble(color_r) .or. &
+            mask_color==dble(color_l2) .or. mask_color==dble(color_r2))
+            mask = 0.0_rk
+            mask_color = 0
+            us(:,:,:,1) = 0.0_rk
+            us(:,:,:,2) = 0.0_rk
+            us(:,:,:,3) = 0.0_rk
+         end where
       endif
 
       cleaned_already_once = .true.

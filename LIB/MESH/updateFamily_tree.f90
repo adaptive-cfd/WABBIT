@@ -13,12 +13,20 @@
 !  however, for refinement and coarsening they are comfortable because all operations become
 !  a send between the individual blocks
 ! ********************************************************************************************
-subroutine updateFamily_tree(params, tree_ID)
+subroutine updateFamily_tree(params, tree_ID, Jmin_set, Jmax_set)
 
     implicit none
     type (type_params), intent(in)      :: params                   !> user defined parameter structure
     integer(kind=ik), intent(in)        :: tree_ID
+    integer(kind=ik), intent(in), optional :: Jmin_set, Jmax_set
     integer(kind=ik)                    :: k, lgt_ID, hvyID, level
+    integer(kind=ik)                    :: Jmin, Jmax
+
+    ! set Jmin and Jmax
+    Jmin = params%Jmin
+    Jmax = params%Jmax
+    if (present(Jmin_set)) Jmin = Jmin_set
+    if (present(Jmax_set)) Jmax = Jmax_set
 
 
     ! loop over active heavy data blocks
@@ -31,9 +39,9 @@ subroutine updateFamily_tree(params, tree_ID)
         level = lgt_block(lgt_ID, IDX_MESH_LVL)
 
         ! search for family, skip mother for blocks on Jmin and daughter for blocks on Jmax for performance purposes
-        if (level /= params%Jmin) call find_mother(params, lgt_ID, hvy_family(hvyID, 1))
+        if (level /= Jmin) call find_mother(params, lgt_ID, hvy_family(hvyID, 1))
         call find_sisters(params, lgt_ID, hvy_family(hvyID, 2:1+2**params%dim))
-        if (level /= params%Jmax) call find_daughters(params, lgt_ID, hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)))
+        if (level /= Jmax) call find_daughters(params, lgt_ID, hvy_family(hvyID, 2+2**params%dim:1+2**(params%dim+1)))
 
         ! write(*, '("3R", i1, " B", i2, " S", i5, " L", i2, " R", i2, " F ", 9(i5, 1x), " TC", 1(b32.32))') &
         ! params%rank, k, lgt_ID, lgt_block(lgt_ID, IDX_MESH_LVL), lgt_block(lgt_ID, IDX_REFINE_STS), hvy_family(hvy_ID, :), lgt_block(lgt_ID, IDX_TC_2)

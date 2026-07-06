@@ -2,13 +2,13 @@
 # Non-module Fortran files to be compiled:
 FFILES = treecode_size.f90 array_compare.f90 \
 proc_to_lgt_data_start_id.f90 lgt2hvy.f90 hvy2lgt.f90 lgt2proc.f90 init_random_seed.f90 \
-init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 compute_vorticity_post.f90 compute_scalar_field_post.f90 \
+init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 compute_vorticity_post.f90 compute_poisson_post.f90 compute_scalar_field_post.f90 \
 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 \
-post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 \
-post_dump_neighbors.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
+post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_create_grid.f90 \
+post_dump_neighbors.f90 post_meta_analyse.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
 post_evaluate_thresholding.f90 post_unit_test.f90 post_compression_unit_test.f90 post_denoising.f90 post_cvs_invertibility_test.f90 \
-post_wavelet_transform.f90 post_denoising_test.f90 post_derivative.f90 proto_GS_multigrid.f90 proto_pressure_multigrid.f90 \
-post_pressure_interpolation.f90
+post_wavelet_transform.f90 post_wavelet_contributions.f90 post_denoising_test.f90 post_derivative.f90 proto_GS_multigrid.f90 proto_pressure_multigrid.f90 \
+post_pressure_interpolation.f90 post_sort.f90 post_external_adapt.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -23,7 +23,7 @@ MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_t
 	module_insects.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90\
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90\
-	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 # module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
+	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 module_NSPP.f90 module_geometry.f90 # module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -33,6 +33,7 @@ VPATH += :LIB/PARAMS:LIB/TREE:LIB/INDICATORS:LIB/GEOMETRY:LIB/EQUATION/ACMnew:LI
 VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB/EQUATION/navier_stokes
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
 VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS:LIB/WAVELETS:LIB/FFT:LIB/POISSON
+VPATH += :LIB/EQUATION/navier_stokes_pressure_poisson
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -74,18 +75,20 @@ FFLAGS += -J$(OBJDIR) # specify directory for modules.
 FFLAGS += -ffree-line-length-none
 PPFLAG = -cpp # preprocessor flag
 #LDFLAGS = -llapack
-FFLAGS += -O3
-FFLAGS += -Wuninitialized -fimplicit-none -fbounds-check -pedantic
-FFLAGS += -Wall -Wextra -Wconversion -fbacktrace -ffpe-trap=zero,invalid 
-FFLAGS += -g3 -g -ggdb  # debugging flags
-FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
+FFLAGS += -O3  # optimization flag
+# compiler warnings
+FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -fimplicit-none -pedantic
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
+# error-catching flags
+FFLAGS += -fbounds-check -fbacktrace -ffpe-trap=zero,invalid
+FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
+# debugging flags
+FFLAGS += -g3 -g -ggdb
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
-LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3 $(SB_LIB) -lz
+LDFLAGS += $(SB_LIB) -lz
 FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
-FFLAGS += -I$(FFT_ROOT)/include
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
 # different pragmas are space-separated
 PRAGMAS = #-DSBLAS
@@ -94,6 +97,8 @@ PRAGMAS += -DDEV
 endif
 # enable / disable FFT depending on the module
 ifdef FFT_ROOT
+FFLAGS += -I$(FFT_ROOT)/include
+LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3
 PRAGMAS += -DFFT_ROOT
 endif
 ifdef MKLROOT
@@ -115,17 +120,26 @@ mpif90:=$(shell $(FC) --version | head -c 5)
 ifeq ($(mpif90),ifort)
 PPFLAG = -fpp # preprocessor flag
 FFLAGS += -O3 -FR -heap-arrays
-##FFLAGS += -xcore-avx2  # use avx2
-# timing flags: attention they might disable all optimization!
-##FFLAGS += -g -warn all,nounused -traceback -check bounds -check all,noarg_temp_created
+# specific optimization for tgcc rome partition
+ifeq ($(shell hostname | head -c 5),irene)
+#   Interprocedural optimization (slower compile, faster run)
+FFLAGS += -ipo
+#   Baseline AVX2 for AMD Rome          
+FFLAGS += -mavx2
+# FFLAGS += -axCORE-AVX2,CORE-AVX512  # Add Intel-optimized paths, enable if we have intel partitions again
+endif
+# timing or error catching flags: attention they might disable all optimization!
+FFLAGS += -traceback
+ifdef DEV
+FFLAGS += -g -warn all,nounused -check bounds -check all,noarg_temp_created -fpe0 -ftrapuv
+endif
 FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
 LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
-LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3 $(SB_LIB) -lz
+LDFLAGS += $(SB_LIB) -lz
 FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
-FFLAGS += -I$(FFT_ROOT)/include
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
 # different pragmas are space-separated
 PRAGMAS = #
@@ -134,7 +148,9 @@ PRAGMAS += -DDEV
 endif
 # enable / disable FFT depending on the module
 ifdef FFT_ROOT
+LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3
 PRAGMAS += -DFFT_ROOT
+FFLAGS += -I$(FFT_ROOT)/include
 endif
 ifdef MKLROOT
 # Use MKL lapack
@@ -202,13 +218,17 @@ $(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o \
+$(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o $(OBJDIR)/module_geometry.o \
 	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 \
-	wings_motion.f90 stroke_plane.f90 pointcloud.f90 fractal_trees.f90 insect_init_clean.f90 \
+	wings_motion.f90 stroke_plane.f90 pointcloud.f90 insect_init_clean.f90 \
 	kineloader.f90 active_grid_winglets.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o $(OBJDIR)/module_helpers.o
+$(OBJDIR)/module_geometry.o: module_geometry.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
+	geometry_primitive_2D.f90 geometry_primitive_3D.f90 geometry_primitives_collection.f90
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_ini_files_parser.o: module_ini_files_parser.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_bridge.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_params.o: module_params.f90 $(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
@@ -221,7 +241,7 @@ $(OBJDIR)/module_bridge_interface.o: module_bridge_interface.f90 $(OBJDIR)/modul
 
 $(OBJDIR)/module_navier_stokes_params.o: module_navier_stokes_params.f90 $(OBJDIR)/module_globals.o\
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
-	inicond_NStokes.f90 filter_block.f90 $(OBJDIR)/module_params.o
+	inicond_NStokes.f90 $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ns_penalization.o: module_ns_penalization.f90 $(OBJDIR)/module_navier_stokes_params.o\
@@ -254,11 +274,16 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 2D_wingsection.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 filter_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 time_statistics_convdiff.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_params.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_t_files.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_NSPP.o: module_NSPP.f90 rhs_NSPP.f90 create_mask.f90 save_data_NSPP.f90 \
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_NSPP.f90 time_statistics_NSPP.f90 inicond_NSPP.f90 boundcond_NSPP.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_timing.o: module_timing.f90
@@ -267,19 +292,19 @@ $(OBJDIR)/module_timing.o: module_timing.f90
 $(OBJDIR)/module_ini_files_parser_mpi.o: module_ini_files_parser_mpi.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
-$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_treelib.o \
-	conversion_routines.f90
+$(OBJDIR)/module_wavelets.o: module_wavelets.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_operators.o \
+	conversion_routines.f90 wavelet_decomposition_reconstruction.f90 sub0_decomposition.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_fft.o: module_fft.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_poisson.o: module_poisson.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_forestMetaData.o \
-	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_fft.o $(OBJDIR)/module_mpi.o multigrid_vcycle.f90
+	$(OBJDIR)/module_treelib.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_fft.o $(OBJDIR)/module_mpi.o $(OBJDIR)/module_operators.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_physics_metamodule.o: module_physics_metamodule.f90 $(OBJDIR)/module_globals.o \
-	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ACM.o $(OBJDIR)/module_params.o
+	$(OBJDIR)/module_ConvDiff_new.o $(OBJDIR)/module_navier_stokes.o $(OBJDIR)/module_ACM.o $(OBJDIR)/module_NSPP.o $(OBJDIR)/module_params.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_hdf5_wrapper.o: module_hdf5_wrapper.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_globals.o
@@ -292,7 +317,7 @@ $(OBJDIR)/module_mpi.o: module_mpi.f90 $(OBJDIR)/module_params.o $(OBJDIR)/modul
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_mpi.o \
-	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o \
+	$(OBJDIR)/module_mesh.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_poisson.o \
 	calculate_time_step.f90 timeStep_tree.f90 RHS_wrapper.f90	 \
 	statistics_wrapper.f90 filter_wrapper.f90 krylov.f90  $(OBJDIR)/module_treelib.o \
 	runge_kutta_generic.f90 runge_kutta_generic_FSI.f90 runge_kutta_chebychev.f90 runge_kutta_chebychev_FSI.f90 $(OBJDIR)/module_t_files.o
@@ -307,15 +332,16 @@ $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_c
 
 $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_wavelets.o \
 	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_treelib.o $(OBJDIR)/module_physics_metamodule.o $(OBJDIR)/module_indicators.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o \
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_forestMetaData.o $(OBJDIR)/module_poisson.o $(OBJDIR)/module_fft.o \
 	InputOutput_Flusi.f90 InputOutput.f90 create_active_and_sorted_lists.f90 createMask_tree.f90 block_xfer_nonblocking.f90 \
 	updateNeighbors_tree.f90 find_neighbors.f90 doesBlockExist_tree.f90 refine_tree.f90 respectJmaxJmin_tree.f90 \
-	refinementExecute.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 refineToEquidistant_tree.f90 \
+	refinementExecute.f90 adapt_tree.f90 coarseningIndicator_tree.f90 ensureGradedness_tree.f90 adaptToLevel_tree.f90 \
 	ensure_completeness_block.f90 executeCoarsening_tree.f90 merge_blocks.f90 balanceLoad_tree.f90 \
 	treecode_to_sfc_id_2D.f90 treecode_to_sfc_id_3D.f90 treecode_to_hilbertcode_2D.f90 treecode_to_hilbertcode_3D.f90 get_block_spacing_origin.f90 \
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
-	remove_nonperiodic_neighbors.f90 forest.f90 setInitialCondition_tree.f90 securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90
+	remove_nonperiodic_neighbors.f90 forest.f90 setInitialCondition_tree.f90 securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90 \
+	multigrid_vcycle.f90 poisson_operations.f90 probes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

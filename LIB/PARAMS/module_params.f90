@@ -38,11 +38,15 @@ module module_params
         character(len=cshort) :: write_method="fixed_time"
         ! data writing frequency
         real(kind=rk) :: write_time=0.1_rk, walltime_write = 999999.9_rk, walltime_last_write=0.0_rk, write_time_first=0.0_rk
-        ! data next write time, store here the next time for output data
-        real(kind=rk) :: next_write_time=0.0_rk
+        integer(kind=ik) :: write_backup_n=0
+        real(kind=rk) :: write_backup_time=0.1_rk, write_backup_walltime=999999.9_rk, write_backup_walltime_last=0.0_rk
+        real(kind=rk), dimension(:), allocatable :: write_backup_time_list
+        integer(kind=ik), dimension(:), allocatable :: write_backup_iteration_list
         ! this number is used when generating random grids.
         ! the default of 10% is mostly enough, also ensures everything can still be refined for one level
         real(kind=rk) :: max_grid_density = 0.1_rk
+        ! percentage of memory we leave free for miscellaneous arrays that are created during the run
+        real(kind=rk) :: memory_safety_percentage = 2.0_rk
 
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable :: butcher_tableau
@@ -71,7 +75,7 @@ module module_params
         real(kind=rk), dimension(:), allocatable :: HD, GD, HR, GR
         ! filters for multigrid method - restriction prediction filter, HD for lifted wavelets and low-pass filter for unlifted wavelets
         real(kind=rk), dimension(:), allocatable :: MGR
-        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr
+        integer(kind=ik) :: Nscl, Nscr, Nwcl, Nwcr, Nreconl, Nreconr, Ndep2l, Ndep2r
 
 
         ! minimal level for blocks in data tree
@@ -86,6 +90,7 @@ module module_params
         ! order of spatial discretization
         character(len=cshort) :: order_discretization="not-initialized"
         character(len=cshort) :: poisson_order="not-initialized"
+        integer(kind=ik)      :: poisson_Jmin=0
         integer(kind=ik)      :: poisson_stencil_size=0
         character(len=cshort) :: poisson_cycle_end_criteria="not-initialized"
         integer(kind=ik)      :: poisson_cycle_it=0
@@ -94,7 +99,8 @@ module module_params
         integer(kind=ik)      :: poisson_cycle_max_it=0
         integer(kind=ik)      :: poisson_GS_it=0
         integer(kind=ik)      :: poisson_Sync_it=0
-        character(len=cshort) :: poisson_coarsest="FFT"
+        character(len=cshort) :: poisson_coarsest="FFT", poisson_order_predictor="not-initialized"
+        logical               :: poisson_balanceLoad=.false.
         integer(kind=ik) :: nprojection_NSI = 1 !> let's do regular projections every nprojection_NSI time steps
         character(len=cshort) :: FFT_accuracy="spectral"  ! FD or spectral
         character(len=cshort) :: refinement_indicator="everywhere"
@@ -105,6 +111,9 @@ module module_params
         logical :: read_from_files
         ! files we want to read for inital cond.
         character(len=cshort), dimension(:), allocatable :: input_files
+        logical :: inicond_vorticity_formulation = .false.
+        logical :: inicond_pressure_from_velocity = .false.
+        logical :: inicond_helmholtz_projection = .false.
 
         integer(kind=ik), dimension(3) :: Bs=(/ 0, 0, 0 /)! number of block nodes
         integer(kind=ik) :: g=0 ! number of ghost nodes
@@ -127,13 +136,14 @@ module module_params
         ! physics
         ! -------------------------------------------------------------------------------------
         character(len=cshort) :: physics_type="not-initialized"
+        character(len=cshort) :: PDE_type="not-initialized"
         real(kind=rk) :: domain_size(3)=0.0_rk
         integer(kind=ik) :: dim=2 ! can be 2 or 3
 
         ! -------------------------------------------------------------------------------------
         ! statistics
         ! -------------------------------------------------------------------------------------
-        real(kind=rk) :: tsave_stats=99999999.9_rk, next_stats_time=0.0_rk
+        real(kind=rk) :: tsave_stats=99999999.9_rk
         integer(kind=ik) :: nsave_stats=99999999_ik
 
         ! -------------------------------------------------------------------------------------
@@ -176,12 +186,28 @@ module module_params
         logical :: use_iteration_as_fileid = .false.
 
         ! -------------------------------------------------------------------------------------
+        ! probes (configured in [Saving])
+        ! -------------------------------------------------------------------------------------
+        integer(kind=ik) :: nsave_probes=99999999_ik
+        real(kind=rk)    :: tsave_probes=9999999.9_rk
+        real(kind=rk)    :: probe_start_time=0.0_rk
+        integer(kind=ik) :: n_probes=0_ik, n_probe_lines=0_ik
+        integer(kind=ik) :: N_probe_variables=0_ik
+        integer(kind=ik) :: probe_interpolation_order=1_ik
+        real(kind=rk), allocatable :: probe_x(:), probe_y(:), probe_z(:), probe_line_x1(:), probe_line_y1(:), probe_line_z1(:), probe_line_x2(:), probe_line_y2(:), probe_line_z2(:)
+        integer(kind=ik), allocatable :: probe_line_npoints(:)
+        character(len=cshort), allocatable :: probe_variables(:)
+
+        ! -------------------------------------------------------------------------------------
         ! unit tests and debugging
         ! -------------------------------------------------------------------------------------
         logical :: test_treecode=.false., test_ghost_nodes_synch=.true., test_wavelet_decomposition=.true.
 
         logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
         logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
+        logical :: debug_poisson = .false.
+
+        integer :: verbose_level = 1
 
         ! -------------------------------------------------------------------------------------
         ! filter
@@ -193,6 +219,7 @@ module module_params
         ! save filter strength sigma
         logical :: save_filter_strength
         logical :: filter_only_maxlevel = .false., filter_all_except_maxlevel = .false.
+        logical, allocatable :: filter_component(:)
 
         ! -------------------------------------------------------------------------------------
         ! Boundary conditions

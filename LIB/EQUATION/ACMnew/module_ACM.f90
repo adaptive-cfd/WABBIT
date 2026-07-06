@@ -13,8 +13,9 @@ module module_acm
   ! from a file.
   use module_ini_files_parser_mpi
   use module_operators, only : compute_vorticity, compute_divergence, compute_derivative, compute_dissipation, compute_gradient, compute_laplacian
-  use module_helpers, only : startup_conditioner, smoothstep, random_data, fseries_eval, dump_block_fancy, dump_block
+  use module_helpers
   use module_timing
+  use module_geometry
 
   implicit none
 
@@ -26,9 +27,9 @@ module module_acm
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
-  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, FILTER_ACM, create_mask_2D_ACM, &
+  INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, PREPARE_THRESHOLDFIELD_ACM, &
-  INITIALIZE_ASCII_FILES_ACM, WRITE_INSECT_DATA, Update_Insect_wrapper
+  INITIALIZE_ASCII_FILES_ACM
   !**********************************************************************************************
 
   ! for 2d wing section optimization
@@ -47,8 +48,8 @@ module module_acm
 
   type(wingsection) :: wingsections(2)
 
-! how many different parts of the mask can be distinguished
-  integer, parameter :: ncolors=8
+! how many different parts of the mask can be distinguished at max
+  integer(kind=ik) :: ncolors=8
 
   ! user defined data structure for time independent parameters, settings, constants
   ! and the like. only visible here.
@@ -57,16 +58,18 @@ module module_acm
     real(kind=rk) :: c_0
     real(kind=rk) :: C_eta, beta, C_eta_const, C_eta_start, C_eta_ring, penalization_startup_tau
     logical :: use_free_flight_solver = .false., soft_penalization_startup=.false.
-    real(kind=rk),dimension(1:3) :: force_insect_g=0.0_rk, moment_insect_g=0.0_rk
+    ! this is the force and moment that is applied on the insect from the fluid, it will be computed during RHS computations
+    ! as it is computed by the physics module, it was designed to be a member of the physics module at first
+    ! ToDo: the insects should contain the information themselves
+    real(kind=rk), allocatable :: force_insect_g(:, :), moment_insect_g(:, :)
     ! nu
     real(kind=rk) :: nu, nu_p=0.0_rk, nu_bulk=0.0_rk
     real(kind=rk) :: dx_min = -1.0_rk
-    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3),  &
-                     urms(1:3), div_max, div_min, freq, u_vert=0.0_rk, z_vert, penal_power(1:3), h_channel
-    ! forces for the different colors
-    real(kind=rk) :: force_color(1:3,0:ncolors), moment_color(1:3,0:ncolors)
+    ! Forces for the different colors
+    ! These are computed and used only in statistics output
+    real(kind=rk), allocatable :: force_color(:,:), moment_color(:,:)
     real(kind=rk) :: gamma_p
-    logical :: penalization, smooth_mask=.True., compute_flow=.true.
+    logical :: penalization, compute_flow=.true.
     ! sponge term:
     logical :: use_sponge = .false.
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0, C_smooth=1.5_rk
@@ -77,6 +80,9 @@ module module_acm
     logical :: HIT_linear_forcing = .false., skew_symmetry=.false.
     real(kind=rk) :: HIT_energy = 1.0_rk
     real(kind=rk) :: HIT_gain = 100.0_rk
+
+    logical :: use_energy_limiter = .false.
+    real(kind=rk) :: energy_start = -1.0_rk
 
     ! channel flow
     logical :: use_channel_forcing = .false.
@@ -98,24 +104,35 @@ module module_acm
     logical :: time_statistics = .false.
     integer(kind=ik) :: N_time_statistics = 0
     character(len=cshort), allocatable :: time_statistics_names(:)
+    real(kind=rk), allocatable :: time_statistics_mean(:), time_statistics_maxabs(:)
 
     logical :: read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
     real(kind=rk), dimension(3) :: domain_size=0.0_rk
-    character(len=cshort) :: inicond="", discretization="", filter_type="", geometry="cylinder"
+    character(len=clong) :: inicond="", discretization=""
+
+    ! VPM section
+    real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3), freq, h_channel
+    integer(kind=ik) :: n_geometries = 1
+    character(len=clong) :: geometry_legacy="", geometry_string=""
+    character(len=clong), allocatable :: geometries(:), geometry_files(:)
+    integer(kind=ik), allocatable :: geometry_colors(:)
     character(len=cshort) :: sponge_type=""
     character(len=cshort) :: p_eqn_model="acm"
-    character(len=cshort) :: coarsening_indicator=""
     character(len=cshort) :: wingsection_inifiles(1:2)
+
+    character(len=cshort) :: coarsening_indicator=""
     character(len=cshort) :: scalar_BC_type="neumann"
     character(len=cshort), allocatable :: names(:)
+    logical :: inicond_vorticity_formulation = .false.
+    logical :: inicond_pressure_from_velocity = .false.
     ! the mean flow, as required for some forcing terms. it is computed in the RHS
     real(kind=rk) :: mean_flow(1:3)=0.0_rk, mean_p=0.0_rk, umax=0.0_rk, umag=0.0_rk
     real(kind=rk) :: start_time = 0.0_rk
-    ! kinetic energy and enstrophy (both integrals)
-    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, helicity=0.0_rk, u_residual(1:3)=0.0_rk, &
-    sponge_volume=0.0_rk, dissipation=0.0_rk, scalar_removal=0.0_rk, ACM_energy=0.0_rk
+    ! integral quantities like kinetic energy and enstrophy
+    real(kind=rk) :: e_kin=0.0_rk, enstrophy=0.0_rk, max_vort=0.0_rk, helicity=0.0_rk, u_residual(1:3)=0.0_rk, &
+    sponge_volume=0.0_rk, dissipation=0.0_rk, scalar_removal=0.0_rk, ACM_energy=0.0_rk, urms(1:3), div_max, div_min, penal_power(1:3)
     ! we need to know which mpirank prints output..
     integer(kind=ik) :: mpirank, mpisize
     !
@@ -126,6 +143,8 @@ module module_acm
     real(kind=rk) :: R0, R1, R2
     character(len=clong) :: file_usx, file_usy, file_usp
     character(len=cshort) :: smoothing_type
+    integer(kind=ik) :: smoothing_type_int
+    real(kind=rk) :: smoothing_width, smoothing_safety
     real(kind=rk), allocatable :: u_lamballais(:,:,:)
 
     logical :: initialized = .false.
@@ -135,10 +154,6 @@ module module_acm
   ! in the rest of the code. WABBIT does not need to know them.
   ! HACK: made them public for FSI time stepper (18 Feb 2021)
   type(type_params_acm), public, save :: params_acm
-
-  ! all parameters for insects go here:
-  ! HACK: made them public for FSI time stepper (18 Feb 2021)
-  type(diptera), public, save :: insect
 
 contains
 
@@ -150,38 +165,7 @@ contains
 #include "save_data_ACM.f90"
 #include "statistics_ACM.f90"
 #include "time_statistics_ACM.f90"
-#include "filter_ACM.f90"
 #include "2D_wingsection.f90"
-
-! this routine is public, even though it is non-standard for all physics modules.
-! it is used in "dry-run" mode, which we use to create insect mask functions without
-! solving the fluid equations. This is an incredibly useful mode, and it needs to write
-! the kinematics to *.t file. until a permanent solution is found, this is a HACK
-subroutine WRITE_INSECT_DATA(time)
-    implicit none
-    real(kind=rk), intent(in) :: time
-
-    if (.not. params_acm%initialized) write(*,*) "WARNING: WRITE_INSECT_DATA called but ACM not initialized"
-
-    if (Insect%second_wing_pair) then
-        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w, &
-        Insect%alpha_l2, Insect%phi_l2, Insect%theta_l2, &
-        Insect%alpha_r2, Insect%phi_r2, Insect%theta_r2, &
-        Insect%rot_rel_wing_l2_w, Insect%rot_rel_wing_r2_w, &
-        Insect%rot_dt_wing_l2_w, Insect%rot_dt_wing_r2_w/) )
-    else
-        call append_t_file( 'kinematics.t', (/time, Insect%xc_body_g, Insect%psi, Insect%beta, &
-        Insect%gamma, Insect%eta_stroke, Insect%alpha_l, Insect%phi_l, &
-        Insect%theta_l, Insect%alpha_r, Insect%phi_r, Insect%theta_r, &
-        Insect%rot_rel_wing_l_w, Insect%rot_rel_wing_r_w, &
-        Insect%rot_dt_wing_l_w, Insect%rot_dt_wing_r_w/) )
-    endif
-
-end subroutine
 
   !-----------------------------------------------------------------------------
   ! main level wrapper routine to read parameters in the physics module. It reads
@@ -204,7 +188,7 @@ end subroutine
     real(kind=rk), allocatable :: buffer_array(:,:)
 
     type(inifile) :: FILE
-    integer :: Neqn, i
+    integer :: Neqn, i, insect_id
 
     N_mask_components = 0
     ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
@@ -253,7 +237,6 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'nu_p', params_acm%nu_p, 0.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'nu_bulk', params_acm%nu_bulk, 0.0_rk)
     call read_param_mpi(FILE, 'ACM-new', 'gamma_p', params_acm%gamma_p, 1.0_rk)
-    call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'ACM-new', 'beta', params_acm%beta, 0.05_rk )
     call read_param_mpi(FILE, 'ACM-new', 'compute_flow', params_acm%compute_flow, .true. )
     call read_param_mpi(FILE, 'ACM-new', 'HIT_linear_forcing', params_acm%HIT_linear_forcing, .false. )
@@ -262,11 +245,11 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'p_eqn_model', params_acm%p_eqn_model, "acm" )
     call read_param_mpi(FILE, 'ACM-new', 'skew_symmetry', params_acm%skew_symmetry, .false. )
 
-    ! channel flow
-    call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )
-
     ! initial condition
     call read_param_mpi(FILE, 'ACM-new', 'inicond', params_acm%inicond, "meanflow")
+    call read_param_mpi(FILE, 'Physics', 'inicond_vorticity_formulation', params_acm%inicond_vorticity_formulation, .false.)
+    call read_param_mpi(FILE, 'Physics', 'inicond_pressure_from_velocity', params_acm%inicond_pressure_from_velocity, params_acm%inicond_vorticity_formulation)
+    
     ! the free flight FSI solver needs to know if it resumes a backup or not
     call read_param_mpi(FILE, 'Physics', 'read_from_files', params_acm%read_from_files, .false.)
     ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
@@ -281,7 +264,6 @@ end subroutine
 
 
     call read_param_mpi(FILE, 'Discretization', 'order_discretization', params_acm%discretization, "FD_4th_central_optimized")
-    call read_param_mpi(FILE, 'Discretization', 'filter_type', params_acm%filter_type, "no_filter")
 
     call read_param_mpi(FILE, 'Blocks', 'coarsening_indicator', params_acm%coarsening_indicator, "threshold-state-vector")
     call read_param_mpi(FILE, 'Blocks', 'eps_norm', params_acm%eps_norm, "Linfty")
@@ -295,8 +277,33 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'C_eta_ring', params_acm%C_eta_ring, params_acm%C_eta)
     call read_param_mpi(FILE, 'VPM', 'penalization_startup_tau', params_acm%penalization_startup_tau, 0.20_rk)
     call read_param_mpi(FILE, 'VPM', 'soft_penalization_startup', params_acm%soft_penalization_startup, .false.)
-    call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry, "cylinder")
+
+    ! geometry read_in: first we check if only one geometry should be set. This is in parity with the old ini-files
+    ! if not, we read in an array of geometries and can sert in several geometry files or strings
+    call read_param_mpi(FILE, 'VPM', 'geometry', params_acm%geometry_legacy, "")
+    if (params_acm%geometry_legacy /= "") then
+        params_acm%n_geometries = 1
+        allocate(params_acm%geometries(1))
+        allocate(params_acm%geometry_files(1))
+        allocate(params_acm%geometry_colors(1))
+        params_acm%geometries(1) = params_acm%geometry_legacy
+        params_acm%geometry_colors(:) = 1
+    else
+        call read_param_mpi(FILE, 'VPM', 'n_geometries', params_acm%n_geometries, 1)
+        allocate(params_acm%geometries(params_acm%n_geometries))
+        allocate(params_acm%geometry_files(params_acm%n_geometries))
+        allocate(params_acm%geometry_colors(params_acm%n_geometries))
+        params_acm%geometries(:) = "none"
+        call read_param_mpi(FILE, 'VPM', 'geometries', params_acm%geometries, defaultvalue=params_acm%geometries )
+        params_acm%geometry_files = ""
+        params_acm%geometry_string = ""
+        call read_param_mpi(FILE, 'VPM', 'geometry_files', params_acm%geometry_files, defaultvalue=params_acm%geometry_files )
+        call read_param_mpi(FILE, 'VPM', 'geometry_string', params_acm%geometry_string, defaultvalue=params_acm%geometry_string )
+        params_acm%geometry_colors(:) = 1
+        call read_param_mpi(FILE, 'VPM', 'geometry_colors', params_acm%geometry_colors, defaultvalue=params_acm%geometry_colors )
+    endif
     
+    ! fixed geometry parameters. They are read only once and are the same for all geometries
     call read_param_mpi(FILE, 'VPM', 'x_cntr', params_acm%x_cntr, (/0.5*params_acm%domain_size(1), 0.5*params_acm%domain_size(2), 0.5*params_acm%domain_size(3)/)  )
     call read_param_mpi(FILE, 'VPM', 'R_cyl', params_acm%R_cyl, 0.5_rk )
     call read_param_mpi(FILE, 'VPM', 'length', params_acm%length, 1.0_rk )
@@ -311,14 +318,28 @@ end subroutine
     call read_param_mpi(FILE, 'VPM', 'file_usx', params_acm%file_usx, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usy', params_acm%file_usy, 'none')
     call read_param_mpi(FILE, 'VPM', 'file_usp', params_acm%file_usp, 'none')
-    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, 'hester')
+    call read_param_mpi(FILE, 'VPM', 'smoothing_type', params_acm%smoothing_type, 'cos')
+    select case(params_acm%smoothing_type)
+        case("cos", "cosine")
+            params_acm%smoothing_type_int = STEP_METHOD_COSINE
+        case("hester")
+            params_acm%smoothing_type_int = STEP_METHOD_HESTER
+        case("dis", "disc", "discontinuous")
+            params_acm%smoothing_type_int = STEP_METHOD_DISC
+        case default
+            call abort(62371118, "unknown smoothing type: "//params_acm%smoothing_type)
+    end select
 
     ! stuff for channel flow
+    call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
     call read_param_mpi(FILE, 'VPM', 'h_channel', params_acm%h_channel, 0.25_rk)
 
-    if (params_acm%geometry=="2D-wingsection" .or. params_acm%geometry=="two-moving-cylinders") then
-        call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
-    endif
+    do i=1,params_acm%n_geometries
+        if (params_acm%geometries(i) == "2D-wingsection" .or. params_acm%geometries(i) == "two-moving-cylinders") then
+            call read_param_mpi(FILE, 'VPM', 'wingsection_inifiles', params_acm%wingsection_inifiles, (/"", ""/))
+        endif
+    enddo
 
     call read_param_mpi(FILE, 'Sponge', 'use_sponge', params_acm%use_sponge, .false. )
     call read_param_mpi(FILE, 'Sponge', 'L_sponge', params_acm%L_sponge, 0.0_rk )
@@ -402,6 +423,8 @@ end subroutine
     if (params_acm%time_statistics) then
         call read_param_mpi(FILE, 'Time-Statistics', 'N_time_statistics', params_acm%N_time_statistics, 1)
         allocate( params_acm%time_statistics_names(1:params_acm%N_time_statistics) )
+        allocate( params_acm%time_statistics_mean(1:params_acm%N_time_statistics) )
+        allocate( params_acm%time_statistics_maxabs(1:params_acm%N_time_statistics) )
         call read_param_mpi(FILE, 'Time-Statistics', 'time_statistics_names', params_acm%time_statistics_names, (/"none"/))
     endif
 
@@ -425,6 +448,21 @@ end subroutine
     dx_min = minval( ddx(1:params_acm%dim) )
     ! uniqueGrid modification
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
+
+    ! compute some settings for VPM
+    select case(params_acm%smoothing_type)
+        case("cos", "cosine")
+            params_acm%smoothing_width = dx_min * params_acm%C_smooth
+            params_acm%smoothing_safety = 1.0_rk * params_acm%smoothing_width
+        case ("hester")
+            params_acm%smoothing_width = sqrt(params_acm%nu * params_acm%C_eta)
+            params_acm%smoothing_safety = max(5.0_rk * params_acm%smoothing_width, 2*maxval( ddx(1:params_acm%dim) ))
+        case("discontinuous", "dis")
+            params_acm%smoothing_width = dx_min * params_acm%C_smooth
+            params_acm%smoothing_safety = 3.0_rk * params_acm%smoothing_width
+        case default
+            call abort(260602, "Never heard of the smoothing type "//trim(params_acm%smoothing_type))
+    end select
 
     ! print some time-step related information
     if (params_acm%c_0 > 0.0_rk) then
@@ -466,63 +504,85 @@ end subroutine
       write(*,'(80("<"))')
     endif
 
-    ! if used, setup insect. Note fractal tree and active grid are part of the insects: they require the same init module
-    !
-    ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
-    if (params_acm%geometry == "Insect".or.params_acm%geometry=="fractal_tree".or.params_acm%geometry=="active_grid" &
-    .or. params_acm%geometry=="cylinder-free".or.params_acm%geometry=="sphere-free".or.params_acm%geometry=="plate-free") then
-        ! when computing passive scalars, we require derivatives of the mask function, which
-        ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
-        ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
-        ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
-        ! to set the mask on all points of a block (incl ghost nodes)
-        if (params_acm%set_mask_on_ghost_nodes) then
-            call insect_init( params_acm%start_time, filename, insect, params_acm%read_from_files, "", params_acm%domain_size, &
-            params_acm%nu, dx_min, N_ghost_nodes=0)
-        else
-            call insect_init( params_acm%start_time, filename, insect, params_acm%read_from_files, "", params_acm%domain_size, &
-            params_acm%nu, dx_min, N_ghost_nodes=g)
+    ! before we init the insects, we have to count how many there are
+    do i=1,params_acm%n_geometries
+        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
+        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+            n_insects = n_insects + 1
         endif
-    endif
+    enddo
+    ! now we initialize all the insects
+    call insects_array_init(n_insects)
+    allocate( params_acm%force_insect_g(1:3, 0:n_insects))
+    allocate( params_acm%moment_insect_g(1:3, 0:n_insects))
 
-    if (params_acm%geometry=="fractal_tree") then
-        call fractal_tree_init( Insect )
-    endif
+    ! Loop over all geometries and do geometry-specific initialization
+    ncolors = 1
+    do i=1,params_acm%n_geometries
 
-    if (params_acm%geometry=="2D-wingsection" .or. params_acm%geometry=="two-moving-cylinders") then
-        call init_wingsection_from_file(params_acm%wingsection_inifiles(1), wingsections(1), 0.0_rk)
-        call init_wingsection_from_file(params_acm%wingsection_inifiles(2), wingsections(2), 0.0_rk)
-    endif
+        ncolors = max( ncolors, params_acm%geometry_colors(i) )
 
+        ! if used, setup insect. Note active grid is part of the insects: they require the same init module
+        !
+        ! NOTE: there are several testing geometries used to test the free-flight solver: cylinder-free, sphere-free and plate-free (2D)
+        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
+        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+            ! when computing passive scalars, we require derivatives of the mask function, which
+            ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
+            ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
+            ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
+            ! to set the mask on all points of a block (incl ghost nodes)
+            call get_insect_id( i, insect_id )
+            if (params_acm%set_mask_on_ghost_nodes) then
+                call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type, N_ghost_nodes=0, colors_default=(/params_acm%n_geometries + 5*insect_id,params_acm%n_geometries+1+5*insect_id,params_acm%n_geometries+2+5*insect_id,params_acm%n_geometries+3+5*insect_id,params_acm%n_geometries+4+5*insect_id, params_acm%geometry_colors(i)/))
+            else
+                call insect_init( params_acm%start_time, filename, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
+                params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type, N_ghost_nodes=g, colors_default=(/params_acm%n_geometries + 5*insect_id,params_acm%n_geometries+1+5*insect_id,params_acm%n_geometries+2+5*insect_id,params_acm%n_geometries+3+5*insect_id,params_acm%n_geometries+4+5*insect_id, params_acm%geometry_colors(i)/))
+            endif
 
-    ! read lamballais reference fields, see
-    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013 
-    if ((params_acm%geometry == "lamballais").or.(params_acm%geometry=="lamballais-local")) then
-        if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
-        
-        ! read us field
-        call count_lines_in_ascii_file_mpi(params_acm%file_usx, num_lines, 0)
-        ! avoid maxcolumns restriction (read in a single long column and reshape)
-        allocate(buffer_array(1:num_lines,1:1))
-        call read_array_from_ascii_file_mpi(params_acm%file_usx, buffer_array, 0)
-
-        write(*,*) "lamballais num_lines", num_lines, nx_max
-
-
-        if (num_lines /= nx_max**2) then
-            call abort(2410011, "Lamballais: you seem to read the wrong field (size mismatch?!)")
+            ! compute maximum color
+            ncolors = max( ncolors, int(maxval((/ insects(insect_id)%color_body, insects(insect_id)%color_l, insects(insect_id)%color_r, insects(insect_id)%color_l2, insects(insect_id)%color_r2/)), kind=ik) )
         endif
 
-        allocate(params_acm%u_lamballais(0:nx_max-1, 0:nx_max-1, 1:3))
-        ! reshape
-        params_acm%u_lamballais(:,:,1) = reshape(buffer_array, (/nx_max, nx_max/))
+        if (params_acm%geometries(i)=="2D-wingsection" .or. params_acm%geometries(i)=="two-moving-cylinders") then
+            call init_wingsection_from_file(params_acm%wingsection_inifiles(1), wingsections(1), 0.0_rk)
+            call init_wingsection_from_file(params_acm%wingsection_inifiles(2), wingsections(2), 0.0_rk)
+        endif
 
-        call read_array_from_ascii_file_mpi(params_acm%file_usy, buffer_array, 0)
-        params_acm%u_lamballais(:,:,2) = reshape(buffer_array, (/nx_max, nx_max/))
 
-        call read_array_from_ascii_file_mpi(params_acm%file_usp, buffer_array, 0)
-        params_acm%u_lamballais(:,:,3) = reshape(buffer_array, (/nx_max, nx_max/))
-    endif
+        ! read lamballais reference fields, see
+        ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40 , Computers & Fluids 75, 103–111, 2013
+        if ((params_acm%geometries(i) == "lamballais").or.(params_acm%geometries(i)=="lamballais-local")) then
+            if (params_acm%dim /= 2) call abort(1409241, "lamballais is a 2D test case")
+            
+            ! read us field
+            call count_lines_in_ascii_file_mpi(params_acm%file_usx, num_lines, 0)
+            ! avoid maxcolumns restriction (read in a single long column and reshape)
+            allocate(buffer_array(1:num_lines,1:1))
+            call read_array_from_ascii_file_mpi(params_acm%file_usx, buffer_array, 0)
+
+            write(*,*) "lamballais num_lines", num_lines, nx_max
+
+
+            if (num_lines /= nx_max**2) then
+                call abort(2410011, "Lamballais: you seem to read the wrong field (size mismatch?!)")
+            endif
+
+            allocate(params_acm%u_lamballais(0:nx_max-1, 0:nx_max-1, 1:3))
+            ! reshape
+            params_acm%u_lamballais(:,:,1) = reshape(buffer_array, (/nx_max, nx_max/))
+
+            call read_array_from_ascii_file_mpi(params_acm%file_usy, buffer_array, 0)
+            params_acm%u_lamballais(:,:,2) = reshape(buffer_array, (/nx_max, nx_max/))
+
+            call read_array_from_ascii_file_mpi(params_acm%file_usp, buffer_array, 0)
+            params_acm%u_lamballais(:,:,3) = reshape(buffer_array, (/nx_max, nx_max/))
+        endif
+    enddo
+
+    ! now initialze force arrays for colors at last, because we know how many colors we have
+    allocate( params_acm%force_color(1:3, 0:ncolors), params_acm%moment_color(1:3, 0:ncolors) )
 
     params_acm%initialized = .true.
   end subroutine READ_PARAMETERS_ACM
@@ -678,145 +738,155 @@ end subroutine
       ! therefore the general call has to pass time
       real(kind=rk), intent (in) :: time
       logical, intent(in) :: overwrite
-      logical :: is_insect, use_color
+      logical :: is_insect, has_two_wings
+      integer :: i_insect, i_color
+      character(len=cshort) :: headers(1:100)  ! we can use this to create headers
 
       is_insect = .false.
-      use_color = .false.
-      if (params_acm%geometry == "Insect") is_insect = .true.
-      if (params_acm%geometry == "two-moving-cylinders") use_color = .true.
+      if (any(params_acm%geometries(:) == "Insect").or.any(params_acm%geometries(:)=="active_grid") &
+        .or. any(params_acm%geometries(:)=="cylinder-free").or.any(params_acm%geometries(:)=="sphere-free").or.any(params_acm%geometries(:)=="plate-free")) is_insect = .true.
+
+      has_two_wings = .false.
+      do i_insect = 1, n_insects
+        has_two_wings = has_two_wings .or. (insects(i_insect)%second_wing_pair)
+      enddo
 
 
 
       call init_t_file('meanflow.t', overwrite)
-      call init_t_file('e_kin.t', overwrite, (/"           time", "          e_kin", " p^2/2c0^2+ekin"/))
-      call init_t_file('enstrophy.t', overwrite)
+      headers(1) = "time"
+      headers(2) = "e_kin"
+      headers(3) = "p^2/2c0^2+ekin"
+      call init_t_file('e_kin.t', overwrite, headers(1:3))
+      headers(2) = "enstrophy"
+      headers(3) = "max(omega)"
+      call init_t_file('enstrophy.t', overwrite, headers(1:3))
       if (params_acm%dim == 3) then
-        call init_t_file('helicity.t', overwrite)
+        headers(2) = "helicity"
+        call init_t_file('helicity.t', overwrite, headers(1:2))
       endif
-      call init_t_file('dissipation.t', overwrite)
-      call init_t_file('div.t', overwrite)
-      call init_t_file('umag.t', overwrite)
-      call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
+      headers(2) = "nu u laplace u"
+      call init_t_file('dissipation.t', overwrite, headers(1:2))
+      headers(2) = "max(div)"
+      headers(3) = "min(div)"
+      call init_t_file('div.t', overwrite,  headers(1:3))
+      headers(2) = "max(|u|)=um"
+      headers(3) = "c0"
+      headers(4) = "c0/um"
+      headers(5) = "sqrt(c0^2+um^2)"
+      call init_t_file('umag.t', overwrite, headers(1:5))
+      if (params_acm%HIT_linear_forcing) then
+        call init_t_file('turbulent_statistics.t', overwrite, (/"           time", "    dissipation", "         energy", "          u_RMS", &
       "    kolm_length", "      kolm_time", "  kolm_velocity", "   taylor_micro", "reynolds_taylor"/))
+      endif
       call init_t_file('CFL.t', overwrite, (/&
       "           time", &
       "            CFL", &
       "         CFL_nu", &
       "        CFL_eta"/) )
+      if (params_acm%time_statistics) then
+        call init_t_file('time_statistics_mean.t', overwrite)
+        call init_t_file('time_statistics_maxabs.t', overwrite)
+      endif
       if (params_acm%penalization .or. params_acm%use_sponge) then
-        call init_t_file('forces.t', overwrite)
+        call init_t_file('forces.t', overwrite, (/ "           time", "   sum_forces_X", "   sum_forces_Y", "   sum_forces_Z"/))
+
+        ! dynamic initialziation of force array so that it makes sense
+        do i_color = 1, ncolors
+            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "c", i_color, ":force_X"
+            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "c", i_color, ":force_Y"
+            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "c", i_color, ":force_Z"
+        enddo
+        call init_t_file('forces_color.t', overwrite, headers(1:3*ncolors+1) )
+        do i_color = 1, ncolors
+            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "c", i_color, ":moment_X"
+            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "c", i_color, ":moment_Y"
+            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "c", i_color, ":moment_Z"
+        enddo
+        call init_t_file('moments_color.t', overwrite, headers(1:3*ncolors+1) )
+
         if (is_insect) then
             call init_t_file('moments.t', overwrite)
-            call init_t_file('aero_power.t', overwrite)
+
+            ! headers for aero power file
+            do i_insect = 1, n_insects
+                write(headers((i_insect-1)*2 + 2),"(A,i0.2,A)") "I", i_insect, ":apow"
+                write(headers((i_insect-1)*2 + 3),"(A,i0.2,A)") "I", i_insect, ":ipow"
+            enddo
+            call init_t_file('aero_power.t', overwrite, headers(1:2*n_insects+1) )
+
             call init_t_file('forces_body.t', overwrite)
             call init_t_file('moments_body.t', overwrite)
             call init_t_file('forces_leftwing.t', overwrite)
             call init_t_file('moments_leftwing.t', overwrite)
             call init_t_file('forces_rightwing.t', overwrite)
             call init_t_file('moments_rightwing.t', overwrite)
-            call init_t_file('insect_state_vector.t', overwrite)
-        endif
-        if (use_color) then
-            call init_t_file('forces_1.t', overwrite)
-            call init_t_file('forces_2.t', overwrite)
+
+            ! headers for state vector file
+            do i_insect = 1, n_insects
+                write(headers((i_insect-1)*23 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
+                write(headers((i_insect-1)*23 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
+                write(headers((i_insect-1)*23 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
+                write(headers((i_insect-1)*23 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
+                write(headers((i_insect-1)*23 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
+                write(headers((i_insect-1)*23 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
+                write(headers((i_insect-1)*23 + 8),"(A,i0.2,A)") "I", i_insect, ":q1-body"
+                write(headers((i_insect-1)*23 + 9),"(A,i0.2,A)") "I", i_insect, ":q2-body"
+                write(headers((i_insect-1)*23 + 10),"(A,i0.2,A)") "I", i_insect, ":q3-body"
+                write(headers((i_insect-1)*23 + 11),"(A,i0.2,A)") "I", i_insect, ":q4-body"
+                write(headers((i_insect-1)*23 + 12),"(A,i0.2,A)") "I", i_insect, ":w-x-body"
+                write(headers((i_insect-1)*23 + 13),"(A,i0.2,A)") "I", i_insect, ":w-y-body"
+                write(headers((i_insect-1)*23 + 14),"(A,i0.2,A)") "I", i_insect, ":w-z-body"
+                write(headers((i_insect-1)*23 + 15),"(A,i0.2,A)") "I", i_insect, ":q1-l"
+                write(headers((i_insect-1)*23 + 16),"(A,i0.2,A)") "I", i_insect, ":q2-l"
+                write(headers((i_insect-1)*23 + 17),"(A,i0.2,A)") "I", i_insect, ":q3-l"
+                write(headers((i_insect-1)*23 + 18),"(A,i0.2,A)") "I", i_insect, ":q4-l"
+                write(headers((i_insect-1)*23 + 19),"(A,i0.2,A)") "I", i_insect, ":w-x-l"
+                write(headers((i_insect-1)*23 + 20),"(A,i0.2,A)") "I", i_insect, ":w-y-l"
+                write(headers((i_insect-1)*23 + 21),"(A,i0.2,A)") "I", i_insect, ":w-z-l"
+                write(headers((i_insect-1)*23 + 22),"(A,i0.2,A)") "I", i_insect, ":force-g-x"
+                write(headers((i_insect-1)*23 + 23),"(A,i0.2,A)") "I", i_insect, ":force-g-y"
+                write(headers((i_insect-1)*23 + 24),"(A,i0.2,A)") "I", i_insect, ":force-g-z"
+            enddo
+            call init_t_file('insect_state_vector.t', overwrite, headers(1:23*n_insects+1) )
+
+            if (has_two_wings) then
+                call init_t_file('forces_leftwing2.t', overwrite)
+                call init_t_file('moments_leftwing2.t', overwrite)
+                call init_t_file('forces_rightwing2.t', overwrite)
+                call init_t_file('moments_rightwing2.t', overwrite)
+            endif
+
+            call init_insect_data(overwrite)
         endif
         call init_t_file('mask_volume.t', overwrite)
         call init_t_file('u_residual.t', overwrite)
-        call init_t_file('kinematics.t', overwrite)
         call init_t_file('forces_rk.t', overwrite)
         call init_t_file('penal_power.t', overwrite, (/&
         "           time", &
         "  E_dot_f_solid"/))
-
-        if (Insect%second_wing_pair) then
-          call init_t_file('forces_leftwing2.t', overwrite)
-          call init_t_file('moments_leftwing2.t', overwrite)
-          call init_t_file('forces_rightwing2.t', overwrite)
-          call init_t_file('moments_rightwing2.t', overwrite)
-          call init_t_file('kinematics.t', overwrite, (/&
-          "           time", &
-          "    xc_body_g_x", &
-          "    xc_body_g_y", &
-          "    xc_body_g_z", &
-          "      psi (rad)", &
-          "     beta (rad)", &
-          "    gamma (rad)", &
-          "      eta (rad)", &
-          "  alpha_l (rad)", &
-          "    phi_l (rad)", &
-          "  theta_l (rad)", &
-          "  alpha_r (rad)", &
-          "    phi_r (rad)", &
-          "  theta_r (rad)", &
-          "  rot_rel_l_w_x", &
-          "  rot_rel_l_w_y", &
-          "  rot_rel_l_w_z", &
-          "  rot_rel_r_w_x", &
-          "  rot_rel_r_w_y", &
-          "  rot_rel_r_w_z", &
-          "   rot_dt_l_w_x", &
-          "   rot_dt_l_w_y", &
-          "   rot_dt_l_w_z", &
-          "   rot_dt_r_w_x", &
-          "   rot_dt_r_w_y", &
-          "   rot_dt_r_w_z", &
-          " alpha_l2 (rad)", &
-          "   phi_l2 (rad)", &
-          " theta_l2 (rad)", &
-          " alpha_r2 (rad)", &
-          "   phi_r2 (rad)", &
-          " theta_r2 (rad)", &
-          " rot_rel_l2_w_x", &
-          " rot_rel_l2_w_y", &
-          " rot_rel_l2_w_z", &
-          " rot_rel_r2_w_x", &
-          " rot_rel_r2_w_y", &
-          " rot_rel_r2_w_z", &
-          "  rot_dt_l2_w_x", &
-          "  rot_dt_l2_w_y", &
-          "  rot_dt_l2_w_z", &
-          "  rot_dt_r2_w_x", &
-          "  rot_dt_r2_w_y", &
-          "  rot_dt_r2_w_z"/) )
-        else
-          call init_t_file('kinematics.t', overwrite, (/&
-          "           time", &
-          "    xc_body_g_x", &
-          "    xc_body_g_y", &
-          "    xc_body_g_z", &
-          "      psi (rad)", &
-          "     beta (rad)", &
-          "    gamma (rad)", &
-          "      eta (rad)", &
-          "  alpha_l (rad)", &
-          "    phi_l (rad)", &
-          "  theta_l (rad)", &
-          "  alpha_r (rad)", &
-          "    phi_r (rad)", &
-          "  theta_r (rad)", &
-          "  rot_rel_l_w_x", &
-          "  rot_rel_l_w_y", &
-          "  rot_rel_l_w_z", &
-          "  rot_rel_r_w_x", &
-          "  rot_rel_r_w_y", &
-          "  rot_rel_r_w_z", &
-          "   rot_dt_l_w_x", &
-          "   rot_dt_l_w_y", &
-          "   rot_dt_l_w_z", &
-          "   rot_dt_r_w_x", &
-          "   rot_dt_r_w_y", &
-          "   rot_dt_r_w_z"/) )
-        endif
     endif
 
 
   end subroutine INITIALIZE_ASCII_FILES_ACM
 
-  ! this tiny wrapper avoids us to use "module_insects" as public module in some places.
-  subroutine Update_Insect_wrapper(time)
-      implicit none
-      real(kind=rk), intent(in) :: time
-      call Update_Insect(time, Insect)
+  !> In geometry string, we might have [primitives-collection, insect, primitives-collection, insect].
+  !! Now, when looping over all geometries, we want to now that geometry 4 corresponds to the second insect.
+  !! This routine does exactly that.
+  subroutine get_insect_id(i_geom, insect_id)
+    implicit none
+    integer, intent(in) :: i_geom  !< index of the geometry in the geometries array
+    integer, intent(inout) :: insect_id  !< the insect_id corresponding to the geometry
+
+    integer :: i, count_insects
+    count_insects = 0
+    do i = 1, i_geom
+        if (params_acm%geometries(i) == "Insect".or.params_acm%geometries(i)=="active_grid" &
+        .or. params_acm%geometries(i)=="cylinder-free".or.params_acm%geometries(i)=="sphere-free".or.params_acm%geometries(i)=="plate-free") then
+            count_insects = count_insects + 1
+        endif
+    enddo
+    insect_id = count_insects
   end subroutine
 
 end module module_acm

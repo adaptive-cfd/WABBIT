@@ -55,6 +55,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     integer(kind=ik), dimension(3) :: Bs
     real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_inv, x, y, z, f_block(1:3)
     integer(kind=2) :: color
+    integer(kind=ik) :: i_insect
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: RHS_ACM called but ACM not initialized"
 
@@ -100,12 +101,13 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             params_acm%mean_flow = 0.0_rk
         endif
 
-        if (params_acm%geometry == "Insect") call Update_Insect(time, Insect)
+        ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+        call Update_All_Insects(time)
 
         if (params_acm%use_free_flight_solver) then
             ! reset forces, we compute their value now
-            params_acm%force_insect_g = 0.0_rk
-            params_acm%moment_insect_g = 0.0_rk
+            params_acm%force_insect_g(:, :) = 0.0_rk
+            params_acm%moment_insect_g(:, :) = 0.0_rk
         endif
 
     case ("integral_stage")
@@ -120,8 +122,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         !
         ! called for each block.
         do i = 1, size(u,4)
-            if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > 1.0e12_rk) then
-                write(*,'("RHS: maxval in u(",i2,") = ", es10.4, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es8.2))') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))), x0, dx
+            if (maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))) > LIM_DIVERGED) then
+                write(*,'("RHS: maxval in u(",i2,") = ", es10.3, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es9.2))') i, maxval(abs(u(g+1:Bs(1)+g,g+1:Bs(2)+g,g+1:Bs(3)+g,i))), x0, dx
 
                 ! call dump_block_fancy(u(:,:,:,i:i), "block_ACM_diverged_RHS.txt", Bs, g)
 
@@ -167,63 +169,66 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
+                do i_insect = 1, n_insects
+                    do iy = g+1, Bs(2)+g
+                        y = x0(2) + dble(iy-(g+1)) * dx(2) - Insects(i_insect)%xc_body_g(2)
+                        do ix = g+1, Bs(1)+g
+                            x = x0(1) + dble(ix-(g+1)) * dx(1) - Insects(i_insect)%xc_body_g(1)
 
-                do iy = g+1, Bs(2)+g
-                    y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
-                    do ix = g+1, Bs(1)+g
-                        x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
+                            ! get this points color
+                            color = int( mask(ix, iy, 1, 5), kind=2 )
 
-                        ! get this points color
-                        color = int( mask(ix, iy, 1, 5), kind=2 )
+                            ! exclude walls, trees, etc... (they have color 0)
+                            ! if (color>0_2 .and. color < 6_2) then
+                            ! penalization term
+                            penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) * C_eta_inv
 
-                        ! exclude walls, trees, etc... (they have color 0)
-                        ! if (color>0_2 .and. color < 6_2) then
-                        ! penalization term
-                        penal = -mask(ix,iy,1,1) * (u(ix,iy,1,1:3) - mask(ix,iy,1,2:4)) * C_eta_inv
+                            f_block = f_block - penal
+                            f_block(3) = 0.0_rk
 
-                        f_block = f_block - penal
-                        f_block(3) = 0.0_rk
+                            ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
 
-                        ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
-
-                        ! moments. For insects, we compute the total moment wrt to the body center
-                        ! params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
-                        ! endif
+                            ! moments. For insects, we compute the total moment wrt to the body center
+                            ! params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
+                            ! endif
+                        enddo
                     enddo
-                enddo
 
-                params_acm%force_insect_g = params_acm%force_insect_g + f_block*dV
+                    params_acm%force_insect_g(:, i_insect) = params_acm%force_insect_g(:, i_insect) + f_block*dV
+                enddo
             else
                 dV = dx(1)*dx(2)*dx(3)
                 C_eta_inv = 1.0_rk / params_acm%C_eta
                 f_block = 0.0_rk
 
-                do iz = g+1, Bs(3)+g
-                    z = x0(3) + dble(iz-(g+1)) * dx(3) - Insect%xc_body_g(3) ! note: x-xc insect
-                    do iy = g+1, Bs(2)+g
-                        y = x0(2) + dble(iy-(g+1)) * dx(2) - Insect%xc_body_g(2)
-                        do ix = g+1, Bs(1)+g
-                            x = x0(1) + dble(ix-(g+1)) * dx(1) - Insect%xc_body_g(1)
+                do i_insect = 1, n_insects
+                    do iz = g+1, Bs(3)+g
+                        z = x0(3) + dble(iz-(g+1)) * dx(3) - Insects(i_insect)%xc_body_g(3) ! note: x-xc insect
+                        do iy = g+1, Bs(2)+g
+                            y = x0(2) + dble(iy-(g+1)) * dx(2) - Insects(i_insect)%xc_body_g(2)
+                            do ix = g+1, Bs(1)+g
+                                x = x0(1) + dble(ix-(g+1)) * dx(1) - Insects(i_insect)%xc_body_g(1)
 
-                            ! get this points color
-                            color = int( mask(ix, iy, iz, 5), kind=2 )
+                                ! get this points color
+                                color = int( mask(ix, iy, iz, 5), kind=2 )
 
-                            ! exclude walls, trees, etc... (they have color 0)
-                            if (color>0_2 .and. color < 6_2) then
-                                ! penalization term
-                                penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
+                                ! exclude walls, trees, etc... (they have color 0)
+                                if (color>0_2 .and. color < 6_2) then
+                                    ! penalization term
+                                    penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_inv
 
-                                f_block = f_block - penal
+                                    f_block = f_block - penal
 
-                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+                                    ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
 
-                                ! moments. For insects, we compute the total moment wrt to the body center
-                                params_acm%moment_insect_g = params_acm%moment_insect_g - cross((/x, y, z/), penal)*dV
-                            endif
+                                    ! moments. For insects, we compute the total moment wrt to the body center
+                                    params_acm%moment_insect_g(:, i_insect) = params_acm%moment_insect_g(:, i_insect) - cross((/x, y, z/), penal)*dV
+                                endif
+                            enddo
                         enddo
                     enddo
+                    params_acm%force_insect_g(:, i_insect) = params_acm%force_insect_g(:, i_insect) + f_block*dV
                 enddo
-                params_acm%force_insect_g = params_acm%force_insect_g + f_block*dV
             endif ! NOTE: MPI_SUM is perfomed in the post_stage.
 
         endif
@@ -245,8 +250,8 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         endif
 
         if (params_acm%use_free_flight_solver) then
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_insect_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_insect_g, 3*n_insects, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%moment_insect_g, 3*n_insects, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         endif
 
     case ("local_stage")
@@ -306,7 +311,7 @@ end subroutine RHS_ACM
 
 
 subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask, n_domain)
-
+    use module_operators
     implicit none
 
     !> grid parameter
@@ -359,7 +364,11 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! 6th order FD scheme
     real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
     real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
+    ! coefficients and indices for generalized FD stencils
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD1_r, FD2
+    integer(kind=ik) :: FD1_ls, FD1_le, FD1_rs, FD1_re, FD2_s, FD2_e
 
+    character(len=clong) :: write_statement
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -376,8 +385,9 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     C_eta_inv = 1.0_rk / C_eta
 
-    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
-        call abort(66233,"wrong size, I go for a walk instead.")
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)<params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
+        write(write_statement, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') "phi size: ", size(phi,1), " x ", size(phi,2), " x ", size(phi,3), " expected: ", Bs(1)+2*g, " x ", Bs(2)+2*g, " x ", params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics
+        call abort(66233,"wrong size, I go for a walk instead: " // trim(write_statement))
     endif
 
 
@@ -760,7 +770,104 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         endif
 
     case default
-        call abort(441166, "Discretization unkown "//trim(adjustl(order_discretization))//", you should go play outside. Its nice." )
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Flexible operator version for 2D ACM using generalized stencils
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Here, the stencils are defined as 1D arrays and their application is written in a generalized form;
+        ! any 1D stencil can be used with this code. However, note, it is significantly faster to explicitly
+        ! write the stencils as is done above! Therefore, the most frequently used cases are NOT to be generalized
+        ! even though that may be tempting from an aesthetics point of view.
+
+        ! define the stencils
+        call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
+        call setup_FD1_right_stencil(order_discretization, FD1_r, FD1_rs, FD1_re)
+        
+        ! Performance optimization: if viscosity is zero, set up trivial FD2 stencil
+        if (abs(nu) < 1.0e-14_rk) then
+            ! Zero viscosity: set up dummy stencil that always returns 0
+            allocate(FD2(0:0))
+            FD2(0) = 0.0_rk
+            FD2_s = 0
+            FD2_e = 0
+        else
+            call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
+        endif
+
+        if (params_acm%skew_symmetry) then
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! Generalized first derivatives
+                    u_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,1)) * dx_inv
+                    u_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,1)) * dy_inv
+
+                    v_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,2)) * dx_inv
+                    v_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,2)) * dy_inv
+
+                    ! Pressure gradients with right stencil (complementary to div_u)
+                    p_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,3)) * dx_inv
+                    p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,3)) * dy_inv
+
+                    ! Generalized nonlinear terms
+                    uu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1)*phi(ix+FD1_ls:ix+FD1_le,iy,1)) * dx_inv
+                    uv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,1)*phi(ix,iy+FD1_ls:iy+FD1_le,2)) * dy_inv
+
+                    vu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,2)*phi(ix+FD1_ls:ix+FD1_le,iy,1)) * dx_inv
+                    vv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,2)*phi(ix,iy+FD1_ls:iy+FD1_le,2)) * dy_inv
+
+                    ! Generalized second derivatives
+                    u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,1)) * dx2_inv
+                    v_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,2)) * dx2_inv
+
+                    u_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,1)) * dy2_inv
+                    v_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,2)) * dy2_inv
+
+                    ! Divergence with left stencil (complementary to pressure)
+                    div_U = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1)) * dx_inv + &
+                            sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,2)) * dy_inv
+
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+
+                    ! Skew-symmetric formulation
+                    rhs(ix,iy,1) = -0.5_rk*(uu_dx + uv_dy   + phi(ix,iy,1)*u_dx + phi(ix,iy,2)*u_dy ) -p_dx + nu*(u_dxdx + u_dydy ) + penalx
+                    rhs(ix,iy,2) = -0.5_rk*(vu_dx + vv_dy   + phi(ix,iy,1)*v_dx + phi(ix,iy,2)*v_dy ) -p_dy + nu*(v_dxdx + v_dydy ) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
+            end do
+        else
+            do iy = g+1, Bs(2)+g
+                do ix = g+1, Bs(1)+g
+                    ! Generalized first derivatives
+                    u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,1)) * dx_inv
+                    v_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,2)) * dx_inv
+
+                    u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,1)) * dy_inv
+                    v_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,2)) * dy_inv
+
+                    ! for the non-skew symmetric formulation, we just use the same stencils as in the 
+                    ! skew symmetric one, i.e., right stencil for the pressure
+                    p_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,3)) * dx_inv
+                    p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,3)) * dy_inv
+
+                    ! Generalized second derivatives
+                    u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,1)) * dx2_inv
+                    v_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,2)) * dx2_inv
+
+                    u_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,1)) * dy2_inv
+                    v_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,2)) * dy2_inv
+
+                    div_U = u_dx + v_dy
+
+                    penalx = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,1) -mask(ix,iy,2))
+                    penaly = -mask(ix,iy,1) * C_eta_inv * (phi(ix,iy,2) -mask(ix,iy,3))
+
+                    ! Standard formulation
+                    rhs(ix,iy,1) = -phi(ix,iy,1)*u_dx - phi(ix,iy,2)*u_dy - p_dx + nu*(u_dxdx + u_dydy) + penalx
+                    rhs(ix,iy,2) = -phi(ix,iy,1)*v_dx - phi(ix,iy,2)*v_dy - p_dy + nu*(v_dxdx + v_dydy) + penaly
+                    rhs(ix,iy,3) = -(c_0**2)*div_U - gamma*phi(ix,iy,3)
+                end do
+            end do
+        endif
 
     end select
 
@@ -768,7 +875,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! sponge term.
     ! --------------------------------------------------------------------------
     ! HACK
-    if (.not.((params_acm%geometry == "lamballais") .or. (params_acm%geometry == "lamballais-local"))) then 
+    if (all(params_acm%geometries(:) /= "lamballais") .or. all(params_acm%geometries(:) /= "lamballais-local")) then 
         if (params_acm%use_sponge) then
             ! avoid division by multiplying with inverse
             C_sponge_inv = 1.0_rk / params_acm%C_sponge
@@ -860,7 +967,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, w_dxdz, w_dydz, &
                      p_dx, p_dy, p_dz, penalx, penaly, penalz, u, v, w, p, chi, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz
+                     C_sponge_inv, p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz, div_u
     !> loop variables
     integer(kind=ik) :: ix, iy, iz
 
@@ -876,9 +983,14 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     real(kind=rk), parameter :: a_FD6(-3:3) = (/-1.0_rk/60.0_rk, 3.0_rk/20.0_rk, -3.0_rk/4.0_rk, 0.0_rk, 3.0_rk/4.0_rk, -3.0_rk/20.0_rk, 1.0_rk/60.0_rk/) ! 1st derivative
     real(kind=rk), parameter :: b_FD6(-3:3) = (/ 1.0_rk/90.0_rk, -3.0_rk/20.0_rk, 3.0_rk/2.0_rk, -49.0_rk/18.0_rk, 3.0_rk/2.0_rk, -3.0_rk/20.0_rk, 1.0_rk/90.0_rk/) ! 2nd derivative
 
-    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
-    integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
+    real(kind=rk), allocatable, dimension(:) :: FD1_l, FD1_r, FD2
+    integer(kind=ik) :: FD1_ls, FD1_le, FD1_rs, FD1_re, FD2_s, FD2_e
+    character(len=clong) :: write_statement
 
+    if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)/=Bs(3)+2*g .or. size(phi,4)<params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
+        write(write_statement, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') "phi size: ", size(phi,1), " x ", size(phi,2), " x ", size(phi,3), " x ", size(phi,4), " expected: ", Bs(1)+2*g, " x ", Bs(2)+2*g, " x ", Bs(3)+2*g, " x ", params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics
+        call abort(66233,"wrong size, I go for a walk instead: " // trim(write_statement))
+    endif
 
     ! set parameters for readability
     c_0         = params_acm%c_0
@@ -1457,12 +1569,32 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         endif
 
     case default
-        ! call abort(44167, "3d Discretization unknown "// trim(order_discretization)//", I'll walk into the light now.")
-
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! Flexible operator version for 3D ACM using generalized stencils
+        !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ! Here, the stencils are defined as 1D arrays and their application is written in a generalized form;
+        ! any 1D stencil can be used with this code. However, note, it is significantly faster to explicitly
+        ! write the stencils as is done above! Therefore, the most frequently used cases are NOT to be generalized
+        ! even though that may be tempting from an aesthetics point of view.
 
+        ! Setup stencils. The left and right stencils are for the skew-symmetric formulation
+        ! see [J. Reiss 2015], used for the convective part of the nonlinear term and the divergence
+        ! part, respectively. Often, these are one-sided stencils. However, it is also possible
+        ! to set up the code using symmetric stencils here, in which case they're both identical.
+        !
         call setup_FD1_left_stencil(order_discretization, FD1_l, FD1_ls, FD1_le)
-        call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
+        call setup_FD1_right_stencil(order_discretization, FD1_r, FD1_rs, FD1_re)
+        
+        ! Performance optimization: if viscosity is zero, set up trivial FD2 stencil
+        if (abs(nu) < 1.0e-14_rk) then
+            ! Zero viscosity: set up dummy stencil that always returns 0
+            allocate(FD2(0:0))
+            FD2(0) = 0.0_rk
+            FD2_s = 0
+            FD2_e = 0
+        else
+            call setup_FD2_stencil(order_discretization, FD2, FD2_s, FD2_e)
+        endif
 
         if (params_acm%skew_symmetry) then
             do iz = g+1, Bs(3)+g
@@ -1478,24 +1610,25 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         penaly = -chi * (v - mask(ix,iy,iz,3))
                         penalz = -chi * (w - mask(ix,iy,iz,4))
 
-                        ! Generalized first derivatives
-                        u_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
-                        u_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,1)) * dy_inv
-                        u_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,1)) * dz_inv
+                        ! Generalized first derivatives (convective part - right stencil)
+                        u_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,1)) * dx_inv
+                        u_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,1)) * dy_inv
+                        u_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,1)) * dz_inv
 
-                        v_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,2)) * dx_inv
-                        v_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
-                        v_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,2)) * dz_inv
+                        v_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,2)) * dx_inv
+                        v_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,2)) * dy_inv
+                        v_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,2)) * dz_inv
 
-                        w_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,3)) * dx_inv
-                        w_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)) * dy_inv
-                        w_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+                        w_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,3)) * dx_inv
+                        w_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,3)) * dy_inv
+                        w_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,3)) * dz_inv
 
-                        p_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,4)) * dx_inv
-                        p_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,4)) * dy_inv
-                        p_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,4)) * dz_inv
+                        ! Pressure gradients with right stencil (complementary to div_u)
+                        p_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,4)) * dx_inv
+                        p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,4)) * dy_inv
+                        p_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,4)) * dz_inv
 
-                        ! Generalized nonlinear terms
+                        ! Generalized nonlinear terms (divergence part - left stencil)
                         uu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
                         uv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,1)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
                         uw_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,1)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
@@ -1504,7 +1637,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         vv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
                         vw_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,2)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
 
-                        wu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,3)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
+                        wu_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_re,iy,iz,3)*phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv
                         wv_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)*phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv
                         ww_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)*phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
 
@@ -1521,11 +1654,16 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w_dydy = sum(FD2(FD2_s:FD2_e) * phi(ix,iy+FD2_s:iy+FD2_e,iz,3)) * dy2_inv
                         w_dzdz = sum(FD2(FD2_s:FD2_e) * phi(ix,iy,iz+FD2_s:iz+FD2_e,3)) * dz2_inv
 
+                        ! Divergence with left stencil (complementary to pressure)
+                        div_U = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,1)) * dx_inv + &
+                                sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,2)) * dy_inv + &
+                                sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
+
                         ! Skew-symmetric formulation
                         rhs(ix,iy,iz,1) = -0.5_rk*(uu_dx + uv_dy + uw_dz   + u*u_dx + v*u_dy + w*u_dz) -p_dx + nu*(u_dxdx + u_dydy + u_dzdz) + penalx
                         rhs(ix,iy,iz,2) = -0.5_rk*(vu_dx + vv_dy + vw_dz   + u*v_dx + v*v_dy + w*v_dz) -p_dy + nu*(v_dxdx + v_dydy + v_dzdz) + penaly
                         rhs(ix,iy,iz,3) = -0.5_rk*(wu_dx + wv_dy + ww_dz   + u*w_dx + v*w_dy + w*w_dz) -p_dz + nu*(w_dxdx + w_dydy + w_dzdz) + penalz
-                        rhs(ix,iy,iz,4) = -(c_0**2)*(u_dx + v_dy + w_dz) - gamma*p
+                        rhs(ix,iy,iz,4) = -(c_0**2)*div_U - gamma*p
                     end do
                 end do
             end do
@@ -1556,9 +1694,11 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                         w_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,3)) * dy_inv
                         w_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,3)) * dz_inv
 
-                        p_dx = sum(FD1_l(FD1_ls:FD1_le) * phi(ix+FD1_ls:ix+FD1_le,iy,iz,4)) * dx_inv
-                        p_dy = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy+FD1_ls:iy+FD1_le,iz,4)) * dy_inv
-                        p_dz = sum(FD1_l(FD1_ls:FD1_le) * phi(ix,iy,iz+FD1_ls:iz+FD1_le,4)) * dz_inv
+                        ! for the non-skew symmetric formulation, we just use the same stencils as in the 
+                        ! skew symmetric one, i.e., right stencil for the pressure
+                        p_dx = sum(FD1_r(FD1_rs:FD1_re) * phi(ix+FD1_rs:ix+FD1_re,iy,iz,4)) * dx_inv
+                        p_dy = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy+FD1_rs:iy+FD1_re,iz,4)) * dy_inv
+                        p_dz = sum(FD1_r(FD1_rs:FD1_re) * phi(ix,iy,iz+FD1_rs:iz+FD1_re,4)) * dz_inv
 
                         ! Generalized second derivatives
                         u_dxdx = sum(FD2(FD2_s:FD2_e) * phi(ix+FD2_s:ix+FD2_e,iy,iz,1)) * dx2_inv
@@ -1922,7 +2062,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     ! On input, the mask array is correctly filled. You cannot create the full mask here.
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
-    character(len=cshort), intent(in)       :: order_discretization
+    character(len=clong), intent(in)       :: order_discretization
     !> time
     real(kind=rk), intent(in)               :: time
     ! when implementing boundary conditions, it is necessary to know if the local field (block)

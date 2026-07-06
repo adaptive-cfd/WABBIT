@@ -118,7 +118,7 @@ subroutine coarseningIndicator_block( params, block_data, block_work, indicator,
     ! i.e. the grid is always at the finest level on mask interfaces. Careful though: the Penalization
     ! is implemented on physics-module level, i.e. it is not available for all modules.  If it is
     ! not available, the option is useless but can cause errors.
-    ! NOTE: since the CDF44 wavelet is expensive, we use an alternative method to detect the gradient.
+    ! NOTE: since lifted wavelets are expensive, we use an alternative method to detect the gradient.
     if (params%threshold_mask .and. present(block_mask)) then
         ! t0 = MPI_Wtime()
         ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level

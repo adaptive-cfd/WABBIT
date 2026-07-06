@@ -132,7 +132,7 @@ subroutine coarseExtensionUpdate_tree( params, hvy_block, hvy_tmp, tree_ID, inpu
 
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! coarseExtension: remove wavelet coefficients near a fine/coarse interface
-    ! on the fine block. Does nothing in the case of CDF60, CDF40 or CDF20.
+    ! on the fine block. Does nothing in the case of unlifted wavelets
     ! This is the first coarse extension before removing blocks
     ! As every block is assumed to be WDed here we can do it on the whole tree
     t0 = MPI_Wtime()

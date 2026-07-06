@@ -233,7 +233,7 @@ subroutine unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_
 
                     open(unit=32, file=file_dump, status='unknown', position='append')
                     write(32, '(A)') ""  ! new line
-                    write(32, '(A, es8.2, A)') "1 corresponds to a deviation of 1 between correct value and synched one. Value deemed wrong at >50. Values with -99 were not considered"
+                    write(32, '(A, es9.2, A)') "1 corresponds to a deviation of 1 between correct value and synched one. Value deemed wrong at >50. Values with -99 were not considered"
                     close(32)
 
                     call dump_block_fancy(hvy_tmp(:, :, :, 1:1, hvy_id), file_dump, Bs, g, to_int=.true., digits=4, append=.true.)

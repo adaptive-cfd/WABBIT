@@ -9,11 +9,14 @@ use module_ini_files_parser
 use module_helpers, only : count_entries
 use mpi
 
+interface read_array_from_ascii_file_mpi
+    module procedure read_dblearray_from_ascii_file_mpi, read_intarray_from_ascii_file_mpi, read_chararray_from_ascii_file_mpi
+end interface
 
 ! the generic call "read_param" redirects to these routines, depending on the data
 ! type and the dimensionality. vectors can be read without setting a default.
 interface read_param_mpi
-    module procedure param_dbl_mpi, param_int_mpi, param_vct_mpi, param_str_mpi, &
+    module procedure param_dbl_mpi, param_int_mpi, param_vct_mpi, param_vct_int_mpi, param_str_mpi, &
         param_bool_mpi, param_vct_str_mpi, param_boolvct_mpi, param_matrix_mpi
     end interface
 
@@ -27,10 +30,12 @@ contains
     ! read an array from an ascii file (SERIAL version, to be executed only on root)
     ! note: array is assumed-shape and its size defines what we try to read
     !-----------------------------------------------------------------------------
-    subroutine read_array_from_ascii_file_mpi(file, array, n_header)
+    subroutine read_dblearray_from_ascii_file_mpi(file, array, n_header, n_lines, verbose)
         implicit none
         character(len=*), intent(in) :: file
         integer, intent(in) :: n_header
+        integer, intent(in), optional :: n_lines
+        logical, optional, intent(in) :: verbose
         real(kind=rk), intent(inout) :: array (1:,1:)
         integer :: nlines, ncols, mpicode, mpirank
 
@@ -45,7 +50,7 @@ contains
         ncols = size(array,2)
 
         ! only root reads from file...
-        if (mpirank==0) call read_array_from_ascii_file(file, array, n_header)
+        if (mpirank==0) call read_array_from_ascii_file(file, array, n_header, n_lines=n_lines, verbose=verbose)
         ! ... then broadcast
         call MPI_BCAST(array,nlines*ncols,MPI_DOUBLE_PRECISION,0,WABBIT_COMM,mpicode)
 
@@ -55,12 +60,14 @@ contains
 
 
 
-    end subroutine read_array_from_ascii_file_mpi
+    end subroutine read_dblearray_from_ascii_file_mpi
 
-    subroutine read_intarray_from_ascii_file_mpi(file, array, n_header)
+    subroutine read_intarray_from_ascii_file_mpi(file, array, n_header, n_lines, verbose)
         implicit none
         character(len=*), intent(in) :: file
         integer, intent(in) :: n_header
+        integer, intent(in), optional :: n_lines
+        logical, optional, intent(in) :: verbose
         integer(kind=ik), intent(inout) :: array (1:,1:)
         integer :: nlines, ncols, mpicode, mpirank
 
@@ -75,7 +82,7 @@ contains
         ncols = size(array,2)
 
         ! only root reads from file...
-        if (mpirank==0) call read_intarray_from_ascii_file(file, array, n_header)
+        if (mpirank==0) call read_array_from_ascii_file(file, array, n_header, n_lines=n_lines, verbose=verbose)
         ! ... then broadcast
         call MPI_BCAST(array,nlines*ncols,MPI_INTEGER4,0,WABBIT_COMM,mpicode)
 
@@ -85,6 +92,35 @@ contains
 
     end subroutine read_intarray_from_ascii_file_mpi
 
+    subroutine read_chararray_from_ascii_file_mpi(file, array, n_header, n_lines, verbose)
+        implicit none
+        character(len=*), intent(in) :: file
+        integer, intent(in) :: n_header
+        integer, intent(in), optional :: n_lines
+        logical, optional, intent(in) :: verbose
+        character(len=*), intent(inout) :: array (1:,1:)
+        integer :: nlines, ncols, mpicode, mpirank
+
+        ! check if communicator is set
+        if (WABBIT_COMM==-1) then
+            call abort(3567632,"Error[module_ini_files_parser_mpi.f90]: Communicator not set")
+        endif
+        ! fetch my process id
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        nlines = size(array,1)
+        ncols = size(array,2)
+
+        ! only root reads from file...
+        if (mpirank==0) call read_array_from_ascii_file(file, array, n_header, n_lines=n_lines, verbose=verbose)
+        ! ... then broadcast
+        call MPI_BCAST(array,nlines*ncols*len(array(1,1)),MPI_CHARACTER,0,WABBIT_COMM,mpicode)
+
+        ! security barrier: if for some reason not all ranks call MPI_BCAST approx. at the same time,
+        ! that causes crashes on some machines.
+        call MPI_BARRIER(WABBIT_COMM, mpicode) ! note this is irrelevant for performance here.
+
+    end subroutine read_chararray_from_ascii_file_mpi
 
     !-----------------------------------------------------------------------------
     ! count the number of lines in an ascii file, skip n_header lines
@@ -115,18 +151,19 @@ contains
     !-----------------------------------------------------------------------------
     ! count the number of columns in an ascii file, skip n_header lines
     !-----------------------------------------------------------------------------
-    subroutine count_cols_in_ascii_file_mpi(file, num_cols, n_header)
+    subroutine count_cols_in_ascii_file_mpi(file, num_cols, n_header, delimiter)
         implicit none
         character(len=*), intent(in) :: file
         integer, intent(out) :: num_cols
         integer, intent(in) :: n_header
+        character(len=1), intent(in), optional :: delimiter
         integer :: mpicode, mpirank
 
         ! fetch my process id
         call MPI_Comm_rank(MPI_COMM_WORLD, mpirank, mpicode)
 
         ! only root reads from file...
-        if (mpirank==0) call count_cols_in_ascii_file(file, num_cols, n_header)
+        if (mpirank==0) call count_cols_in_ascii_file(file, num_cols, n_header, delimiter=delimiter)
         ! ... then broadcast
         call MPI_BCAST(num_cols,1,MPI_INTEGER,0,MPI_COMM_WORLD,mpicode)
 
@@ -193,6 +230,32 @@ contains
     end subroutine read_ini_file_mpi
 
 
+    ! check if section exists, but for all processes
+    subroutine param_section_exists_mpi(PARAMS, section, exists)
+        implicit none
+        ! Contains the ascii-params file
+        type(inifile), intent(inout) :: PARAMS
+        character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+        logical, intent(out) :: exists
+        integer :: mpicode
+        integer :: mpirank
+
+        ! fetch my process id
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
+        if (mpirank==0) then
+            call param_section_exists(PARAMS, section, exists)
+        endif
+
+        ! And then broadcast
+        call MPI_BCAST( exists, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+
+        ! security barrier: if for some reason not all ranks call MPI_BCAST approx. at the same time,
+        ! that causes crashes on some machines.
+        call MPI_BARRIER(WABBIT_COMM, mpicode) ! note this is irrelevant for performance here.
+
+    end subroutine param_section_exists_mpi
 
 
     !-------------------------------------------------------------------------------
@@ -326,6 +389,55 @@ contains
         call MPI_BARRIER(WABBIT_COMM, mpicode) ! note this is irrelevant for performance here.
 
     end subroutine param_vct_mpi
+
+
+    !-------------------------------------------------------------------------------
+    ! Fetches a VECTOR VALUED parameter from the PARAMS.ini file.
+    ! Displays what it does on stdout (so you can see whats going on)
+    ! Input:
+    !       PARAMS: the complete *.ini file
+    !       section: the section we're looking for
+    !       keyword: the keyword we're looking for
+    !       defaultvalue: if the we can't find a vector, we return this and warn
+    !       n: length of vector
+    ! Output:
+    !       params_vector: this is the parameter you were looking for
+    !-------------------------------------------------------------------------------
+    subroutine param_vct_int_mpi(PARAMS, section, keyword, params_vector, defaultvalue)
+        implicit none
+        ! Contains the ascii-params file
+        type(inifile), intent(inout) :: PARAMS
+        character(len=*), intent(in) :: section ! What section do you look for? for example [Resolution]
+        character(len=*), intent(in) :: keyword ! what keyword do you look for? for example nx=128
+        integer(kind=ik), intent(inout) :: params_vector(1:)
+        integer(kind=ik), optional, intent(in) :: defaultvalue(1:)
+
+        integer :: n
+        integer :: mpicode
+        integer :: mpirank
+
+        ! fetch my process id
+        call MPI_Comm_rank(WABBIT_COMM, mpirank, mpicode)
+
+        n = size(params_vector,1)
+
+        ! Root rank fetches value from PARAMS.ini file (which is in PARAMS)
+        if (mpirank==0) then
+            if (present(defaultvalue)) then
+                call read_param(PARAMS, section, keyword, params_vector, defaultvalue)
+            else
+                call read_param(PARAMS, section, keyword, params_vector)
+            endif
+        endif
+
+        ! And then broadcast
+        call MPI_BCAST( params_vector, n, MPI_INTEGER, 0, WABBIT_COMM, mpicode )
+
+        ! security barrier: if for some reason not all ranks call MPI_BCAST approx. at the same time,
+        ! that causes crashes on some machines.
+        call MPI_BARRIER(WABBIT_COMM, mpicode) ! note this is irrelevant for performance here.
+
+    end subroutine param_vct_int_mpi
 
 
     !-------------------------------------------------------------------------------

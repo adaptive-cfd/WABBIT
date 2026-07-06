@@ -96,7 +96,7 @@ subroutine mask_from_pointcloud(points, normals, xx0, ddx, mask, safety, h_smoot
                     else
                         tmp = -dsqrt(-tmp)
                     endif
-                    mask(ix,iy,iz) = steps( tmp-d0, 0.0_rk, h_smooth )
+                    mask(ix,iy,iz) = step_cosine( tmp-d0, 0.0_rk, h_smooth )
                 else
                     mask(ix,iy,iz) = 0.0_rk
                 endif

@@ -28,7 +28,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
 
     ! cpu time variables for running time calculation
     real(kind=rk)                  :: t0, t1, t2, t_misc, test(1:size(hvy_block, 4))
-    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id, hvy_id, mpierr
+    integer(kind=ik)               :: k, hvy_n_afterRefinement, lgt_id, hvy_id, mpierr, Jmax_active
     real(kind=rk) :: norm(1:params%n_eqn)
     logical :: checkFullTree
 
@@ -47,6 +47,9 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     t0 = MPI_Wtime()
     t_misc = 0.0_rk
 
+    ! Jmin_active = minActiveLevel_tree(tree_ID)
+    Jmax_active = maxActiveLevel_tree(tree_ID)
+
     !> (a) loop over the blocks and set their refinement status.
     t1 = MPI_Wtime()
     call refinementIndicator_tree( params, hvy_block, tree_ID, indicator )
@@ -63,11 +66,11 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     !> (c) ensure gradedness of mesh. If the refinement is done everywhere, there is
     !! no way gradedness can be damaged, so we skip the call in this case. However,
     !! in all other indicators, this step is very important.
-    t1 = MPI_Wtime()
-    if ( indicator /= "everywhere" ) then
+    if ( trim(indicator) /= "everywhere" ) then
+      t1 = MPI_Wtime()
       call ensureGradedness_tree( params, tree_ID )
+      call toc( "refine_tree (ensureGradedness_tree)", 143, MPI_Wtime()-t1 )
     endif
-    call toc( "refine_tree (ensureGradedness_tree)", 143, MPI_Wtime()-t1 )
 
 
     ! this (preventive) load balancing step ensures that AFTER the execution of refinement, 
@@ -75,8 +78,10 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     ! be perfectly balanced (+- 2**D blocks, because we can only distribute a block before refinement
     ! which means 2**D blocks after refinement), but is better than before.
     ! To ensure perfect balancing, a second step is done after the actual refinement.
-    if (indicator /= "everywhere") then
-        call balanceLoad_tree( params, hvy_block, tree_ID, balanceForRefinement=.true., balance_name='refine_pre', time=time )
+    if ((.not. params%force_maxlevel_dealiasing .and. Jmax_active == params%Jmax) .or. (trim(indicator)/="everywhere")) then
+        t1 = MPI_Wtime()
+        call balanceLoad_tree( params, hvy_block, tree_ID, balanceMode="refine_predictive", balance_name='refine_pre', time=time )
+        call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 
     !---------------------------------------------------------------------------
@@ -114,7 +119,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     !! hold the same number of blocks, if they started with a balanced distribution (which is the
     !! output of adapt_tree.)
     !! This of course implies any other indicator than "everywhere" requires balancing here.
-    if ((params%force_maxlevel_dealiasing .eqv. .false.) .or. (indicator/="everywhere")) then
+    if ((.not. params%force_maxlevel_dealiasing .and. Jmax_active == params%Jmax) .or. (trim(indicator)/="everywhere")) then
         t1 = MPI_Wtime()
         call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='refine_post', time=time )
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
@@ -212,7 +217,7 @@ subroutine check_oom(params, tree_id, error_OOM, check_full_tree, check_ref)
     if (error_OOM) then
         allocate(hvy_n_procs(1:params%number_procs), stat=mpierr)
         ! Gather hvy_n_afterRefinement from all ranks to rank 0
-        call MPI_GATHER(hvy_n_afterRefinement, 1, MPI_INTEGER, hvy_n_procs, 1, MPI_INTEGER, 0, WABBIT_COMM, mpierr)
+        call MPI_GATHER(hvy_n_afterRefinement, 1, MPI_INTEGER4, hvy_n_procs, 1, MPI_INTEGER4, 0, WABBIT_COMM, mpierr)
         if (params%rank == 0) then
             open(unit=99, file="oom_hvy_n_per_rank.txt", status="replace")
             write(99,'(A, i0)') "Rank, current hvy_n, expected hvy_n after refinement, limit is: ", params%number_blocks

@@ -1,5 +1,5 @@
 !> \brief Check if block is a leaf-block and has no daughters
-function block_is_leaf(params, hvy_ID, check_empty)
+pure function block_is_leaf(params, hvy_ID, check_empty)
     implicit none
 
     type (type_params), intent(in)      :: params      !< user defined parameter structure
@@ -26,7 +26,7 @@ function block_is_leaf(params, hvy_ID, check_empty)
 end function block_is_leaf
 
 !> \brief Check if block is a root-block and has no mother
-function block_is_root(params, hvy_ID, check_empty)
+pure function block_is_root(params, hvy_ID, check_empty)
     implicit none
 
     type (type_params), intent(in)      :: params      !< user defined parameter structure
@@ -45,7 +45,7 @@ end function block_is_root
 
 
 !> \brief Check if block has a valid neighbor for same patch for the given level_difference
-function block_has_valid_neighbor(params, hvy_ID, i_n, lvl_diff)
+pure function block_has_valid_neighbor(params, hvy_ID, i_n, lvl_diff)
     implicit none
 
     type (type_params), intent(in)      :: params      !< user defined parameter structure

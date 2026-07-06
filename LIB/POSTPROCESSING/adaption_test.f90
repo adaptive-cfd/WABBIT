@@ -23,8 +23,9 @@ subroutine adaption_test(params)
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration
   integer(kind=ik) :: j, n_components=1, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
-  logical :: verbose = .false., save_all = .true.
-  character(len=30) :: rowfmt
+  logical :: verbose = .false., save_all = .true., save_ref=.false.
+  character(len=clong) :: write_statement
+  real(kind=rk), allocatable :: norm(:), norm_tmp(:)
 
   ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
   ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -38,16 +39,16 @@ subroutine adaption_test(params)
       if ( params%rank==0 ) then
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
           write(*,*) "mpi_command -n number_procs ./wabbit-post --adaption_test --eps-list='1e-5 1e-4' --list=filelist.txt [list_uy.txt] [list_uz.txt]"
-          write(*,*) "[--order=CDF[22|44|40] --eps-norm=[L2|Linfty] --save_all]"
+          write(*,*) "[--wavelet=CDF[22|44|40] --eps-norm=[L2|Linfty] --save_all]"
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
           write(*,*) " Wavelet adaption test "
           write(*,*) " --list               list of files containing all snapshots"
-          write(*,*) " --components         number of components in statevector"
           write(*,*) " --eps-list           eps used"
           write(*,*) " --wavelet            wavelet to be used"
           write(*,*) " --adapt              threshold for wavelet adaptation of modes and snapshot"
           write(*,*) " --eps-norm           normalization of wavelets"
           write(*,*) " --save_all           saves adapted snapshots"
+          write(*,*) " --save_ref           saves the adapted snapshots on the original grid"
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       end if
       return
@@ -57,6 +58,7 @@ subroutine adaption_test(params)
   ! read parameters
   !----------------------------------
   call get_cmd_arg( "--save_all", save_all, default=.false.)
+  call get_cmd_arg( "--save_ref", save_ref, default=.false.)
   call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
   call get_cmd_arg_str( "--wavelet", params%wavelet, default="CDF44" )
   call get_cmd_arg( "--list", params%input_files )
@@ -73,7 +75,7 @@ subroutine adaption_test(params)
   n_eps = size(eps_str_list)
   params%block_distribution="sfc_hilbert"
   params%time_step_method="none"
-  params%Jmin=1
+  params%Jmin=0
   params%physics_type="POD"
   params%eps_normalized=.True. ! normalize the statevector before thresholding
   params%adapt_tree = .True.! .False.!.True.
@@ -81,6 +83,9 @@ subroutine adaption_test(params)
   params%threshold_mask=.False.
   params%n_eqn = n_components
   params%forest_size = 3
+
+  allocate(norm(params%n_eqn))
+  allocate(norm_tmp(params%n_eqn))
 
   ! initialize wavelet transform
   ! also, set number of ghost nodes params%G to minimal value for this wavelet
@@ -130,7 +135,8 @@ subroutine adaption_test(params)
   ! error_epsilon=|| u_input - u_epsilon||_2 / ||u_input||_2
   !###########################################################
   ! need the L2 norm of the input for the relative error
-  L2norm = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_input, verbose )
+  ! L2norm = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_input, verbose )
+  call componentWiseNorm_tree(params, hvy_block, tree_ID_input, which_norm="L2", norm=norm)
 
   do i = 1, n_eps
     ! copy form original data
@@ -145,25 +151,36 @@ subroutine adaption_test(params)
 
     if (save_all) then
       do j = 1, n_components
-          write( file_out, '("u",i1,"-eps", A,"_",i12.12 ,".h5")') j, trim(adjustl(eps_str_list(i))), nint(time * 1.0e6_rk)
+          write( file_out, '("u",i1,"-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time)))
 
           call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_adapt)
       end do
     end if
 
+    if (save_ref) then
+      ! refine the tree back to the other one
+      call refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
+      do j = 1, n_components
+          write( file_out, '("u",i1,"-full-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time)))
+          call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_input)
+      end do
+    end if
+
     ! compare to original data:
     call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
+
     ! compute L2 norm
-    error(i) = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_adapt, verbose )
-    error(i) = error(i)/L2norm
+    call componentWiseNorm_tree(params, hvy_block, tree_ID_adapt, which_norm="L2", norm=norm_tmp)
+    ! error(i) = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_adapt, verbose )
+    error(i) = sum(norm_tmp / norm)
     Nb_adapt(i) = lgt_n_tmp
 
     ! give some output
     if (rank == 0) then
-       write(*,'("Field adapted to eps=",es10.2," rel err=", es10.2," Nblocks=", i6," Nb_adapt/Nb_dense=",f6.1,"% Nb_adapt/Nb_input=",f5.1,"% [Jmin,Jmax]=[",i2,",",i2,"]")') &
-              params%eps, error(i), lgt_n_tmp, &
-              100.0*dble(lgt_n_tmp)/dble( (2**params%Jmax)**params%dim ), &
-              100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), Jmin, Jmax
+      write(write_statement, '(A, i0, A)') '(A, es10.2, A, ', params%n_eqn, '(es10.2, 1x), A, i6, A, f6.1, A, f5.1, A, i2, A, i2, A)'
+      write(*,write_statement) "Field adapted to eps=", params%eps, " rel err=", norm_tmp / norm, " Nblocks=", lgt_n_tmp, &
+              " Nb_adapt/Nb_dense=", 100.0*dble(lgt_n_tmp)/dble( (2**params%Jmax)**params%dim ), &
+              "% Nb_adapt/Nb_input=", 100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), "% [Jmin,Jmax]=[", Jmin, ',', Jmax, "]"
     endif
   end do
   ! elapsed time for reading and coarsening the data

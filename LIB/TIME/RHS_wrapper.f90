@@ -13,7 +13,7 @@
 !! | 0 | b1 | b2 | b3|
 !**********************************************************************************************
 
-subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree_ID)
+subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree_ID, stage)
    implicit none
 
     real(kind=rk), intent(in)           :: time
@@ -23,22 +23,33 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     real(kind=rk), intent(inout)        :: hvy_mask(:, :, :, :, :)      !> hvy_mask: the mask function, usx,usy,usz,color,sponge
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
+    integer(kind=ik), intent(in), optional        :: stage
 
     real(kind=rk), dimension(3)         :: volume_int                   !> global integral
     real(kind=rk), dimension(3)         :: dx, x0                       !> spacing and origin of a block
     integer(kind=ik)                    :: k, dF, neqn, lgt_id, hvy_id  ! loop variables
-    integer(kind=ik)                    :: g, hvy_id_mask
-    integer(kind=ik), dimension(3)      :: Bs
+    integer(kind=ik)                    :: g, hvy_id_mask, Bs(1:3), grhs, Neqn_RHS, Jmin_active, Jmax_active, stage_set
     integer(kind=2)                     :: n_domain(1:3)
     real(kind=rk)                       :: t0, t1
+    logical                             :: is_equidistant
 
-    Bs       = params%Bs
-    g        = params%g
+    Neqn_RHS = params%n_eqn_rhs
+    Bs   = params%Bs
+    g    = params%g
+    grhs = params%g_rhs
     t0       = MPI_wtime()
     n_domain = 0
     x0       = 0.0_rk
     dx       = 0.0_rk
     hvy_ID   = 1
+
+    Jmin_active = minActiveLevel_tree(tree_ID_flow)
+    Jmax_active = maxActiveLevel_tree(tree_ID_flow)
+    is_equidistant = (Jmin_active == Jmax_active)
+
+    ! assume this is stage 1 if we don't know. This is just important for optimizations for the Poisson solver
+    stage_set = 1
+    if (present(stage)) stage_set = stage
  
     !-------------------------------------------------------------------------
     ! CoarseExtension update of input data
@@ -79,19 +90,14 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        if ( .not. All(params%periodic_BC) ) then
-            ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
-            call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
-        endif
+        ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+        if ( .not. All(params%periodic_BC) ) call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
 
         ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
         ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
         ! Note: hvy_mask is not used if in this case by the RHS routines...
-        if (size(hvy_mask,5) == 1) then
-            hvy_id_mask = 1
-        else 
-            hvy_id_mask = hvy_id
-        endif
+        hvy_id_mask = hvy_id
+        if (size(hvy_mask,5) == 1) hvy_id_mask = 1
 
         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, x0, dx,&
         hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id_mask), "integral_stage", n_domain )
@@ -122,24 +128,119 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        if ( .not. All(params%periodic_BC) ) then
-            ! check if block is adjacent to a boundary of the domain, might be used later on
-            call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
-        endif
+        ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+        if ( .not. All(params%periodic_BC) ) call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
 
         ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
         ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
         ! Note: hvy_mask is not used if in this case by the RHS routines...
-        if (size(hvy_mask,5) == 1) then
-            hvy_id_mask = 1
-        else 
-            hvy_id_mask = hvy_id
-        endif
+        hvy_id_mask = hvy_id
+        if (size(hvy_mask,5) == 1) hvy_id_mask = 1
 
         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:, hvy_id), g, &
         x0, dx, hvy_rhs(:,:,:,:, hvy_id), hvy_mask(:,:,:,:,hvy_id_mask), "local_stage", n_domain)
     enddo
     call toc( "RHS_wrapper::local-stage", 33, MPI_wtime()-t1 )
+
+    ! For purely hyperbolic equations, at this stage the RHS is completely ready.
+    ! However, for NSPP we have to actually solve the pressure-poisson equation to get the correct pressure gradient term.
+    ! This has to be done at exactly this position. However, we will need to sync some variables, which you usually would love to avoid in the RHS_wrapper
+    if (params%PDE_type == "mixed_hyperbolic_parabolic") then
+
+        ! TBH, this makes less sense to me somehow, I am skipping it for now as for several stages we always alternate between computing P and dP
+        ! ! incremental version, add old pressure gradient so that new pressure to be solved is only Dp - this reduces the amount of iterations for projection needed to converge, however it only really helps for adaptive grids. We assume that hvy_block contains the pressure of the last MultiGrid solve
+        ! if (stage > 1 .and. .not. is_equidistant) then
+        !     do k = 1, hvy_n(tree_ID)
+        !         hvy_id = hvy_active(k, tree_ID)
+        !         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        !         call get_block_spacing_origin( params, lgt_id, x0, dx )
+
+        !         ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+        !         if ( .not. All(params%periodic_BC) ) call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
+
+        !         ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
+        !         ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
+        !         ! Note: hvy_mask is not used if in this case by the RHS routines...
+        !         hvy_id_mask = hvy_id
+        !         if (size(hvy_mask,5) == 1) hvy_id_mask = 1
+
+        !         ! RHS_meta will assume the pressure to be in component dim+1, it then will update the hvy_rhs with the pressure gradient term
+        !         call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
+        !             hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "pressure_gradient_stage", n_domain )
+        !     enddo
+        ! endif
+
+        ! sync RHS
+        t1 = MPI_wtime()
+        call sync_ghosts_RHS_tree( params, hvy_rhs(:,:,:,1:Neqn_RHS, :), tree_ID, g_minus=grhs, g_plus=grhs )
+        call toc( "RHS_wrapper::sync-RHS", 10035, MPI_wtime()-t1 )
+
+        ! ! debug save
+        ! call saveHDF5_tree("RHSx_0.h5", 0.0_rk, 0, 1, params, hvy_rhs(:,:,:,:,:), tree_ID, no_sync=.false.)
+        ! call saveHDF5_tree("RHSy_0.h5", 0.0_rk, 0, 2, params, hvy_rhs(:,:,:,:,:), tree_ID, no_sync=.false.)
+
+        ! divergence of RHS
+        t1 = MPI_wtime()
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
+
+            if ( .not. All(params%periodic_BC) ) then
+                ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+                call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
+            endif
+            ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
+            ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
+            ! Note: hvy_mask is not used if in this case by the RHS routines...
+            hvy_id_mask = hvy_id
+            if (size(hvy_mask,5) == 1) hvy_id_mask = 1
+            ! RHS_meta will compute the divergence and store it in the first component of hvy_block
+
+            call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
+             hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "divergence_stage", n_domain )
+        enddo
+        call toc( "RHS_wrapper::divergence-stage", 10036, MPI_wtime()-t1 )
+
+        ! ! debug save
+        ! call saveHDF5_tree("divRHS_0.h5", 0.0_rk, 0, 1, params, hvy_block(:,:,:,:,:), tree_ID, no_sync=.false.)
+
+        ! MultiGrid solve, we sync before and after in multigrid_solve
+        ! Logic here: We can reuse the latest solution as initialization if the grid is equidistant and we are sure it is the same as before
+        t1 = MPI_wtime()
+        call multigrid_solve(params, hvy_block(:,:,:,params%dim+1:params%dim+1,:), hvy_block(:,:,:,1:1,:), hvy_block(:,:,:,2:2,:), tree_ID, init_0=.not.(is_equidistant .and. (stage > 1 .or. (stage == 1 .and. .not. params%adapt_tree))), verbose=.false., hvy_full=hvy_block, time=time)
+
+        ! ! debug save
+        ! call saveHDF5_tree("phi_0.h5", 0.0_rk, 0, params%dim+1, params, hvy_block(:,:,:,:,:), tree_ID, no_sync=.false.)
+
+        ! update RHS with pressure gradient
+        t1 = MPI_wtime()
+        do k = 1, hvy_n(tree_ID)
+            hvy_id = hvy_active(k, tree_ID)
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
+
+            if ( .not. All(params%periodic_BC) ) then
+                ! check if block is adjacent to a boundary of the domain, if this is the case we use one sided stencils
+                call get_adjacent_boundary_surface_normal( params, lgt_id, n_domain )
+            endif
+            ! the hvy_mask array is allocated even if the mask is not used, it has then the size (1,1,1,1,1)
+            ! (a single point). Therefore, pay attention not to pass hvy_mask(:,:,:,:,hvy_id) with hvy_id>1.
+            ! Note: hvy_mask is not used if in this case by the RHS routines...
+            hvy_id_mask = hvy_id
+            if (size(hvy_mask,5) == 1) hvy_id_mask = 1
+
+            ! RHS_meta will assume the pressure to be in component dim+1, it then will update the hvy_rhs with the pressure gradient term
+            call RHS_meta( params%physics_type, time, hvy_block(:,:,:,:,hvy_id), g, x0, dx, &
+             hvy_rhs(:,:,:,:,hvy_id), hvy_mask(:,:,:,:,hvy_id), "pressure_gradient_stage", n_domain )
+        enddo
+        call toc( "RHS_wrapper::NSPP-pressure-poisson-solver", 10037, MPI_wtime()-t1 )
+
+        ! ! debug save
+        ! call saveHDF5_tree("RHS2x_0.h5", 0.0_rk, 0, 1, params, hvy_rhs(:,:,:,:,:), tree_ID, no_sync=.false.)
+        ! call saveHDF5_tree("RHS2y_0.h5", 0.0_rk, 0, 2, params, hvy_rhs(:,:,:,:,:), tree_ID, no_sync=.false.)
+
+    endif
 
     ! This subroutine is actually a hack. The RHS of the ACM eqn can be equipped with a pressure gradient term that is supposed 
     ! to keep the mean flow constant - but that seems to work only approximately. I do not know where the 

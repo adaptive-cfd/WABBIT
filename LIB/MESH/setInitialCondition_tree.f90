@@ -1,15 +1,17 @@
 ! Initial condition.
 ! Can be read from files (params%input_files), or generated in an interative process.
-subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, iteration, hvy_mask, hvy_tmp, hvy_work)
+subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, iteration, hvy_tmp, hvy_mask, hvy_work)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
+    ! we need some poisson routines
+    use module_poisson
 
     implicit none
 
     type (type_params), intent(inout)    :: params                      !> user defined parameter structure
     real(kind=rk), intent(inout)         :: hvy_block(:, :, :, :, :)    !> heavy data array - block data
-    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)   !> heavy work data array - block data.
     real(kind=rk), intent(inout)         :: hvy_tmp(:, :, :, :, :)
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)   !> heavy work data array - block data.
     integer(kind=ik), intent(in)         :: tree_ID
     real(kind=rk), intent(inout)         :: time                        !> time loop variables
     integer(kind=ik), intent(inout)      :: iteration
@@ -36,26 +38,26 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
 
     if (params%rank==0) then
         write(*,'(10("╼╾"), "   ini-cond   ", 23("╼╾"))')
-        write(*,*) "Setting initial condition on all blocks."
-        write(*,*) "Adaptive initial condition is: ", adapt
-        write(*,*) "read_from_files: ", params%read_from_files
-        write(*,*) "inicond_refinements: ", params%inicond_refinements
+        write(*,'(A)') "Setting initial condition on all blocks."
+        write(*,'(A, L1)') "Adaptive initial condition is: ", adapt
+        write(*,'(A, L1)') "read_from_files: ", params%read_from_files
+        write(*,'(A, I0)') "inicond_refinements: ", params%inicond_refinements
     endif
 
     ! we need the wavelet here (refinement and coarsening), so if its not yet done
     ! initialize it here:
     call setup_wavelet(params)
 
-    ! this is a HACK
-    if (params%physics_type == 'ACM-new') then
-        tmp = params%threshold_mask
-        params%threshold_mask = .true.
-        if (.not. params%penalization) params%threshold_mask = .false.
-    endif
+    ! ! this is a HACK
+    ! if (params%physics_type == 'ACM-new' .or. params%physics_type == 'NSPP') then
+    !     tmp = params%threshold_mask
+    !     params%threshold_mask = .true.
+    !     if (.not. params%penalization) params%threshold_mask = .false.
+    ! endif
 
     ! choose between reading from files and creating datafields analytically
     if (params%read_from_files) then
-        if (params%rank==0) write(*,*) "Initial condition is read from file!"
+        if (params%rank==0) write(*,'(A)') "INIT: Initial condition is read from file!"
         !-----------------------------------------------------------------------
         ! read initial condition from file
         !-----------------------------------------------------------------------
@@ -64,11 +66,19 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         ! therefore, there is still a grid-level (=wabbit) parameter read_from_files
         call readHDF5vct_tree(params%input_files, params, hvy_block, tree_ID, time=time, iteration=iteration)
 
-        ! create lists of active blocks (light and heavy data)
-        call updateMetadata_tree(params, tree_ID)
+        !---------------------------------------------------------------------------
+        ! Possibly, we need to transform the IC, because it might be in
+        ! vorticity formulation, or we need to compute pressure from velocity
+        !---------------------------------------------------------------------------
 
-        ! synching is required for the adaptation step
-        call sync_ghosts_tree( params, hvy_block, tree_ID )
+        if (params%inicond_vorticity_formulation) then
+            if (params%rank==0) write(*,'(A)') "INIT: Transform initial condition from vorticity formulation to velocity formulation"
+            call velocity_from_vorticity(params, hvy_block, hvy_tmp, tree_ID, force_convergence=.true.)
+        endif
+        if (params%inicond_pressure_from_velocity) then
+            if (params%rank==0) write(*,'(A)') "INIT: Compute initial pressure field from initial velocity field"
+            call pressure_from_velocity(params, time, hvy_block, hvy_tmp, hvy_mask, tree_ID, force_convergence=.true.)
+        endif
 
         ! even if we read the initial condition from file, we can still adapt it immediately
         ! so the max error is eps. This is useful if we read a dense field where we already know that
@@ -121,8 +131,8 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
 
     else
         if (params%inicond_grid_from_file == "no") then
-            if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
-            if (params%rank==0) write(*,*) "Grid is auto-generated!"
+            if (params%rank==0) write(*,'(A)') "INIT: Initial condition is defined by physics modules!"
+            if (params%rank==0) write(*,'(A)') "INIT: Grid is auto-generated!"
 
             !---------------------------------------------------------------------------
             ! Create the first grid as equidistant on the coarsest treelevel
@@ -133,6 +143,20 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! on the grid, evaluate the initial condition
             !---------------------------------------------------------------------------
             call setInicondBlocks_tree(params, hvy_block, tree_ID)
+
+            !---------------------------------------------------------------------------
+            ! Possibly, we need to transform the IC, because it might be in
+            ! vorticity formulation, or we need to compute pressure from velocity
+            !---------------------------------------------------------------------------
+
+            if (params%inicond_vorticity_formulation) then
+                if (params%rank==0) write(*,'(A)') "INIT: Transform initial condition from vorticity formulation to velocity formulation"
+                call velocity_from_vorticity(params, hvy_block, hvy_tmp, tree_ID, force_convergence=.true.)
+            endif
+            if (params%inicond_pressure_from_velocity) then
+                if (params%rank==0) write(*,'(A)') "INIT: Compute initial pressure field from initial velocity field"
+                call pressure_from_velocity(params, time, hvy_block, hvy_tmp, hvy_mask, tree_ID, force_convergence=.true.)
+            endif
 
             !---------------------------------------------------------------------------
             ! grid adaptation
@@ -160,6 +184,20 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! corresponds to advancing the solution in time, it's just that here we know the exact
                     ! solution (the inicond)
                     call setInicondBlocks_tree(params, hvy_block, tree_ID)
+
+                    !---------------------------------------------------------------------------
+                    ! Possibly, we need to transform the IC, because it might be in
+                    ! vorticity formulation, or we need to compute pressure from velocity
+                    !---------------------------------------------------------------------------
+
+                    if (params%inicond_vorticity_formulation) then
+                        if (params%rank==0) write(*,'(A)') "INIT: Transform initial condition from vorticity formulation to velocity formulation"
+                        call velocity_from_vorticity(params, hvy_block, hvy_tmp, tree_ID, force_convergence=.true.)
+                    endif
+                    if (params%inicond_pressure_from_velocity) then
+                        if (params%rank==0) write(*,'(A)') "INIT: Compute initial pressure field from initial velocity field"
+                        call pressure_from_velocity(params, time, hvy_block, hvy_tmp, hvy_mask, tree_ID, force_convergence=.true.)
+                    endif
 
                     ! now, evaluate the refinement criterion on each block, and coarsen the grid where possible.
                     ! adapt-mesh also performs neighbor and active lists updates
@@ -193,6 +231,20 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! set initial condition
                     call setInicondBlocks_tree(params, hvy_block, tree_ID)
 
+                    !---------------------------------------------------------------------------
+                    ! Possibly, we need to transform the IC, because it might be in
+                    ! vorticity formulation, or we need to compute pressure from velocity
+                    !---------------------------------------------------------------------------
+
+                    if (params%inicond_vorticity_formulation) then
+                        if (params%rank==0) write(*,'(A)') "INIT: Transform initial condition from vorticity formulation to velocity formulation"
+                        call velocity_from_vorticity(params, hvy_block, hvy_tmp, tree_ID, force_convergence=.true.)
+                    endif
+                    if (params%inicond_pressure_from_velocity) then
+                        if (params%rank==0) write(*,'(A)') "INIT: Compute initial pressure field from initial velocity field"
+                        call pressure_from_velocity(params, time, hvy_block, hvy_tmp, hvy_mask, tree_ID, force_convergence=.true.)
+                    endif
+
                     if (params%rank == 0) then
                         write(*,'(" did ",i2," refinement stage (beyond what is required for the &
                         &prescribed precision eps) Nblocks=",i6, " Jmin=",i2, " Jmax=",i2)') k, lgt_n(tree_ID), &
@@ -202,19 +254,30 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                 enddo
             endif
         else
-            if (params%rank==0) write(*,*) "Initial condition is defined by physics modules!"
-            if (params%rank==0) write(*,*) "Grid is read from file!"
+            if (params%rank==0) write(*,'(A)') "INIT: Initial condition is defined by physics modules!"
+            if (params%rank==0) write(*,'(A)') "INIT: Grid is read from file!"
 
             ! read input data
-            call readHDF5vct_tree( (/params%inicond_grid_from_file/), params, hvy_block, tree_ID)
-
-            ! create lists of active blocks (light and heavy data)
-            call updateMetadata_tree(params, tree_ID)
+            call readHDF5vct_tree( (/params%inicond_grid_from_file/), params, hvy_block, tree_ID, synchronize_ghosts=.false.)
 
             !---------------------------------------------------------------------------
             ! on the grid, evaluate the initial condition
             !---------------------------------------------------------------------------
             call setInicondBlocks_tree(params, hvy_block, tree_ID)
+
+            !---------------------------------------------------------------------------
+            ! Possibly, we need to transform the IC, because it might be in
+            ! vorticity formulation, or we need to compute pressure from velocity
+            !---------------------------------------------------------------------------
+
+            if (params%inicond_vorticity_formulation) then
+                if (params%rank==0) write(*,'(A)') "INIT: Transform initial condition from vorticity formulation to velocity formulation"
+                call velocity_from_vorticity(params, hvy_block, hvy_tmp, tree_ID, force_convergence=.true.)
+            endif
+            if (params%inicond_pressure_from_velocity) then
+                if (params%rank==0) write(*,'(A)') "INIT: Compute initial pressure field from initial velocity field"
+                call pressure_from_velocity(params, time, hvy_block, hvy_tmp, hvy_mask, tree_ID, force_convergence=.true.)
+            endif
         endif
     end if
 
@@ -253,7 +316,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     endif
 
     ! HACK
-    if (params%physics_type == 'ACM-new') then
+    if (params%physics_type == 'ACM-new' .or. params%physics_type == 'NSPP') then
         params%threshold_mask = tmp
     endif
 

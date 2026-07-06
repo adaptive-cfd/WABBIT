@@ -67,8 +67,6 @@ subroutine post_wavelet_transform(params)
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
     call setup_wavelet(params, params%g)
 
-    call setup_wavelet(params)
-
     params%forest_size = 1
     params%n_eqn = 1
 
@@ -80,7 +78,7 @@ subroutine post_wavelet_transform(params)
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
 
-    params%Jmin = 1
+    params%Jmin = 0
     params%Jmax = tc_length
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)

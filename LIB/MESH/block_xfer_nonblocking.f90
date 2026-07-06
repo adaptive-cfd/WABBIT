@@ -13,7 +13,7 @@
 ! performance is better. note you have to wait somewhere! always!
 !
 ! NOTE: We expect the xfer_list to be identical on all ranks
-subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
+subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg, hvy_tmp )
     implicit none
 
     !> user defined parameter structure
@@ -24,14 +24,16 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     character(len=*), intent(in), optional :: msg
+    !> optional second heavy data array - transferred with same pattern as hvy_block
+    real(kind=rk), intent(inout), optional :: hvy_tmp(:, :, :, :, :)
 
     integer(kind=ik) :: k, lgt_id, mpirank_recver, mpirank_sender, myrank, i, Nxfer_done, Nxfer_total, Nxfer_notPossibleNow
-    integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints
+    integer(kind=ik) :: lgt_id_new, hvy_id_new, hvy_id, npoints, npoints_tmp
     integer :: ierr, tag
     logical, allocatable, save :: xfer_started(:), source_block_deleted(:)
 
     ! array of mpi requests
-    integer(kind=ik), allocatable, save :: requests(:)
+    integer, allocatable, save :: requests(:)
     integer(kind=ik) :: ireq
 
     logical :: not_enough_memory
@@ -56,6 +58,11 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
     source_block_deleted(1:N_xfers) = .false.
     ! size of one block, in points
     npoints = size(hvy_block,1)*size(hvy_block,2)*size(hvy_block,3)*size(hvy_block,4)
+    
+    ! if hvy_tmp is present, calculate its size (first 3 dims same as hvy_block)
+    if (present(hvy_tmp)) then
+        npoints_tmp = size(hvy_tmp,1)*size(hvy_tmp,2)*size(hvy_tmp,3)*size(hvy_tmp,4)
+    endif
 
     Nxfer_done = 0
     Nxfer_total = N_xfers
@@ -114,10 +121,25 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
             tag = 2*k ! use unique tag for each message
 
             ! open channel to receive one block.
+
+            ! VERY IMPORTANT NOTE FOR MPI_IRECV:
+            ! hvy_block neets to be contiguous in memory! You cannot slice the fourth component (like, hvy_block cannot stem from for example physical allocated array hvy_tmp(:,:,:,4:4,:)!
+            ! Otherwise, this appears to not work with some compilation chains (on Irene??)
             call MPI_irecv( hvy_block(:,:,:,:,hvy_id_new), npoints, MPI_DOUBLE_PRECISION, &
                 mpirank_sender, tag, WABBIT_COMM, requests(ireq), ierr)
 
             if (ierr /= MPI_SUCCESS) call abort(1809181531, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv failed!")
+            
+            ! if hvy_tmp present, receive it with same pattern
+            if (present(hvy_tmp)) then
+                ireq = ireq + 1
+                tag = 2*k + 1 ! different tag for second array
+                
+                call MPI_irecv( hvy_tmp(:,:,:,:,hvy_id_new), npoints_tmp, MPI_DOUBLE_PRECISION, &
+                    mpirank_sender, tag, WABBIT_COMM, requests(ireq), ierr)
+                
+                if (ierr /= MPI_SUCCESS) call abort(1809181534, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_irecv (hvy_tmp) failed!")
+            endif
 
         ! Am I the owner of this block, so will I have to send data?
         elseif (myrank == mpirank_sender) then
@@ -132,10 +154,26 @@ subroutine block_xfer( params, xfer_list, N_xfers, hvy_block, msg )
 
             ! send the block to the receiver. Note unfortunately we cannot delete it right away, since
             ! we have to wait for the MPI_REQUEST to be finnished.
+
+            ! VERY IMPORTANT NOTE FOR MPI_ISEND:
+            ! hvy_block neets to be contiguous in memory! You cannot slice the fourth component (like, hvy_block cannot stem from for example physical allocated array hvy_tmp(:,:,:,4:4,:)!
+            ! Otherwise, this appears to not work with some compilation chains (on Irene??)
             call MPI_isend( hvy_block(:,:,:,:,hvy_id), npoints, MPI_DOUBLE_PRECISION, &
                 mpirank_recver, tag, WABBIT_COMM, requests(ireq), ierr)
 
             if (ierr /= MPI_SUCCESS) call abort(1809181532, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend failed!")
+            
+            ! if hvy_tmp present, send it with same pattern
+            if (present(hvy_tmp)) then
+
+                ireq = ireq + 1
+                tag = 2*k + 1 ! same different tag as recv
+                
+                call MPI_isend( hvy_tmp(:,:,:,:,hvy_id), npoints_tmp, MPI_DOUBLE_PRECISION, &
+                    mpirank_recver, tag, WABBIT_COMM, requests(ireq), ierr)
+                
+                if (ierr /= MPI_SUCCESS) call abort(1809181535, "[block_xfer.f90] "//trim(adjustl(msg2))//" MPI_isend (hvy_tmp) failed!")
+            endif
 
         endif
 

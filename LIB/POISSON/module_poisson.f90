@@ -14,10 +14,11 @@ module module_poisson
     use module_forestMetaData
     use module_timing               ! debug module
     use module_treelib              ! module with evrything related to treecodes (encoding, decoding, neighbors, etc)
-    use module_mesh                 ! needed for multigrid
+    ! NOTE: module_mesh is NOT included at module level to avoid circular dependencies
+    ! It is included locally in subroutines that need mesh operations (multigrid, etc.)
     use module_mpi                  ! needed for multigrid
     use module_fft                  ! needed for multigrid
-    use module_operators, only: setup_FD2_stencil  ! for finite difference stencils
+    use module_operators, only: setup_FD2_stencil, compute_divergence, compute_gradient, subtract_scalar_gradient  ! for finite difference stencils and operators
 
     implicit none
 
@@ -40,18 +41,22 @@ module module_poisson
         real(kind=rk)  :: stencil_RHS
         integer(kind=ik) :: stencil_RHS_size
         logical :: use_tensor
+        
+        ! module initialization flag
+        logical :: is_initialized = .false.
 
 
 
 !---------------------------------------------------------------------------------------------
 ! public parts of this module
     
-    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils, multigrid_vcycle, multigrid_solve
+    PUBLIC :: GS_iteration_level, GS_iteration_ref, GS_compute_residual, GS_compute_Ax, CG_solve_poisson_level0, setup_Laplacian_stencils
 
 
 contains
 
-#include "multigrid_vcycle.f90"
+! NOTE: multigrid_vcycle.f90 and poisson_operations.f90 have been moved to module_mesh
+! to avoid circular dependencies, as they require tree-level operations
 
     subroutine setup_Laplacian_stencils(params, g)
         implicit none
@@ -73,7 +78,7 @@ contains
         if (.not. params%poisson_order == "FD_6th_mehrstellen") then
             ! use standard 1D stencils via module_operators setup_FD2_stencil
             ! for Poisson solver, we want to use exact discretizations for composite stencils to preserve compatibility between operators
-            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_exact_discretization=.true.)
+            call setup_FD2_stencil(params%poisson_order, stencil, fd2_start, fd2_end, use_composite_stencils=.true.)
             
             ! set module variables for compatibility with existing code
             stencil_RHS = 1.0_rk
@@ -142,6 +147,13 @@ contains
             g = max(g, params%poisson_stencil_size)  ! we need at least the stencil size
             g = max(g, stencil_RHS_size)  ! also take RHS into account
         endif
+
+        if (params%poisson_coarsest == "FFT") then
+            call fft_initialize(params)
+        endif
+        
+        ! Mark module as initialized
+        is_initialized = .true.
         
     end subroutine setup_Laplacian_stencils
 
@@ -158,6 +170,9 @@ contains
 
         integer(kind=ik)     :: k, hvy_id, lgt_id
         real(kind=rk)        :: t_block, x0(1:3), dx(1:3)
+        
+        ! Auto-initialize module if not yet done
+        if (.not. is_initialized) call setup_Laplacian_stencils(params)
 
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
@@ -179,7 +194,7 @@ contains
 
 
     !> \brief Gauss-Seidel iteration for a given tree_id and refinement level
-    subroutine GS_iteration_ref(params, tree_id, ref, u, b, sweep_forward, filter_offset)
+    subroutine GS_iteration_ref(params, tree_id, ref, u, b, sweep_forward, filter_offset, sweep_number, multigrid_level)
         implicit none
 
         !> parameter struct
@@ -190,29 +205,63 @@ contains
         real(kind=rk), intent(in)          :: b(:, :, :, :, :)
         logical, intent(in)                :: sweep_forward
         integer(kind=ik), intent(in), optional  :: filter_offset  ! where to apply the filter, default is params%g resulting in only interior points
+        integer(kind=ik), intent(in), optional  :: sweep_number   ! for debug output
+        integer(kind=ik), intent(in), optional  :: multigrid_level ! for debug output
 
-        integer(kind=ik)     :: k, hvy_id, lgt_id, filterOffset
+        integer(kind=ik)     :: k, hvy_id, lgt_id, filterOffset, blocks_iterated, ierr
+        integer(kind=ik), allocatable, save :: blocks_iterated_list(:)
         real(kind=rk)        :: t_block, x0(1:3), dx(1:3)
+        character(len=clong) :: format_string, string_prepare
+        
+        ! Auto-initialize module if not yet done
+        if (.not. is_initialized) call setup_Laplacian_stencils(params)
 
         filterOffset = params%g
         if (present(filter_offset)) filterOffset = filter_offset
+
+        blocks_iterated = 0
 
         t_block = MPI_Wtime()
         do k = 1, hvy_n(tree_ID)
             hvy_id = hvy_active(k, tree_ID)
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            ! skip blocks not on this level
+            ! skip blocks not with this refinement status
             if (all(lgt_block(lgt_id,IDX_REFINE_STS) /= ref)) cycle
 
             ! get spacing
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
             params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
             
-            ! blocks on this level do a GS-sweep
+            ! blocks with this refinement status do a GS-sweep
             call GS_iteration(params, u(:,:,:,:,hvy_id), b(:,:,:,:,hvy_id), dx, sweep_forward, filterOffset)
+
+            ! debugging: count blocks operated on
+            blocks_iterated = blocks_iterated + 1
         enddo
         call toc( "Gauss-Seidel iteration", 10006, MPI_Wtime()-t_block )
+
+        ! debug output to see how many blocks have been decomposed, gather information on rank 0 and print to file
+        if (params%debug_poisson .and. present(sweep_number) .and. present(multigrid_level)) then
+            ! only one sweep reports on load balancing
+            if (sweep_number == 1) then
+                if (.not. allocated(blocks_iterated_list)) allocate(blocks_iterated_list(1:params%number_procs))
+
+                call MPI_GATHER(blocks_iterated, 1, MPI_INTEGER4, blocks_iterated_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
+                if (params%rank == 0) then
+                    open(unit=99, file=trim("debug_poisson.csv"), status="unknown", position="append")
+                    string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row
+                    ! if (present(time)) write(string_prepare,'(es16.6,",")') time
+                    if (params%number_procs == 1) then
+                        write(99,'(A, i0, ",", i0)') trim(adjustl(string_prepare)), multigrid_level, blocks_iterated_list(1)
+                    else
+                        write(format_string, '("(A, i0,",i0,"("","",i0))")') params%number_procs
+                        write(99,format_string) trim(adjustl(string_prepare)), multigrid_level, blocks_iterated_list(1), blocks_iterated_list(2:params%number_procs)
+                    endif
+                    close(99)
+                endif
+            endif
+        endif
     end subroutine
 
     ! do one Gauss Seidel iteration, either in backwards or forwards fashion, to solve Ax=b
@@ -229,6 +278,9 @@ contains
         integer(kind=ik), intent(in), optional :: filter_offset  ! where to apply the filter, default is params%g resulting in only interior points
 
         integer(kind=ik)                   :: ix,iy,iz, ic, filterOffset, is(1:3), ie(1:3), dir, a
+
+        ! Auto-initialize module if not yet done
+        if (.not. is_initialized) call setup_Laplacian_stencils(params)
 
         filterOffset = params%g
         if (present(filter_offset)) filterOffset = filter_offset
@@ -446,6 +498,9 @@ contains
         integer :: Ax_factor
 
         integer(kind=ik)                  :: ix,iy,iz,ic, a
+        
+        ! Auto-initialize module if not yet done
+        if (.not. is_initialized) call setup_Laplacian_stencils(params)
 
         ! factor to multiply Ax with, decides if we compute r = b - Ax or recompute b = r + Ax
         Ax_factor = -1
@@ -508,6 +563,9 @@ contains
 
         integer(kind=ik)                  :: ix,iy,iz, a, is(1:3), ie(1:3)
         logical :: use_stencil_RHS
+        
+        ! Auto-initialize module if not yet done
+        if (.not. is_initialized) call setup_Laplacian_stencils(params)
 
         ! get indices over which we loop
         is(:) = 1
@@ -603,6 +661,9 @@ contains
         integer(kind=ik) :: ic, it, nx, ny, nz, nc, g(1:3), bs(1:3)
 
         character(len=cshort)              :: fname
+
+        ! Auto-initialize module if not yet done
+        if (.not. is_initialized) call setup_Laplacian_stencils(params)
 
         nx = size(u,1)
         ny = size(u,2)

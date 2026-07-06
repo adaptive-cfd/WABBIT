@@ -333,7 +333,7 @@ subroutine draw_cylinder(mask, x0, dx, Bs, g )
            x = dble(ix-(g+1)) * dx(1) + x0(1) - cyl%x_cntr(1)
            ! distance from center of cylinder
            r = dsqrt(x*x + y*y)
-           mask(ix,iy) = smoothstep( r - cyl%radius, h)
+           mask(ix,iy) = step_cosine( r - cyl%radius, h)
        end do
     end do
 
@@ -392,7 +392,7 @@ subroutine draw_triangle(mask, x0, dx, Bs, g )
           y = dble(iy-(g+1)) * dx(2) + x0(2)
           y = abs(y-triangle%x_cntr(2))
 
-          mask(ix,iy) = soft_bump(x,0.0_rk,length+h,h)*smoothstep(y-height,h)
+          mask(ix,iy) = soft_bump(x,0.0_rk,length+h,h)*step_cosine(y-height,h)
 
       end do
    end do

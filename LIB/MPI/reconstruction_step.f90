@@ -1,6 +1,6 @@
 !> \brief Modify the SC and WC of a wavelet decomposed blocks at fine/coarse interfaces
 !> This routine assumes that the input is already wavelet decomposed in spaghetti form
-subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, s_val, clear_wc, copy_sc)
+subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, s_level, s_ref, clear_wc, copy_sc)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -12,7 +12,7 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
     integer(kind=ik), intent(in)        :: tree_ID                     !< Tree to be 
     character(len=*)                    :: CE_case                     !< String representing which kind of CE we want to do, act on tree, level or ref
 
-    integer(kind=ik), intent(in), optional  :: s_val                   !< if CE_modify acts on level or ref, it is restricted to this value
+    integer(kind=ik), intent(in), optional  :: s_level, s_ref          !< if CE_modify acts on level or ref, it is restricted to this value
     logical, optional, intent(in)       :: clear_wc                    !< optionally disable wc clearing (defaults to true)
     logical, optional, intent(in)       :: copy_sc                     !< optionally disable sc copy (defaults to true)
 
@@ -37,6 +37,8 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
         CE_case_id = 1
     case("ref")
         CE_case_id = 2
+    case("level_ref")
+        CE_case_id = 3
     case default
         call abort(240809, "My language does not have so many cases, so I have no idea what you want from me.")
     end select
@@ -51,10 +53,15 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
 
         ! for some calls we don't want to work on whole tree so skip some blocks
         if (CE_case_ID == 1) then
-            if (level_me /= s_val) cycle
+            if (level_me /= s_level) cycle
         elseif (CE_case_ID == 2) then
-            if (ref_me /= s_val) cycle
+            if (ref_me /= s_ref) cycle
+        elseif (CE_case_ID == 3) then
+            if (level_me /= s_level .or. ref_me /= s_ref) cycle
         endif
+
+        ! select only blocks which are leaf-blocks, 
+        if (.not. block_is_leaf(params, hvy_ID)) cycle
 
         ! loop over all relevant neighbors
         do i_n = 1, size(hvy_neighbor, 2)
@@ -65,10 +72,9 @@ subroutine coarse_extension_modify(params, hvy_data, hvy_tmp, tree_ID, CE_case, 
                 level_n = lgt_block( lgt_ID_n, IDX_MESH_LVL )
 
                 ! coarse extension for coarser neighbors
-                ! select only blocks which are leaf-blocks, additionally check if there is a same-lvl or finer neighbor for the same patch
+                ! additionally check if there is a same-lvl or finer neighbor for the same patch
                 ! In theory checking same-lvl is enough, but their values could be REF_TMP_EMPTY so we need to check finer too if it exists
-                if (level_n < level_me .and. block_is_leaf(params, hvy_ID) &
-                .and. .not. (block_has_valid_neighbor(params, hvy_id, i_n, 0) .or. block_has_valid_neighbor(params, hvy_id, i_n, -1))) then
+                if (level_n < level_me .and. .not. (block_has_valid_neighbor(params, hvy_id, i_n, 0) .or. block_has_valid_neighbor(params, hvy_id, i_n, -1))) then
                     ! manipulation of coeffs
                     if (clearWC) then
                         call coarseExtensionManipulateWC_block(params, hvy_data(:,:,:,:,hvy_ID), i_n)

@@ -1,0 +1,1455 @@
+! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+! mask functions separately. This makes the mask routines tree-level routines (and no longer
+! block level) so the physics modules have to provide an interface to create the mask at a tree
+! level. All parts of the mask shall be included: chi, boundary values, sponges.
+! This is a block-level wrapper to fill the mask.
+subroutine create_mask_3D_NSPP( time, x0, dx, Bs, g, mask, stage )
+    use module_globals
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: Bs(3), g
+    !> mask term for every grid point of this block
+    ! components: mask, usx, usy, usz, color, sponge
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
+    !     stage == "time-independent-part"
+    !     stage == "time-dependent-part"
+    !     stage == "all-parts"
+    character(len=*), intent(in) :: stage
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
+
+    integer(kind=ik) :: i_geom, insect_id
+
+    ! usually, the routine should not be called with no penalization, but if it still
+    ! happens, do nothing.
+    if ( params_nspp%penalization .eqv. .false.) then
+        mask = 0.0_rk
+        return
+    endif
+
+    ! check if the array has the right dimension, if not, put money in swear jar.
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g .or. size(mask,3) /= Bs(3)+2*g ) then
+        write(*,'(A)') shape(mask)
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    if (size(mask,4) < 5 ) then
+        write(*,'(A)') shape(mask)
+        call abort(777108, "mask: wrong number of components (5), there's pirates, captain!")
+    endif
+
+
+    if (.not. params_nspp%initialized) write(*,'(A)') "WARNING: create_mask_3D_NSPP called but NSPP not initialized"
+
+    ! Initialization of Insects, this needs to be called only by one call every time the mask is created for all insects at once
+    if (stage == "init_stage") then
+        call update_all_insects(time)
+    endif
+
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ! mask function and boundary values
+    ! loop over all individual geometries
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    do i_geom= 1, params_nspp%n_geometries
+        select case (trim(standardize_string(params_nspp%geometries(i_geom))))
+
+        case ('sphere-fixed')
+            if (stage == "time-independent-part" .or. stage == "all-parts") then
+                call draw_sphere( mask(:,:,:,1), mask(:,:,:,5), x0, dx, g, params_nspp%x_cntr(1:3), params_nspp%R_cyl, color_set=1_ik, smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+            endif
+
+        case ('sphere-free')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
+                call draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
+            endif
+
+        case ('active-grid')
+            !-----------------------------------------------------------------------
+            ! ACTIVE GRID
+            !-----------------------------------------------------------------------
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                ! active grids are always time-dependent
+                call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
+                call draw_active_grid_winglets(time, insect_id, x0-dble(g)*dx, dx, &
+                mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4))
+            endif
+
+
+        case ('insect')
+            !-----------------------------------------------------------------------
+            ! INSECT MODULE
+            !-----------------------------------------------------------------------
+            ! the insects require us to determine their state vector before they can be drawn
+            ! as this is to do only once, not for all blocks
+            ! 18 Feb 2021: deactivated the call here because it is (more efficiently) done in module_mask.f90
+            ! This is important as for FSI problems the mask function at TIME may have to be recomputed even if we
+            ! already computed it at this time!! Think of RK substeps, where several RHS evaluations are to be done
+            ! at the same time level but with different input data. Hence, the check below is NOT sufficient in those
+            ! cases.
+            ! if (abs(time-Insect%time) >= 1.0e-13_rk) then
+            !     call Update_Insect(time, Insect)
+            ! endif
+
+            ! 2026-06-15 : JB Disabled insect mask deleting itself, as at the start of create_mask_tree the whole mask is always wiped
+            !              Obviously, for static grids and masks (channel?) this is not needed and could be optimized later on
+
+            call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
+
+            select case(stage)
+            case ("time-independent-part")
+                ! insect body: note non-tethered-flight is a problem
+                if (Insects(insect_id)%body_moves == "no") then
+                    call draw_insect_body( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
+                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id), delete=.false.)
+                endif
+
+
+            case ("time-dependent-part")
+                if (Insects(insect_id)%body_moves == "no") then
+                    ! wings
+                    call draw_insect_wings( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
+                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id), delete=.false.)
+                else
+                    ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+                    call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4), delete=.false. )
+                endif
+
+            case ("all-parts")
+                ! wings and body
+                ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+                call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4), delete=.false. )
+
+            case ("init_stage")
+                ! do nothing
+            case default
+                call abort(16072019, "unknown request to create_mask")
+
+            end select
+
+        case ('channel-3d')
+            if (stage == "time-independent-part" .or. stage == "all-parts") then
+                call draw_channel(x0, dx, Bs, g, mask )
+            endif
+        
+        case ('primitives-collection')
+            if (stage == "init_stage") then
+                ! init and setup all geometries
+                ! either from file or from string, but not both
+                if (params_nspp%geometry_files(i_geom) /= "") then
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), file=params_nspp%geometry_files(i_geom), i_collection=i_geom)
+                elseif (params_nspp%geometry_string /= "") then
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), string=params_nspp%geometry_string, i_collection=i_geom)
+                else
+                    call abort(260603, "ERROR: primitives-collection geometry selected but no geometry string or file provided!")
+                endif
+            elseif (stage == "time-independent-part" .or. stage == "all-parts") then
+                ! normal call, everything is prepared so we can just call it
+                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety, i_collection=i_geom)
+            endif
+
+        case ('none')
+            mask = 0.0_rk
+
+        case default
+            call abort(120001,"ERROR: geometry for 3d VPM is unknown: "//params_nspp%geometries(i_geom))
+
+        end select
+    enddo
+
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ! sponge
+    !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ! Though time-independent, we treat the sponge mask as if it were time-dependent
+    ! because it does not have to be refined to the finest level (unlike the mask
+    ! function.)
+    if (stage == "time-dependent-part" .or. stage == "all-parts") then
+        if (params_nspp%use_sponge) then
+            call sponge_3D( mask(:,:,:,6), x0, dx, Bs, g)
+        endif
+    endif
+
+end subroutine create_mask_3D_NSPP
+
+!-------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
+! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
+! mask functions separately. This makes the mask routines tree-level routines (and no longer
+! block level) so the physics modules have to provide an interface to create the mask at a tree
+! level. All parts of the mask shall be included: chi, boundary values, sponges.
+! This is a block-level wrapper to fill the mask.
+subroutine create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
+    !> spacing and origin of block
+    real(kind=rk), intent(in) :: x0(1:2), dx(1:2), time
+    ! sometimes one has to do preparatory work for the mask function => staging idea.
+    character(len=*), intent(in) :: stage
+
+    integer(kind=ik) :: i_geom, insect_id
+
+    ! some cheap checks
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(634840, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    mask = 0.0_rk
+
+    ! usually, the routine should not be called with no penalization, but if it still
+    ! happens, do nothing.
+    if (.not. params_nspp%penalization) return
+
+    if (.not. params_nspp%initialized) write(*,'(A)') "WARNING: create_mask_2D_NSPP called but NSPP not initialized"
+
+    !---------------------------------------------------------------------------
+    ! Mask function and forcing values
+    !---------------------------------------------------------------------------
+    do i_geom = 1, params_nspp%n_geometries
+        select case (trim(standardize_string(params_nspp%geometries(i_geom))))
+        case ('rotating-rod')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call draw_rotating_rod( time, mask(:,:,1,:), x0, dx, Bs, g )
+            endif
+
+        case ('circle', 'cylinder')  ! someone called this cylinder, but it is actually a circle in 2D
+            if (stage == "time-independent-part" .or. stage == "all-parts") then
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, params_nspp%x_cntr(1:2), params_nspp%R_cyl, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+            endif
+
+        case ('lamballais')
+            if (stage == "time-independent-part" .or. stage == "all-parts") then
+                call draw_lamballais( mask(:,:,1,:), x0, dx, Bs, g )
+            endif
+
+        case ('lamballais-local')
+        if (stage == "time-independent-part" .or. stage == "all-parts") then
+            call draw_lamballais_local_variation(mask(:,:,1,:), x0, dx, Bs, g )
+        endif
+
+        case ('plate-free')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
+                call draw_plate_free( mask(:,:,1,:), x0, dx, Bs, g, insect_id )
+            endif
+
+        case ('cylinder-free')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
+                call draw_free_cylinder( mask(:,:,1,:), x0, dx, Bs, g, insect_id )
+            endif
+
+        case ('rotating-cylinder')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call draw_rotating_cylinder( time, mask(:,:,1,:), x0, dx, Bs, g )
+            endif
+
+        case ('two-circles', 'two-cylinders')  ! actually two circles in 2D
+            if (stage == "time-independent-part" .or. stage == "all-parts") then
+                ! center coefficients where hardcoded, I just repeat them here to include this old condition
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.5884_rk*params_nspp%domain_size(1), 0.4116_rk*params_nspp%domain_size(2)/), params_nspp%R_cyl, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.4116_rk*params_nspp%domain_size(1), 0.5884_rk*params_nspp%domain_size(2)/), params_nspp%R_cyl, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+            endif
+
+        case ('two-moving-cylinders')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call draw_two_moving_cylinders( time, mask(:,:,1,:), x0, dx, Bs, g )
+            endif
+
+        case ('flapping-wings')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call draw_2d_flapping_wings( time, mask(:,:,1,:), x0, dx, Bs, g )
+            endif
+
+        case ('cavity')
+            if (stage == "time-independent-part" .or. stage == "all-parts") then
+                ! cavity means that the periodic borders are walls. It is like drawing 4 rectangles with half-size l and height infinity to cover all borders
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_nspp%domain_size(1), 0.0_rk/), half_size=(/1.0e6_rk, params_nspp%length/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_nspp%domain_size(1), params_nspp%domain_size(2)/), half_size=(/1.0e6_rk, params_nspp%length/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.0_rk, 0.5_rk*params_nspp%domain_size(2)/), half_size=(/params_nspp%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+                call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/params_nspp%domain_size(1), 0.5_rk*params_nspp%domain_size(2)/), half_size=(/params_nspp%length, 1.0e6_rk/), angle=0.0_rk, color_set=params_nspp%geometry_colors(i_geom), smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety )
+            endif
+
+        case ('2d-wingsection')
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call draw_2d_wingsections( time, mask(:,:,1,:), x0, dx, Bs, g )
+            endif
+
+        case ('primitives-collection')
+            if (stage == "init_stage") then
+                ! init and setup all geometries
+                ! either from file or from string, but not both
+                if (params_nspp%geometry_files(i_geom) /= "") then
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), file=params_nspp%geometry_files(i_geom), i_collection=i_geom)
+                elseif (params_nspp%geometry_string /= "") then
+                    call init_primitives_collection(center=params_nspp%x_cntr, scale=params_nspp%length, color_set=params_nspp%geometry_colors(i_geom), string=params_nspp%geometry_string, i_collection=i_geom)
+                else
+                    call abort(260603, "ERROR: primitives-collection geometry selected but no geometry string or file provided!")
+                endif
+            elseif (stage == "time-independent-part" .or. stage == "all-parts") then
+                ! normal call, everything is prepared so we can just call it
+                call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_nspp%smoothing_type_int, smoothing_width=params_nspp%smoothing_width, smoothing_safety=params_nspp%smoothing_safety, i_collection=i_geom)
+            endif
+
+        case ('none')
+            mask = 0.0_rk
+
+        case default
+            call abort(120002,"ERROR: geometry for 2d VPM is unknown: "//params_nspp%geometries(i_geom))
+
+        end select
+    enddo
+
+    !---------------------------------------------------------------------------
+    ! sponge
+    !---------------------------------------------------------------------------
+    ! Though time-independent, we treat the sponge mask as if it were time-dependent
+    ! because it does not have to be refined to the finest level (unlike the mask
+    ! function.)
+    if (stage == "time-dependent-part" .or. stage == "all-parts") then
+        if (params_nspp%use_sponge) then
+            call sponge_2D( mask(:,:,1,6), x0, dx, Bs, g)
+        endif
+    endif
+
+end subroutine create_mask_2D_NSPP
+
+! !-------------------------------------------------------------------------------
+! !-------------------------------------------------------------------------------
+
+
+subroutine draw_lamballais(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi
+    ! loop variables
+    integer(kind=ik) :: ix, iy, ix_global, iy_global
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! a mask for the reproduction of the following paper:
+    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
+    ! Computers & Fluids 75, 103–111, 2013 
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = params_nspp%dx_min
+    h = 1.5_rk * dx_min
+
+    epsilon = sqrt(params_nspp%nu * params_nspp%C_eta)
+    safety = 5.0_rk * epsilon
+    delta = 2.64822828_rk
+
+    if (params_nspp%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
+
+    select case(params_nspp%smoothing_type)
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= 0.5_rk*(params_nspp%R0+params_nspp%R1)) then
+                    ! inner cylinder
+                    xi = (r-params_nspp%R0) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ( (r > 0.5_rk*(params_nspp%R0+params_nspp%R1)).and.(r <= 0.5_rk*(params_nspp%R1+params_nspp%R2) )) then
+                    ! inner part of ring
+                    xi = -1.0_rk*(r-params_nspp%R1) / epsilon
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                elseif (r>=0.5_rk*(params_nspp%R1+params_nspp%R2)) then
+                    ! outer part of ring
+                    xi = (r-params_nspp%R2) / epsilon
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_nspp%R0+params_nspp%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_nspp%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_nspp%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_nspp%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("discontinuous", "dis")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= params_nspp%R0) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = 1.0_rk
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ((r >= params_nspp%R1).and.(r <= params_nspp%R2)) then
+                    ! ring
+                    mask(ix,iy,6) = 1.0_rk
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_nspp%R0+params_nspp%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_nspp%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_nspp%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_nspp%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("cos", "cosine")
+    !--------------------------------
+        safety = 2.0_rk*params_nspp%C_smooth*params_nspp%dx_min
+
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r < params_nspp%R0+safety) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = step_cosine(r, params_nspp%R0, params_nspp%C_smooth*params_nspp%dx_min)
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                elseif ( (r > params_nspp%R0+safety).and.(r <= 0.5_rk*(params_nspp%R1+params_nspp%R2) )) then
+                    ! inner part of ring
+                    mask(ix,iy,6) = step_cosine( params_nspp%R1-r, 0.0_rk, params_nspp%C_smooth*params_nspp%dx_min)
+                elseif (r>=0.5_rk*(params_nspp%R1+params_nspp%R2)) then                
+                    ! outer part of ring
+                    mask(ix,iy,6) = step_cosine(r, params_nspp%R2, params_nspp%C_smooth*params_nspp%dx_min)
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_nspp%R0+params_nspp%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_nspp%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_nspp%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_nspp%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    end select
+
+end subroutine draw_lamballais
+
+subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi, epsilon_ring, xi_ring
+    ! loop variables
+    integer(kind=ik) :: ix, iy, ix_global, iy_global
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! a mask for the reproduction of the following paper:
+    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
+    ! Computers & Fluids 75, 103–111, 2013 
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = params_nspp%dx_min
+    h = 1.5_rk * dx_min
+
+    epsilon = sqrt(params_nspp%nu * params_nspp%C_eta)
+    safety = 5.0_rk * epsilon
+    delta = 2.64822828_rk
+
+    epsilon_ring = sqrt(params_nspp%nu * params_nspp%C_eta_ring)
+
+    if (params_nspp%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
+
+    select case(params_nspp%smoothing_type)
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= 0.5_rk*(params_nspp%R0+params_nspp%R1)) then
+                    ! inner cylinder
+                    !xi = (r-params_nspp%R0) / epsilon
+                    !mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    xi = (r-params_nspp%R0) / epsilon
+                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                    !*************************************
+                    ! CHANGED
+                    !*************************************
+                elseif ( (r > 0.5_rk*(params_nspp%R0+params_nspp%R1)).and.(r <= 0.5_rk*(params_nspp%R1+params_nspp%R2) )) then
+                    ! inner part of ring
+                    xi_ring = -1.0_rk*(r-params_nspp%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_nspp%R1+params_nspp%R2)) then
+                    ! outer part of ring
+                    xi_ring = (r-params_nspp%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+
+                endif
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_nspp%R0+params_nspp%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_nspp%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_nspp%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_nspp%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("discontinuous", "dis")
+    !--------------------------------
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r <= params_nspp%R0) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = 1.0_rk
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+                    
+                    !*************************************
+                    ! CHANGED
+                    !*************************************
+                elseif ( (r > 0.5_rk*(params_nspp%R0+params_nspp%R1)).and.(r <= 0.5_rk*(params_nspp%R1+params_nspp%R2) )) then
+                    ! ((r >= params_nspp%R1) .and. (r <= params_nspp%R2)) then 
+                    ! inner part of ring
+                    xi_ring = -1.0_rk*(r-params_nspp%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_nspp%R1+params_nspp%R2)) then
+                
+                    ! outer part of ring
+                    xi_ring = (r-params_nspp%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                endif
+
+
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_nspp%R0+params_nspp%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_nspp%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_nspp%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_nspp%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    !--------------------------------
+    case("cos")
+    !--------------------------------
+        safety = 2.0_rk*params_nspp%C_smooth*params_nspp%dx_min
+
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_nspp%x_cntr(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_nspp%x_cntr(1)
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y)
+
+                if (r < params_nspp%R0+safety) then
+                    ! inner cylinder
+                    mask(ix,iy,1) = step_cosine(r, params_nspp%R0, params_nspp%C_smooth*params_nspp%dx_min)
+                    ! do not copy to sponge, because we do not enforce a 
+                    ! pressure BC inside the actual cylinder
+
+                    !*************************************
+                    ! CHANGED
+                    !*************************************
+                elseif ( (r > 0.5_rk*(params_nspp%R0+params_nspp%R1)).and.(r <= 0.5_rk*(params_nspp%R1+params_nspp%R2) )) then
+                    ! ((r >= params_nspp%R1) .and. (r <= params_nspp%R2)) then
+                    ! inner part of ring
+                    xi_ring = -1.0_rk*(r-params_nspp%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                elseif (r>=0.5_rk*(params_nspp%R1+params_nspp%R2)) then
+                
+                    ! outer part of ring
+                    xi_ring = (r-params_nspp%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                endif
+                
+
+                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
+                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
+
+                if ( r <= 0.5_rk*(params_nspp%R0+params_nspp%R1) ) then
+                    mask(ix,iy,2:3) = 0.0_rk
+                else
+                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
+                    mask(ix,iy,2) = params_nspp%u_lamballais(ix_global,iy_global,1)
+                    mask(ix,iy,3) = params_nspp%u_lamballais(ix_global,iy_global,2)
+                    ! attention this is 2d so we can use slot 4 for p
+                    ! it is not usz (this is a HACK)
+                    mask(ix,iy,4) = params_nspp%u_lamballais(ix_global,iy_global,3)
+                endif
+
+            end do
+        end do
+    end select
+
+end subroutine draw_lamballais_local_variation
+
+!-------------------------------------------------------------------------------
+! The "free cylinder" is a 2D mask function that is coupled with the insect module
+! it is used for debuging and development (hence the coupling)
+subroutine draw_free_cylinder(mask, x0, dx, Bs, g, insect_id )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+    !> insect id for coupling with insect module
+    integer(kind=ik), intent(in) :: insect_id
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! The vertical (y) position and velocity is taken from the insect module free-flight
+    ! solver (and the corresponding degree of freedom can be disabled, in which case this
+    ! mask function is an impulsively started cylinder)
+    !
+    ! ini-parameters:
+    ! [FreeFlightSolver]::use_free_flight_solver=1
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insects(insect_id)%C_smooth*minval(dx(1:2))
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - Insects(insect_id)%STATE(2)
+        do ix = 1, Bs(1)+2*g
+            ! note origin is in the domain middle in x-direction (used for dev only...)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_nspp%domain_size(1)
+            ! distance from center of cylinder
+            r = dsqrt(x*x + y*y)
+
+            tmp = step(r, params_nspp%R_cyl, h, 5*h, params_nspp%smoothing_type_int)
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! vertical () velocity
+                mask(ix,iy,3) = Insects(insect_id)%STATE(5)
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine draw_free_cylinder
+
+!-------------------------------------------------------------------------------
+! as above draw_free_cylinder, but draws a thin, rectangular plate with width "length"
+! and thickness "thickness"
+subroutine draw_plate_free(mask, x0, dx, Bs, g, insect_id )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+    !> insect id for coupling with insect module
+    integer(kind=ik), intent(in) :: insect_id
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, r, h, dx_min, tmpy, tmpx, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! The vertical (y) position and velocity is taken from the insect module free-flight
+    ! solver (and the corresponding degree of freedom can be disabled, in which case this
+    ! mask function is an impulsively started cylinder)
+    !
+    ! ini-parameters:
+    ! [FreeFlightSolver]::use_free_flight_solver=1
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insects(insect_id)%C_smooth*minval(dx(1:2))
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - Insects(insect_id)%STATE(2)
+
+        do ix = 1, Bs(1)+2*g
+            ! note origin is in the domain middle in x-direction (used for dev only...)
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - 0.5_rk*params_nspp%domain_size(1)
+
+            tmpx = step( abs(x), 0.5_rk*params_nspp%length, h, 5*h, params_nspp%smoothing_type_int)
+            tmpy = step( abs(y), 0.5_rk*params_nspp%thickness, h, 5*h, params_nspp%smoothing_type_int)
+
+            tmp = tmpy*tmpx
+
+            if (tmp >= mask(ix,iy,1)) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! vertical () velocity
+                mask(ix,iy,3) = Insects(insect_id)%STATE(5)
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_free_sphere(x0, dx, Bs, g, mask, insect_id )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+    !> insect id for coupling with insect module
+    integer(kind=ik), intent(in) :: insect_id
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, dx_min, tmp
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    h = Insects(insect_id)%C_smooth*minval(dx)
+
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3) - Insects(insect_id)%STATE(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2) - Insects(insect_id)%STATE(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1) - Insects(insect_id)%STATE(1)
+
+                ! distance from center of cylinder
+                r = dsqrt(x*x + y*y + z*z)
+
+                mask(ix,iy,iz,1) = step(r, params_nspp%R_cyl, h, 5*h, params_nspp%smoothing_type_int)
+                mask(ix,iy,iz,2) = Insects(insect_id)%STATE(4)
+                mask(ix,iy,iz,3) = Insects(insect_id)%STATE(5)
+                mask(ix,iy,iz,4) = Insects(insect_id)%STATE(6)
+                ! color
+                mask(ix,iy,iz,5) = 1.0_rk
+            end do
+        end do
+    end do
+
+end subroutine draw_free_sphere
+
+!-------------------------------------------------------------------------------
+
+subroutine draw_channel(x0, dx, Bs, g, mask )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:,:), intent(out) :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(1:3), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk)  :: x, y, z, r, h, tmp, dx_min, H_fluid, safety, epsilon, xi, delta
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! reset mask array
+    mask = 0.0_rk
+
+     ! parameter for smoothing function (width)
+    dx_min = params_nspp%dx_min
+
+    epsilon = sqrt(params_nspp%nu * params_nspp%C_eta)
+    delta = 2.64822828_rk
+
+    ! Fluid domain
+    H_fluid = params_nspp%domain_size(2) - 2*params_nspp%h_channel
+
+    ! | h_channel
+    ! |____
+    ! |
+    ! | H_fluid
+    ! |____
+    ! |
+    ! | h_channel
+
+    select case(params_nspp%smoothing_type)
+    !--------------------------------
+    case ("discontinuous", "dis")
+    !--------------------------------
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_nspp%h_channel) then
+                    ! lower wall
+                    mask(ix, iy, iz, 1) = 1.0_rk
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif ((y >= (params_nspp%h_channel+H_fluid)).and.(y <=  params_nspp%domain_size(2))) then
+                    ! upper wall
+                    mask(ix, iy, iz, 1) = 1.0_rk
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+
+    !--------------------------------
+    case ("cos", "cosine")
+    !--------------------------------
+    safety = 2.0_rk*params_nspp%C_smooth*params_nspp%dx_min
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_nspp%h_channel+safety) then
+                    ! lower wall
+                    mask(ix, iy, iz, 1) = step_cosine(y, params_nspp%h_channel, params_nspp%C_smooth*params_nspp%dx_min)
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif (y >= (params_nspp%h_channel+H_fluid-safety)) then 
+                    ! upper wall
+                    mask(ix, iy, iz, 1) = 1 - step_cosine(y, (params_nspp%h_channel+H_fluid), params_nspp%C_smooth*params_nspp%dx_min)
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+
+    !--------------------------------
+    case ("hester")
+    !--------------------------------
+    safety = 5.0_rk*epsilon
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iz = g+1, Bs(3)+g
+        z = dble(iz-(g+1)) * dx(3) + x0(3)
+        do iy = g+1, Bs(2)+g
+            y = dble(iy-(g+1)) * dx(2) + x0(2)
+            do ix = g+1, Bs(1)+g
+                x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                if (y <= params_nspp%h_channel+safety) then
+                    ! lower wall
+                    xi = (y-params_nspp%h_channel) / epsilon
+                    mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+
+                elseif (y >= (params_nspp%h_channel+H_fluid-safety)) then
+                    ! upper wall
+                    xi = -1.0_rk*(y-(params_nspp%h_channel+H_fluid)) / epsilon
+                    mask(ix,iy,iz,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+
+                    ! color: channel has color 0
+                    mask(ix,iy,iz,5) = 0.0_rk
+                endif
+
+            end do
+        end do
+    end do
+    
+    
+    end select
+    
+
+end subroutine draw_channel
+
+!-------------------------------------------------------------------------------
+! A cylinder that rotates around the domain center with a radius of 1 and a frequency of 1 (non-dimensional units)
+subroutine draw_rotating_cylinder(time, mask, x0, dx, Bs, g )
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    real(kind=rk) :: time
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in) :: x0, dx
+
+    ! auxiliary variables
+    real(kind=rk) :: x, y, r, h, dx_min, tmp, x00, y00, radius, frequ, alpha
+    ! loop variables
+    integer(kind=ik) :: ix, iy
+
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    ! frequency of rotation is unity:
+    frequ = 1.0_rk
+    ! radius of rotation:
+    radius = 1.0_rk
+    alpha = 2.0_rk * pi * time * frequ
+    ! cylinder mid-point as a function of time:
+    x00 = params_nspp%x_cntr(1) + dcos(alpha)*radius
+    y00 = params_nspp%x_cntr(2) + dsin(alpha)*radius
+
+
+    ! reset mask array
+    mask = 0.0_rk
+
+    ! parameter for smoothing function (width)
+    dx_min = params_nspp%dx_min
+    h = 1.5_rk * dx_min
+
+    ! Note: this basic mask function is set on the ghost nodes as well.
+    do iy = 1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        do ix = 1, Bs(1)+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            ! distance from center of cylinder
+            r = dsqrt( (x-x00)*(x-x00) + (y-y00)*(y-y00) )
+
+            tmp = step(r, params_nspp%R_cyl, h, 5*h, params_nspp%smoothing_type_int)
+
+            if (tmp >= mask(ix,iy,1) .and. tmp > 0.0_rk) then
+                ! mask function
+                mask(ix,iy,1) = tmp
+                ! usx
+                mask(ix,iy,2) = -2.0_rk * pi * frequ * sin(alpha)
+                ! usy
+                mask(ix,iy,3) = +2.0_rk * pi * frequ * cos(alpha)
+                ! color
+                mask(ix,iy,5) = 1.0_rk
+            endif
+        end do
+    end do
+
+end subroutine draw_rotating_cylinder
+
+! ------------------------------------------------------------------------------
+! Two cylinders that move! Yaj
+subroutine draw_two_moving_cylinders(time, mask, x0, dx, Bs, g)
+
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+    ! auxiliary variables
+    real(kind=rk)         :: x1, x2, y1, y2, R1, R2, cx1, cx2, cy1,&
+    cy2, r_1, r_2, h, mask1, mask2, freq, vy2
+    real(kind=rk), allocatable, save :: mu(:)
+    !real(kind=rk)         :: f1, f2, St1, St2 ,Re1, Re2
+    ! loop variables
+    integer(kind=ik)      :: ix, iy, k, nfft_y0, smoothing_i
+
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+    nfft_y0 = wingsections(1)%nfft_y0
+    if (.not. allocated(mu)) allocate(mu(nfft_y0))
+    ! reset mask array
+    mask = 0.0_rk
+    mask1 = 0.0_rk
+    mask2 = 0.0_rk
+    !---------------------------------------------------------------------------------------------
+    ! main body
+    ! radius of the cylinders
+    R1 = 1.0_rk * params_nspp%R_cyl
+    R2 = 1.0_rk * params_nspp%R_cyl
+    ! Here we set the frequency of the 2. cylinder oscillating up and down behind
+    ! the 1. cyl. It should be choosen such that the characteristic time scale of
+    ! the vortex shedding is larger then the movement!
+    ! Reynolds Number:
+    ! Re1 = 2 * params_nspp%u_mean_set(1) * R1/ params_nspp%nu
+    ! Re2 = 2 * params_nspp%u_mean_set(1) * R2/ params_nspp%nu
+    ! ! strouhal number: (see: https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street)
+    ! St1 = 0.198 * (1-19.7/Re1)
+    ! St2 = 0.198 * (1-19.7/Re2)
+    ! ! vortex shedding frequency
+    ! f1 = St1*params_nspp%u_mean_set(1)/(2*R1)
+    ! f2 = St2*params_nspp%u_mean_set(1)/(2*R2)
+    ! ! make cylinder movement slow in comparison to vortex shedding frequency:
+    ! freq = min(f1,f2) / 10
+    freq = 0.2e-2
+    mu = wingsections(1)%ai_y0
+    ! center of the first cylinder
+    cx1 = 0.250_rk * params_nspp%domain_size(1)
+    cy1 = 0.250_rk * params_nspp%domain_size(2)
+    ! center of the second cylinder (oscillates behind 1. cylinder)
+    cx2 = 0.500_rk * params_nspp%domain_size(1)
+    cy2 = 0.500_rk * params_nspp%domain_size(2)
+    vy2 = 0
+    do k = 1, nfft_y0
+        cy2 = cy2 + mu(k) * cos(2*k*pi*freq*time)
+        ! velocity of moving cylinder
+        vy2 = vy2 - mu(k) * 2 * pi * freq * k * sin(2*k*pi*freq*time)
+    end do
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
+
+    select case(params_nspp%smoothing_type)
+    case ("cos", "cosine")
+        smoothing_i = 0
+    case ("dis", "discontinuous")
+        smoothing_i = 2
+    case default
+        call abort(260603, "ERROR: Can't handle that smoothing type: " // params_nspp%smoothing_type)
+    end select
+
+    do iy=1, Bs(2)+2*g
+        y1 = dble(iy-(g+1)) * dx(2) + x0(2) - cy1
+        y2 = dble(iy-(g+1)) * dx(2) + x0(2) - cy2
+        do ix=1, Bs(1)+2*g
+            x1 = dble(ix-(g+1)) * dx(1) + x0(1) - cx1
+            x2 = dble(ix-(g+1)) * dx(1) + x0(1) - cx2
+            ! distance from center of cylinder 1
+            r_1 = dsqrt(x1*x1 + y1*y1)
+            ! distance from center of cylinder 2
+            r_2 = dsqrt(x2*x2 + y2*y2)
+            if (smoothing_i == 0) then  ! cosine mask
+                mask1 = step_cosine( r_1, R1, h)
+                mask2 = step_cosine( r_2, R2, h)
+                if (mask2>0.0) then
+                  mask(ix,iy,3) = vy2
+                  mask(ix,iy,5) = 2.0_rk
+                end if
+                if (mask1>0.0) then
+                  mask(ix,iy,5) = 1.0_rk
+                end if
+                mask(ix,iy,1) = mask1 + mask2
+            elseif (smoothing_i == 2) then  ! discontinuous mask
+                ! if point is inside one of the cylinders, set mask to 1
+                if (r_1 <= R1) then
+                    mask(ix,iy,1) = 1.0_rk
+                    mask(ix,iy,5) = 1.0_rk
+                elseif ( r_2 <= R2) then
+                    mask(ix,iy,1) = 1.0_rk
+                    mask(ix,iy,2) = 0.0_rk
+                    mask(ix,iy,3) = vy2
+                    mask(ix,iy,5) = 2.0_rk
+                else
+                    mask(ix,iy,:) = 0.0_rk
+                end if
+            else
+                call abort(260602, "ERROR: Can't handle that smoothing type: " // params_nspp%smoothing_type)
+            end if
+        end do
+    end do
+
+
+end subroutine draw_two_moving_cylinders
+
+
+subroutine draw_2d_flapping_wings(time, mask, x0, dx, Bs, g)
+    ! simple 2D insect
+    ! taken from publication:
+    !       Fluid Dyn. Res. 44 (2012), Keigo Ota, Kosuke Suzuki
+    !       and Takaji Inamuro
+    ! Reynolds number is given by:
+    !  Re = u_tip*L/nu
+    !  time-averaged tip speed u_tip, chord length L, cinematic viscousity nu
+    !  u_tip = 4 * L * freq * A   (freq ... frequency, A... max(theta))
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !          wing_l     wing_r
+    !             \       /
+    !              \     /
+    !               \   /
+    !                \ /
+    !                 O        theta is angle between x and wing_r/wing_l
+    !                body
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+    ! auxiliary variables
+    real(kind=rk)         :: x1, x2, y1, y2, R, cxr, cxl, cyr, cyl, c, K, L, b2,&
+                             r_wing_r, r_wing_l,r_body, h, mask_wing_r, x, y, xb, yb, &
+                             mask_wing_l, mask_body, freq, x_bodycenter(2), theta, theta_dt, &
+                             cos_theta, sin_theta, uwing_x, uwing_y, ubody_x, ubody_y, A
+    integer(kind=ik)            :: ix, iy, smoothing_i
+    integer(kind=2), parameter  :: color_l=2, color_r=3
+    integer(kind=2)             :: color
+    !---------------------------------------------------------------------------------------------
+    ! variables initialization
+    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g  ) then
+        call abort(777107, "mask: wrong array size, there's pirates, captain!")
+    endif
+
+    select case(params_nspp%smoothing_type)
+    case ("cos", "cosine")
+        smoothing_i = 0
+    case ("dis", "discontinuous")
+        smoothing_i = 2
+    case default
+        call abort(260603, "ERROR: Can't handle that smoothing type: " // params_nspp%smoothing_type)
+    end select
+
+    ! reset mask array
+    mask = 0.0_rk
+    mask_wing_r = 0.0_rk ! right wing
+    mask_wing_l = 0.0_rk ! left wing
+    mask_body = 0.0_rk
+    ! ---------------
+    ! body center of cylinder
+    x_bodycenter = params_nspp%x_cntr(1:2)
+    ! size of the body
+    R = params_nspp%R_cyl
+    ! chord length
+    c = params_nspp%length
+    ! the wings are elipsoids, center is half of the chord length + radius of the body
+    L = c/2 + R
+    !frequency
+    freq = params_nspp%freq
+    ! half axis ration of elipsoid
+    b2 = 0.1**2
+    ! angle between wing and x axis
+    A = pi*0.25
+    theta = A * cos(2.0_rk*pi*freq*time)
+    ! angular velocity
+    theta_dt = -2.0_rk*pi*freq*A*sin(2.0_rk*pi*freq*time)
+    ! precompute cosinus and sinus
+    cos_theta = cos(theta)
+    sin_theta = sin(theta)
+    ! velocity of body
+    ubody_x = 0.0_rk
+    ubody_y = 0.0_rk
+    ! centers of wing elipsoids
+    ! right wing
+    cxr = x_bodycenter(1) + L * cos_theta
+    cyr = x_bodycenter(2) + L * sin_theta
+    ! left wing
+    cxl = x_bodycenter(1) - L * cos_theta
+    cyl = x_bodycenter(2) + L * sin_theta
+    ! parameter for smoothing function (width)
+    h = 1.5_rk*max(dx(1), dx(2))
+    do iy=1, Bs(2)+2*g
+        y = dble(iy-(g+1)) * dx(2) + x0(2)
+        do ix=1, Bs(1)+2*g
+            x = dble(ix-(g+1)) * dx(1) + x0(1)
+            ! rotate elipsoid of wing right
+            x1 =  cos_theta * (x - cxr) + sin_theta * (y - cyr)
+            y1 = -sin_theta * (x - cxr) + cos_theta * (y - cyr)
+            ! rotate elipsoid of wing left
+            x2 =  cos_theta * (x - cxl) - sin_theta * (y - cyl)
+            y2 =  sin_theta * (x - cxl) + cos_theta * (y - cyl)
+            ! calculate center of body
+            xb = x - x_bodycenter(1)
+            yb = y - x_bodycenter(2)
+            ! distance from center of wing 1
+            r_wing_r = dsqrt(x1*x1 + y1*y1/b2)
+            ! distance from center of wing 2
+            r_wing_l = dsqrt(x2*x2 + y2*y2/b2)
+            ! body
+            r_body = dsqrt(xb*xb + yb*yb)
+            ! compute velocity at the wings
+            ! Note that due to symmetry of the movement,
+            ! only the x component switches sign from wing_r to wing_l
+            uwing_x = -sin_theta * (theta_dt * r_body)
+            uwing_y = cos_theta * (theta_dt * r_body)
+            ! reset color
+            color = 0
+            ! draw mask
+            if (smoothing_i == 0) then  ! cosine mask
+                mask_wing_r = step_cosine( r_wing_r, c*0.5_rk, h)
+                mask_wing_l = step_cosine( r_wing_l, c*0.5_rk, h)
+                mask_body = step_cosine( r_body, R, h)
+                mask(ix,iy,1) = mask_wing_r + mask_wing_l + mask_body
+                if (mask_wing_r>0.0_rk) color = color_r
+                if (mask_wing_l>0.0_rk) color = color_l
+            elseif (smoothing_i == 2) then  ! discontinuous mask
+                ! if point is inside one of the cylinders, set mask to 1
+                if (r_wing_r <= c*0.5_rk ) then
+                    mask(ix,iy,1) = 1.0_rk
+                    color = color_r
+                elseif ( r_wing_l <= c*0.5_rk ) then
+                    mask(ix,iy,1) = 1.0_rk
+                    color = color_l
+                elseif ( r_body <= R ) then
+                    mask(ix,iy,1) = 1.0_rk
+                else
+                    mask(ix,iy,:) = 0.0_rk
+                end if
+            else
+                call abort(260602, "ERROR: Can't handle that smoothing type: " // params_nspp%smoothing_type)
+            end if
+
+            ! set the velocity values inside the rigid body domain
+            if (color == color_r) then
+                mask(ix,iy,2) = ubody_x + uwing_x
+                mask(ix,iy,3) = ubody_y + uwing_y
+            elseif (color == color_l) then
+                mask(ix,iy,2) = ubody_x - uwing_x ! minus because of oposit wing movement direction
+                mask(ix,iy,3) = ubody_y + uwing_y
+            else
+                mask(ix,iy,2) = ubody_x
+                mask(ix,iy,3) = ubody_y
+            end if
+        end do
+    end do
+
+
+end subroutine draw_2d_flapping_wings
+
+subroutine draw_rotating_rod(time, mask, x0, dx, Bs, g)
+    use module_params
+    use module_globals
+
+    implicit none
+
+    ! grid
+    integer(kind=ik), intent(in) :: g
+    integer(kind=ik), dimension(3), intent(in) :: Bs
+    !> mask term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
+    !> spacing and origin of block
+    real(kind=rk), dimension(2), intent(in)        :: x0, dx
+    !> simulation time
+    real(kind=rk), intent(in) :: time
+
+    integer :: ix, iy, iz, mpicode
+    real (kind=rk) :: x2, y2, vx2, vy2, vx2t, vy2t, anglez2, omz2, omz2t, x00, y00
+    real (kind=rk) :: x, y, xref, yref, xlev, ylev, tmp, N, rref, rmax, hsmth, Am, alpham
+    real (kind=rk) :: Af, Sxf, Syf, Jf, forcex, forcey, torquez
+
+    ! reset everything
+    mask = 0.0_rk
+
+    N = params_nspp%C_smooth ! smoothing coefficient
+    hsmth = N*minval(dx) ! smoothing layer thickness
+    rmax = 0.5d0
+
+    x00 = params_nspp%domain_size(1)/2.0_rk
+    y00 = params_nspp%domain_size(2)/2.0_rk
+
+    ! Flapping parameters
+    Am = 1.00d0
+    alpham = 0.25d0*pi
+
+    ! Update kinematics
+    x2 = x00 + Am * dcos(time/Am)
+    y2 = y00
+    anglez2 = 0.5d0*pi + alpham * dsin(time/Am)
+    vx2 = - dsin(time/Am)
+    vy2 = 0.0d0
+    omz2 = alpham/Am * dcos(time/Am)
+    vx2t = - 1.0/Am * cos(time/Am)
+    vy2t = 0.0d0
+    omz2t = - alpham/Am**2 * sin(time/Am)
+
+    ! For all grid points of this subdomain
+    do iy = g+1, Bs(2)+g
+        y = dble(iy-(g+1)) * dx(2) + x0(2) - y2
+
+        do ix = g+1, Bs(1)+g
+            x = dble(ix-(g+1)) * dx(1) + x0(1) - x2
+
+            xref = x*dcos(anglez2) + y*dsin(anglez2)
+            yref = y*dcos(anglez2) - x*dsin(anglez2)
+            rref = dsqrt( xref**2 + 4.0d0**2 * yref**2 ) ! Radius in cylindrical coordinates
+
+            tmp = step(rref, rmax-0.0d0*hsmth, hsmth, 5*hsmth, params_nspp%smoothing_type_int)
+
+            mask(ix,iy,1) = tmp
+            mask(ix,iy,2) = -omz2*y + vx2
+            mask(ix,iy,3) = +omz2*x + vy2
+            mask(ix,iy,4) = 0.0_rk
+            mask(ix,iy,5) = 1.0_rk
+
+        enddo
+    enddo
+
+
+end subroutine draw_rotating_rod

@@ -29,7 +29,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
     integer, allocatable :: blocks_per_mpirank(:)
 
     real(kind=rk)      :: maxmem, mem_per_block
-    real(kind=rk), parameter ::  nstages = 2.0_rk ! stages for ghost node synching
+    real(kind=rk), parameter ::  nstages = 3.0_rk ! stages for ghost node synching
     character(len=cshort)  :: memstring
     integer(kind=ik)   :: i
     logical :: automatic_NB_per_rank = .false.
@@ -186,14 +186,15 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
         ! balance load variables
         mem_per_block = mem_per_block + 10.0*real(number_procs)
 
-        ! put a safety buffer on just for miscellaneous arrays that are being created and used
-        mem_per_block = mem_per_block * 1.02  ! 2%
+        ! put a safety buffer on just for miscellaneous arrays that are being created and used - defaults to 2%
+        mem_per_block = mem_per_block * (1.0_rk + real(params%memory_safety_percentage)/100.0_rk)
 
         mem_per_block = mem_per_block * 8.0e-9 ! in GB
         params%number_blocks = nint(maxmem / mem_per_block)
 
         if (params%rank==0) then
             write(*,'("INIT: for the desired memory we can allocate ",i8," blocks per rank")') params%number_blocks
+            write(*,'("INIT: A memory safety percentage of ",f5.2," %% was used for miscellaneous arrays.")') real(params%memory_safety_percentage)
             write(*,'("INIT: we allocated ",i8," blocks per rank (total: ",i8," blocks) ")') params%number_blocks, params%number_blocks*params%number_procs
         endif
 
@@ -369,7 +370,7 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 end subroutine allocate_forest
 
 
-subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
+subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask )
 
     implicit none
 
@@ -380,6 +381,8 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_tmp(:, :, :, :, :)
     !> heavy work array
     real(kind=rk), allocatable, optional, intent(out)   :: hvy_work(:, :, :, :, :, :)
+    !> heavy mask array
+    real(kind=rk), allocatable, optional, intent(out)   :: hvy_mask(:, :, :, :, :)
 
     if (params%rank == 0) then
         write(*,'(80("─"))')
@@ -393,6 +396,9 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
     if (present(hvy_tmp)) then
         if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     endif
+    if (present(hvy_mask)) then
+        if (allocated(hvy_mask)) deallocate( hvy_mask )
+    endif
     if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )
@@ -404,6 +410,18 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp )
 
     if (allocated(params%threshold_state_vector_component)) deallocate( params%threshold_state_vector_component )
     if (allocated(params%input_files)) deallocate( params%input_files )
+    if (allocated(params%butcher_tableau)) deallocate( params%butcher_tableau )
+    if (allocated(params%symmetry_vector_component)) deallocate( params%symmetry_vector_component )
+    if (allocated(params%time_statistics_names)) deallocate( params%time_statistics_names )
+    if (allocated(params%field_names)) deallocate( params%field_names )
+    if (allocated(params%filter_component)) deallocate( params%filter_component )
+    if (allocated(params%HD)) deallocate( params%HD )
+    if (allocated(params%GD)) deallocate( params%GD )
+    if (allocated(params%HR)) deallocate( params%HR )
+    if (allocated(params%GR)) deallocate( params%GR )
+    if (allocated(params%MGR)) deallocate( params%MGR )
+
+    
 
     if (params%rank == 0) then
         write(*,'(A)') "All memory is cleared!"

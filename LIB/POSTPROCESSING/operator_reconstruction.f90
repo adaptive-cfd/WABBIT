@@ -130,7 +130,7 @@ subroutine operator_reconstruction(params)
 
     !---------------------------------------------------------------------------
 
-    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%g<4)) then
+    if ((params%order_discretization == "FD_4th_central_optimized").and.(params%g<3)) then
         call abort(33,"not enough g")
     endif
 
@@ -259,7 +259,11 @@ subroutine operator_reconstruction(params)
 
             if (refine) then
                 call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1=1, tree_ID2=1)
-
+!
+!
+! Attention! To study the influence of coarse extension on OP instability on static grid, the following line needs to be commented
+!
+!
                 call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM )
 
                 call sync_ghosts_tree(params, hvy_block, tree_ID)
@@ -312,7 +316,9 @@ subroutine operator_reconstruction(params)
 
             if (refine) then
                 ! call adapt_tree( time, params, hvy_block, tree_ID, "everywhere", hvy_tmp )
-
+!
+! This next line does perform the coarse extension (even though the grid is not changing!)
+!
                 ! as both ref meshes are the same, doesnt matter if *ref(:,1) or (:,2)
                 call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
                 hvy_block, hvy_tmp, tree_ID=1, verbosity=.true.)

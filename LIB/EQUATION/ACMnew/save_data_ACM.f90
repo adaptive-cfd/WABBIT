@@ -9,7 +9,7 @@
 ! NOTE that as we have way more work arrays than actual state variables (typically
 ! for a RK4 that would be >= 4*dim), you can compute a lot of stuff, if you want to.
 !-----------------------------------------------------------------------------
-subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
+subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain, names_override )
     implicit none
     ! it may happen that some source terms have an explicit time-dependency
     ! therefore the general call has to pass time
@@ -48,8 +48,11 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
     integer(kind=2), intent(in) :: n_domain(3)
 
+    ! if you want to save something that is not in the default list of variables, you can specify a list of names here.
+    character(len=*), optional, intent(in) :: names_override(:)
+
     ! local variables
-    integer(kind=ik)  :: neqn, nwork, k, iscalar, i_time_statistics
+    integer(kind=ik)  :: neqn, nwork, k, iscalar, i_time_statistics, n_names
     integer(kind=ik), dimension(3) :: Bs
     character(len=cshort) :: name
 
@@ -64,32 +67,45 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
     Bs(2) = size(u,2) - 2*g
     Bs(3) = size(u,3) - 2*g
 
-    if (params_acm%geometry == "Insect" ) then
-        call Update_Insect(time, Insect)
+    ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
+    call Update_All_Insects(time)
+
+
+    if (present(names_override)) then
+        n_names = size(names_override)
+    else
+        n_names = size(params_acm%names,1)
     endif
 
+    if (size(work,4) < n_names) then
+        call abort(2505201, "ACM: PREPARE_SAVE_DATA_ACM: work array has insufficient components for requested names list")
+    endif
 
-
-    do k = 1, size(params_acm%names,1)
-        name = params_acm%names(k)
-        select case(name)
-        case('ux', 'Ux', 'UX')
+    do k = 1, n_names
+        if (present(names_override)) then
+            name = names_override(k)
+        else
+            name = params_acm%names(k)
+        endif
+        ! names have to be standardized here, meaning all lower-case and no "_"
+        select case(trim(standardize_string(name)))
+        case('ux')
             ! copy state vector
             work(:,:,:,k) = u(:,:,:,1)
 
-        case('uy', 'Uy', 'UY')
+        case('uy')
             ! copy state vector
             work(:,:,:,k) = u(:,:,:,2)
 
-        case('uz', 'Uz', 'UZ')
+        case('uz')
             ! copy state vector
             work(:,:,:,k) = u(:,:,:,3)
 
-        case('p', 'P')
+        case('p')
             ! copy state vector (do not use 4 but rather neq for 2D runs, where p=3rd component)
             work(:,:,:,k) = u(:,:,:,params_acm%dim+1)
 
-        case('vor', 'vort', 'Vor', 'Vort', 'vorticity', 'Vorticity')
+        case('vor', 'vort', 'vorticity')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 2D (known bug)")
             endif
@@ -101,7 +117,7 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
 
-        case('vorx', 'Vorx', 'VorX', 'vory', 'Vory', 'VorY', 'vorz', 'Vorz', 'VorZ', 'vorabs', 'Vorabs', 'VorAbs', 'vor-abs', 'Vor-abs', 'Vor-Abs')
+        case('vorx', 'vory', 'vorz', 'vorabs')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
             endif
@@ -113,15 +129,15 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             call compute_vorticity(u(:,:,:,1:3), &
             dx, Bs, g, params_acm%discretization, work(:,:,:,k:k+2))
             ! for different components y,z we need to copy the desired one to the first position
-            if (name == 'vory' .or. name == 'Vory' .or. name == 'VorY') then
+            if (trim(standardize_string(name)) == 'vory') then
                 work(:,:,:,k) = work(:,:,:,k+1)
-            elseif (name == 'vorz' .or. name == 'Vorz' .or. name == 'VorZ') then
+            elseif (trim(standardize_string(name)) == 'vorz') then
                 work(:,:,:,k) = work(:,:,:,k+2)
-            elseif (name=='vorabs' .or. name=='Vorabs' .or.name=='VorAbs' .or. name=='vor-abs' .or. name=='Vor-abs' .or. name=='Vor-Abs') then
+            elseif (trim(standardize_string(name)) == 'vorabs') then
                 work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
             endif
         
-        case('helx', 'Helx', 'HelX', 'hely', 'Hely', 'HelY', 'helz', 'Helz', 'HelZ', 'helabs', 'Helabs', 'HelAbs', 'hel-abs', 'Hel-abs', 'Hel-Abs')
+        case('helx', 'hely', 'helz', 'helabs', 'hel-abs')
             if (size(work,4) - k < 2) then
                 call abort(19101810,"ACM: Not enough space to compute vorticity for helicity, put vorticity computation as first save variables or put atleast two other save variables afterwards. Works only in 3D (known bug)")
             endif
@@ -135,11 +151,11 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! compute by velocity to get local helicity
             work(:,:,:,k:k+2) = work(:,:,:,k:k+2) * u(:,:,:,1:3)
             ! for different components y,z we need to copy the desired one to the first position
-            if (name == 'hely' .or. name == 'Hely' .or. name == 'HelY') then
+            if (trim(standardize_string(name)) == 'hely') then
                 work(:,:,:,k) = work(:,:,:,k+1)
-            elseif (name == 'helz' .or. name == 'Helz' .or. name == 'HelZ') then
+            elseif (trim(standardize_string(name)) == 'helz') then
                 work(:,:,:,k) = work(:,:,:,k+2)
-            elseif (name=='helabs' .or. name=='Helabs' .or.name=='HelAbs' .or. name=='hel-abs' .or. name=='Hel-abs' .or. name=='Hel-Abs') then
+            elseif (trim(standardize_string(name)) == 'helabs' .or. trim(standardize_string(name)) == 'hel-abs') then
                 work(:,:,:,k) = sqrt(work(:,:,:,k)**2 + work(:,:,:,k+1)**2 + work(:,:,:,k+2)**2)
             endif
 
@@ -151,19 +167,97 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
             ! local dissipation rate computed over velocity weighted laplacian
             call compute_dissipation(u(:,:,:,1:params_acm%dim), dx, Bs, g, params_acm%discretization, work(:,:,:,k))
         
-        case('gradPx', 'gradPy', 'gradPz', 'gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', 'gradientPx', 'gradientPy', 'gradientPz', &
-            'grad-Px', 'grad-Py', 'grad-Pz', 'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', 'gradient-Px', 'gradient-Py', 'gradient-Pz')
+        case('gradpx', 'gradpy', 'gradpz', 'gradientpx', 'gradientpy', 'gradientpz', &
+            'grad-px', 'grad-py', 'grad-pz', 'gradient-px', 'gradient-py', 'gradient-pz', &
+            'pdx', 'pdy', 'pdz')
             ! Gradient of pressure, I admit the naming is confusing so I just added every option I could think of
-            if (INDEX(name, 'x') > 0) then
+            if (INDEX(trim(standardize_string(name)), 'x') > 0) then
                 call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k))
-            elseif (INDEX(name, 'y') > 0) then
+            elseif (INDEX(trim(standardize_string(name)), 'y') > 0) then
                 call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k))
-            elseif (INDEX(name, 'z') > 0) then
+            elseif (INDEX(trim(standardize_string(name)), 'z') > 0) then
                 if (params_acm%dim == 3) then
                     call compute_derivative(u(:,:,:,params_acm%dim+1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k))
                 else
                     call abort(19101812,"ACM: Gradient of p in z-direction is not defined for 2D runs")
                 endif
+            endif
+        
+        case('uxdx')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k)) ! dux/dx
+        case('uxdy')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k)) ! dux/dy
+        case('uxdz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k)) ! dux/dz
+            else
+                call abort(19101812,"ACM: derivative of ux in z-direction is not defined for 2D runs")
+            endif
+        case('uydx')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k)) ! duy/dx
+        case('uydy')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k)) ! duy/dy
+        case('uydz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k)) ! duy/dz
+            else
+                call abort(19101812,"ACM: derivative of uy in z-direction is not defined for 2D runs")
+            endif
+        case('uzdx')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 1, params_acm%discretization, work(:,:,:,k)) ! duz/dx
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdy')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 1, params_acm%discretization, work(:,:,:,k)) ! duz/dy
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 1, params_acm%discretization, work(:,:,:,k)) ! duz/dz
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uxdxx')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 1, 2, params_acm%discretization, work(:,:,:,k)) ! d^2ux/dx^2
+        case('uxdyy')
+            call compute_derivative(u(:,:,:,1), dx, Bs, g, 2, 2, params_acm%discretization, work(:,:,:,k)) ! d^2ux/dy^2
+        case('uxdzz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,1), dx, Bs, g, 3, 2, params_acm%discretization, work(:,:,:,k)) ! d^2ux/dz^2
+            else
+                call abort(19101812,"ACM: second derivative of ux in z-direction is not defined for 2D runs")
+            endif
+        case('uydxx')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 1, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uy/dx^2
+        case('uydyy')
+            call compute_derivative(u(:,:,:,2), dx, Bs, g, 2, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uy/dy^2
+        case('uydzz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,2), dx, Bs, g, 3, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uy/dz^2
+            else
+                call abort(19101812,"ACM: second derivative of uy in z-direction is not defined for 2D runs")
+            endif
+        case('uzdxx')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 1, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uz/dx^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdyy')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 2, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uz/dy^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
+            endif
+        case('uzdzz')
+            if (params_acm%dim == 3) then
+                call compute_derivative(u(:,:,:,3), dx, Bs, g, 3, 2, params_acm%discretization, work(:,:,:,k)) ! d^2uz/dz^2
+            else
+                call abort(19101812,"ACM: uz is not defined for 2D runs")
             endif  
 
         case('mask')
@@ -187,18 +281,18 @@ subroutine PREPARE_SAVE_DATA_ACM( time, u, g, x0, dx, work, mask, n_domain )
         end select
 
 
-        if (name(1:6) == "scalar") then
+        if (trim(standardize_string(name(1:6))) == "scalar") then
             ! check if the 7th character is actually a digit
-            if (.not. (name(7:7) >= '0' .and. name(7:7) <= '9')) then
-                call abort(250920, "ERROR: PREPARE_SAVE_DATA_ACM: field_name '"//trim(name)//"' has invalid format. Expected 'scalarX' where X is a digit (1-9), but found '"//name(7:7)//"' at position 7.")
+            if (.not. (trim(standardize_string(name(7:7))) >= '0' .and. trim(standardize_string(name(7:7))) <= '9')) then
+                call abort(250920, "ERROR: PREPARE_SAVE_DATA_ACM: field_name '"//trim(name)//"' has invalid format. Expected 'scalarX' where X is a digit (1-9), but found '"//trim(standardize_string(name(7:7)))//"' at position 7.")
             end if
             read( name(7:7), * ) iscalar
             work(:,:,:,k) = u(:,:,:,params_acm%dim + 1 + iscalar)
         endif
 
         ! if any of those endings is in the name, then it is a timestatistics variable
-        if (index(name, "-avg") > 0 .or. index(name, "-mean") > 0 .or. index(name, "-var") > 0 &
-            .or. index(name, "-minmax") > 0 .or. index(name, "-min") > 0 .or. index(name, "-max") > 0) then
+        if (index(trim(standardize_string(name)), "-avg") > 0 .or. index(trim(standardize_string(name)), "-var") > 0 .or. index(trim(standardize_string(name)), "-minmax") > 0 &
+            .or. index(trim(standardize_string(name)), "-min") > 0 .or. index(trim(standardize_string(name)), "-max") > 0 .or. index(trim(standardize_string(name)), "-cov") > 0) then
             ! now we have to find the index of it
             do i_time_statistics = 1, params_acm%N_time_statistics
                 if (name == trim(params_acm%time_statistics_names(i_time_statistics))) exit
@@ -228,7 +322,7 @@ subroutine FIELD_NAMES_ACM( N, name )
     ! component index
     integer(kind=ik), intent(in) :: N
     ! returns the name
-    character(len=cshort), intent(out) :: name
+    character(len=clong), intent(out) :: name
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: FIELD_NAMES_ACM called but ACM not initialized"
 

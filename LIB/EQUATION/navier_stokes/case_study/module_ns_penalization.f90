@@ -19,7 +19,7 @@ module module_ns_penalization
   use module_navier_stokes_params
   use module_globals
   use module_ini_files_parser_mpi
-  use module_helpers, only:smoothstep
+  use module_helpers, only:step_cosine
   use mpi
 
   implicit none
@@ -31,7 +31,7 @@ module module_ns_penalization
   !**********************************************************************************************
   ! These are the important routines that are visible to WABBIT:
   !**********************************************************************************************
-  PUBLIC :: init_penalization,smoothstep,hardstep,soft_bump, &
+  PUBLIC :: init_penalization,step_cosine,hardstep,soft_bump, &
             soft_bump2,hard_bump,jet_stream,add_penalization_term, &
             transition,draw_free_outlet_wall, &
             init_simple_sponge,sponge_2D,sponge_3D,wall_2D,wall_3D
@@ -326,7 +326,7 @@ subroutine sponge_2D(sponge, x0, dx, Bs, g, alpha)
             ! distance to x-border of domain
             tmp(1) = min(x,-(x-params_ns%domain_size(1)))
 
-            sponge(ix,iy) = smoothstep( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+            sponge(ix,iy) = step_cosine( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
         end do
     end do
 
@@ -386,7 +386,7 @@ subroutine sponge_3D(sponge, x0, dx, Bs, g, alpha)
                 ! distance to x-border of domain
                 tmp(1) = min(x,-(x-params_ns%domain_size(1)))
 
-                sponge(ix,iy,iz) = smoothstep( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+                sponge(ix,iy,iz) = step_cosine( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
             end do
         end do
     end do
@@ -446,7 +446,7 @@ subroutine wall_2D(mask, x0, dx, Bs, g, alpha)
             ! distance to x-border of domain
             tmp(1) = min(x,-(x-params_ns%domain_size(1)))
 
-            mask(ix,iy) = smoothstep( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
+            mask(ix,iy) = step_cosine( tmp(alpha_), 0.5_rk*params_ns%L_sponge, 0.5_rk*params_ns%L_sponge)
         end do
     end do
 
@@ -508,7 +508,7 @@ subroutine wall_3D(mask, x0, dx, Bs, g, alpha)
                 ! distance to x-border of domain
                 tmp(1) = min(x,-(x-params_ns%domain_size(1)))
 
-                mask(ix,iy,iz) = smoothstep( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, h)
+                mask(ix,iy,iz) = step_cosine( tmp(alpha_) , 0.5_rk*params_ns%L_sponge, h)
             end do
         end do
     end do
@@ -554,7 +554,7 @@ subroutine draw_free_outlet_wall(mask, x0, dx, Bs, g )
            y = dble(iy-(g+1)) * dx(2) + x0(2)
            r = abs(y-Domain_Size(2)*0.5_rk)
 
-           mask(ix,iy) = smoothstep(Delta_r-r,h)
+           mask(ix,iy) = step_cosine(Delta_r-r,h)
 
        end do
     end do

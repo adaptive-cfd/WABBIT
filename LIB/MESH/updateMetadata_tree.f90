@@ -9,7 +9,7 @@
 ! NOTE: we require the light data lgt_block to be synchronized BEFORE calling this routine.
 !       No synchronization step is required afterwards.
 !
-subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, update_family, search_overlapping, verbose_check)
+subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, update_family, search_overlapping, Jmin_set, Jmax_set, verbose_check)
     implicit none
 
     type (type_params), intent(in) :: params              !< good ol' params
@@ -18,9 +18,10 @@ subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, 
     logical, optional, intent(in)  :: update_neighbors    !< flag if neighbours should be updated, defaults to .true.
     logical, optional, intent(in)  :: update_family       !< flag if family should be updated, defaults to .true.
     logical, optional, intent(in)  :: search_overlapping  !< for CVS multiple neighbors can coexist, so we search all of them
+    integer(kind=ik), intent(in), optional :: Jmin_set, Jmax_set !< Jmin and Jmax for family update
     logical, optional, intent(in)  :: verbose_check       !< Output verbose flag
 
-    integer(kind=ik) :: k_b, lgt_ID
+    integer(kind=ik) :: k_b, lgt_ID, Jmin, Jmax
     real(kind=rk) :: t_full, t_part
     logical u_l, u_n, u_f, searchOverlapping
     t_full = MPI_wtime()
@@ -33,6 +34,12 @@ subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, 
     if (present(update_neighbors)) u_n = update_neighbors
     if (present(update_family)) u_f = update_family
     if (present(search_overlapping)) searchOverlapping = search_overlapping
+
+    ! set Jmin and Jmax
+    Jmin = params%Jmin
+    Jmax = params%Jmax
+    if (present(Jmin_set)) Jmin = Jmin_set
+    if (present(Jmax_set)) Jmax = Jmax_set
 
     if (u_l) call createActiveSortedLists_tree(params, tree_ID)
 
@@ -61,7 +68,7 @@ subroutine updateMetadata_tree(params, tree_ID, update_lists, update_neighbors, 
 
     if (u_f) then
         t_part = MPI_wtime()
-        call updateFamily_tree(params, tree_ID)
+        call updateFamily_tree(params, tree_ID, Jmin_set=Jmin, Jmax_set=Jmax)
         call toc( "updateMetadata_tree (family)", 58, MPI_wtime()-t_part )
     endif
 

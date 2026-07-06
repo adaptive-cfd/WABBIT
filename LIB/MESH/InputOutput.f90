@@ -1,4 +1,4 @@
-subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts)
+subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID, no_sync, save_ghosts, sort_hvy_arrays)
     implicit none
 
     character(len=*), intent(in)        :: fname                    !< file name
@@ -10,6 +10,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     integer(kind=ik), intent(in)        :: tree_ID
     logical, optional, intent(in)       :: no_sync
     logical, optional, intent(in)       :: save_ghosts
+    logical, optional, intent(in)       :: sort_hvy_arrays
 
     integer(kind=ik)                    :: rank, lgt_rank                       ! process rank
     integer(kind=ik)                    :: k, hvy_id, l, lgt_id, status         ! loop variable
@@ -28,7 +29,7 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     character(len=cshort)               :: arg
     type(INIFILE)                       :: FILE
 
-    logical                             :: saveGhosts, saveGhosts_inBlock
+    logical                             :: saveGhosts, saveGhosts_inBlock, no_sync2, sortHvyArrays
 
     ! procs per rank array
     integer, dimension(:), allocatable  :: actual_blocks_per_proc
@@ -36,7 +37,6 @@ subroutine saveHDF5_tree(fname, time, iteration, dF, params, hvy_block, tree_ID,
     ! spacing and origin (new)
     real(kind=rk) :: xx0(1:3) , ddx(1:3), sparsity_Jcurrent, sparsity_Jmax
     integer(kind=ik), allocatable :: procs(:), lgt_ids(:), refinement_status(:), level(:)
-    logical :: no_sync2
     integer(kind=ik) :: Jmin_active, Jmax_active
 
     no_sync2 = .false.
@@ -319,7 +319,7 @@ end subroutine saveHDF5_tree
 ! test is made if that is true: if the grids are different, garbage will be read.
 !
 !-------------------------------------------------------------------------------
-subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity, synchronize_ghosts)
+subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity, synchronize_ghosts, read_refinement_status)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -332,6 +332,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     logical, intent(in), optional  :: verbosity       !< if verbosity==True generates log output
     logical, intent(in), optional  :: synchronize_ghosts
+    logical, intent(in), optional  :: read_refinement_status  !< if true, we read the refinement status as well, defaults to false
     real(kind=rk), intent(out), optional   :: time
     integer(kind=ik), intent(out), optional   :: iteration
 
@@ -345,14 +346,14 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
     integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n, version(1), datarank, Bs_file(1:3)=0
 
-    logical          :: read_treecode_num
+    logical          :: read_treecode_num, readRefStatus
     ! old reading
     integer(hsize_t) :: dims_treecode(2)
     integer(kind=ik), dimension(:,:), allocatable :: block_treecode
     ! new reading
     integer(kind=ik)                               :: tc_max_level, tc_dim
     integer(kind=tsize), dimension(:), allocatable :: block_treecode_num
-    integer(kind=ik), dimension(:), allocatable    :: level
+    integer(kind=ik), dimension(:), allocatable    :: level, refinement_status
 
     integer(kind=tsize) :: treecode
     integer(hid_t)        :: file_id
@@ -360,6 +361,8 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     logical :: verbose = .true.
 
     if (present(verbosity)) verbose=verbosity
+    readRefStatus = .false.
+    if (present(read_refinement_status)) readRefStatus = read_refinement_status
 
     rank         = params%rank
     number_procs = params%number_procs
@@ -521,6 +524,17 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
             call abort(240929, "This file has heights we cannot even imagine! Please increase max_treelevel to work with this file.")
         endif
 
+        ! read ref status if requested (and it exists in file)
+        if (readRefStatus) then
+            if (dset_exists(file_id, "refinement_status")) then
+                allocate( refinement_status(1:my_hvy_n) )
+                refinement_status = -1
+                call read_dset_mpi_hdf5(file_id, "refinement_status", lbounds(2:2), ubounds(2:2), refinement_status)
+            else
+                if (rank == 0) write(*,'(A)') "WARNING: You requested to read the refinement status, but this file does not contain it."
+            endif
+        endif
+
     ! version(1) < 20240410
     else
 
@@ -542,6 +556,10 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
         ! actual reading of treecodes (= the description of the tree)
         call read_dset_mpi_hdf5(file_id, "block_treecode", lbounds, ubounds, block_treecode)
+
+        if (readRefStatus .and. params%rank == 0) then
+            write(*,'(A)') "WARNING: We tried to read the refinement status, but this file format does not contain it."
+        endif
 
     endif
 
@@ -640,8 +658,12 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
             call set_tc(lgt_block( free_lgt_id, IDX_TC_1:IDX_TC_2), treecode)
         endif
 
-        ! set refinement status
-        lgt_block(free_lgt_id, IDX_REFINE_STS) = 0
+        ! set refinement status (use dataset if available)
+        if (readRefStatus .and. allocated(refinement_status)) then
+            lgt_block(free_lgt_id, IDX_REFINE_STS) = refinement_status(k)
+        else
+            lgt_block(free_lgt_id, IDX_REFINE_STS) = 0
+        endif
         ! set number of the tree
         lgt_block(free_lgt_id, IDX_TREE_ID) = tree_id
 
@@ -686,9 +708,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
 
     if (present(synchronize_ghosts)) then
-        if (synchronize_ghosts) then
-            call sync_ghosts_tree(params, hvy_block, tree_ID )
-        endif
+        if (synchronize_ghosts) call sync_ghosts_tree(params, hvy_block, tree_ID )
     else
         call sync_ghosts_tree(params, hvy_block, tree_ID )
     endif
@@ -702,7 +722,11 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
             do k = 1, hvy_n(tree_ID)
                 hvy_ID = hvy_active(k, tree_ID)
                 call hvy2lgt( lgt_ID, hvy_ID, params%rank, params%number_blocks )
-                if (lgt_block( lgt_id, IDX_MESH_LVL ) == i) lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+                if (lgt_block( lgt_id, IDX_MESH_LVL ) == i) then
+                    lgt_block( lgt_id, IDX_REFINE_STS ) = +1
+                else
+                    lgt_block( lgt_id, IDX_REFINE_STS ) = 0
+                endif
             enddo
             ! sync refinement status
             call synchronize_lgt_data( params, refinement_status_only=.true. )
@@ -718,6 +742,11 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         if (params%rank == 0) then
             write(*, '(A,i0,A,i0)') "READING: Refined mesh to comply to Jmin. Nblocks before: ", lgt_n_old, ", Nblocks after: ", lgt_n(tree_id)
         endif
+
+        if (readRefStatus .and. params%rank == 0) then
+            write(*,'(A)') "WARNING: We read the refinement status, but as we had to refine the mesh to comply with Jmin, we had to overwrite it. Oops"
+        endif
+
     endif
 
     ! it is useful to print out the information on active levels in the file

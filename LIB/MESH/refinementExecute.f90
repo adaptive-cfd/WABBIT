@@ -260,7 +260,7 @@ subroutine refinement_execute_tree( params, hvy_block, tree_ID, time )
         if (.not. allocated(blocks_refined_list)) allocate(blocks_refined_list(1:params%number_procs))
 
         ! debug output to see how many blocks have been refined, gather information on rank 0 and print to file
-        call MPI_GATHER(blocks_refined, 1, MPI_INTEGER, blocks_refined_list, 1, MPI_INTEGER, 0, WABBIT_COMM, ierr)
+        call MPI_GATHER(blocks_refined, 1, MPI_INTEGER4, blocks_refined_list, 1, MPI_INTEGER4, 0, WABBIT_COMM, ierr)
         if (params%rank == 0) then
             open(unit=99, file=trim("debug_refinement.csv"), status="unknown", position="append")
             string_prepare = "-1.0E+00,"  ! set negative time, just to have csv with the same length in every row

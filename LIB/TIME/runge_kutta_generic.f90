@@ -55,21 +55,22 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
     ! calculate time step
     call calculate_time_step(params, time, iteration, hvy_block, dt, tree_ID)
 
-    ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
-    ! slot after the copy of the state vector (hence 2)
-    t_call = MPI_wtime()
-    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), hvy_mask, hvy_tmp, tree_ID )
-    call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
-
     ! save data at time t to heavy work array
     ! copy state vector content to work array. NOTE: 09/04/2018: moved this after RHS_wrapper
     ! since we can allow the RHS wrapper to modify the state vector (eg for mean flow fixing)
     ! if the copy part is above, the changes in state vector are ignored
+    ! NOTE: 02/02/2026 by JB: I moved it back before, because we would like to re-use the space in hvy_block for projection methods
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
         ! first slot in hvy_work is previous time step (time level at start of time step)
         hvy_work( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id, 1 ) = hvy_block( g+1:Bs(1)+g, g+1:Bs(2)+g, z1:z2, 1:Neqn_RHS, hvy_id )
     end do
+
+    ! first stage, call to RHS. note the resulting RHS is stored in hvy_work(), first
+    ! slot after the copy of the state vector (hence 2)
+    t_call = MPI_wtime()
+    call RHS_wrapper(time + dt*rk_coeffs(1,1), params, hvy_block, hvy_work(:,:,:,:,:,2), hvy_mask, hvy_tmp, tree_ID, stage=1 )
+    call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
 
 
     ! compute k_1, k_2, .... (coefficients for final stage)
@@ -117,7 +118,7 @@ subroutine RungeKuttaGeneric(time, dt, iteration, params, hvy_block, hvy_work, &
         t = time + dt*rk_coeffs(j,1)
 
         t_call = MPI_wtime()
-        call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp,  tree_ID )
+        call RHS_wrapper(t, params, hvy_block, hvy_work(:,:,:,:,:,j+1), hvy_mask, hvy_tmp,  tree_ID, stage=j )
         call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
         call toc( "timestep (RK stage)", 23, MPI_wtime()-t_stage)
     end do

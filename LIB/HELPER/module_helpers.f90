@@ -6,16 +6,27 @@ module module_helpers
     use mpi
     implicit none
 
-    interface smoothstep
-        module procedure smoothstep1, smoothstep2
+    interface step_cosine
+        module procedure step_cosine2, step_cosine3, step_cosine4
+    end interface
+    interface step_hester
+        module procedure step_hester3, step_hester4
+    end interface
+    interface step_disc
+        module procedure step_disc2, step_disc4
     end interface
 
     interface get_cmd_arg
         module procedure get_cmd_arg_dbl, get_cmd_arg_int, get_cmd_arg_str, get_cmd_arg_bool, get_cmd_arg_str_vct
     end interface
 
-    ! routines of the interface should be private to hide them from outside this module
-    private :: smoothstep1, smoothstep2
+    ! routines of the steps wrapper should be private to hide them from outside this module
+    private :: step_cosine2, step_cosine3, step_cosine4, step_hester3, step_hester4, step_disc2, step_disc4
+
+    !> method numbers for step function, used in the wrapper "step"
+    integer, parameter :: STEP_METHOD_COSINE = 1
+    integer, parameter :: STEP_METHOD_HESTER = 2
+    integer, parameter :: STEP_METHOD_DISC   = 3
 
 contains
 
@@ -23,7 +34,7 @@ contains
 #include "rotation_matrices.f90"
 
 
-! delta function for interpolation
+    ! delta function for interpolation
     ! $$D(\xi) =
     ! \begin{cases}
     ! \dfrac{3}{8} + \dfrac{\pi}{32} - \dfrac{\xi^2}{4}, & |\xi| \leq 0.5, \\[6pt]
@@ -70,46 +81,6 @@ contains
         endif
     end function
 
-
-    ! Based on the (exact) signed distance function of a cylinder segment
-    ! Source: https://iquilezles.org/articles/distfunctions/, https://www.shadertoy.com/view/wdXGDr
-    function signed_distance_cylinder(p, a, b, r) result(d)
-        implicit none
-        real(kind=rk), dimension(3), intent(in) :: p, a, b
-        real(kind=rk), intent(in) :: r
-        real(kind=rk) :: d
-        real(kind=rk), dimension(3) :: ba, pa, tmp
-        real(kind=rk) :: baba, paba, x, y, x2, y2
-
-        ba = b - a
-        pa = p - a
-        baba = dot_product(ba, ba)
-        paba = dot_product(pa, ba)
-        
-        tmp = pa * baba - ba * paba
-        x = norm2(tmp) - r * baba
-        y = abs(paba - baba * 0.5_rk) - baba * 0.5_rk
-
-        x2 = x * x
-        y2 = y * y * baba
-
-        if (max(x, y) < 0.0_rk) then
-            ! d = -sqrt(min(x2, y2))
-            d = -min(x2,y2)
-        else
-            ! d = sqrt((merge(x2, 0.0_rk, x > 0.0_rk) + merge(y2, 0.0_rk, y > 0.0_rk)))
-            d = 0.0_rk
-            if (x > 0.0_rk) then
-                d = d + x2
-            end if
-            if (y > 0.0_rk) then
-                d = d + y2
-            end if
-        end if
-
-        d = sign(1.0_rk, d) * sqrt(abs(d)) / baba
-        ! d = sign(1.0_rk, d) * d / baba
-    end function 
 
     ! https://de.wikipedia.org/wiki/Polynominterpolation#Lagrangesche_Interpolationsformel
     ! Returns the value of $\ell_j(x)$ with nodes $x_i$
@@ -395,9 +366,32 @@ contains
         return
     end function startup_conditioner
 
+    !==========================================================================
+    !> \brief This subroutine acts as a wrapper for the different step functions
+    function step(x,t,h,safety,method)
+        use module_globals
+        implicit none
+        real(kind=rk), intent(in)  :: x,t,h,safety
+        integer, intent(in) :: method
+        real(kind=rk)              :: step
+
+        select case (method)
+            case (STEP_METHOD_COSINE)
+                step = step_cosine4(x,t,h,safety)
+            case (STEP_METHOD_HESTER)
+                step = step_hester4(x,t,h,safety)
+            case (STEP_METHOD_DISC)
+                step = step_disc4(x,t,h,safety)
+            case default
+                write(*,'("ERROR: method ",I0," not implemented for step function")') method
+                call abort(191919, "Invalid method for step function")
+        end select
+
+    end function step
+
     
     !==========================================================================
-    !> \brief This subroutine returns the value f of a smooth step function \n
+    !> \brief This subroutine returns the value f of a smooth step function using a cosine function \n
     !> The sharp step function would be 1 if delta<=0 and 0 if delta>0 \n
     !> h is the semi-size of the smoothing area, so \n
     !> f is 1 if delta<=0-h \n
@@ -406,56 +400,168 @@ contains
     !> \details
     !> \image html maskfunction.bmp "plot of chi(delta)"
     !> \image latex maskfunction.eps "plot of chi(delta)"
-    function smoothstep1(delta,h)
+    function step_cosine2(delta,h)
         use module_globals
         implicit none
         real(kind=rk), intent(in)  :: delta,h
-        real(kind=rk)              :: smoothstep1,f
+        real(kind=rk)              :: step_cosine2,f
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
         if (delta<=-h) then
             f = 1.0_rk
-        elseif ( -h<delta .and. delta<+h  ) then
-            f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
-        else
+        elseif (delta >=+h) then
             f = 0.0_rk
+        else
+            f = 0.5_rk * (1.0_rk + dcos((delta+h) * pi / (2.0_rk*h)) )
         endif
 
-        smoothstep1=f
-    end function smoothstep1
-    !==========================================================================
-
+        step_cosine2=f
+    end function step_cosine2
+    !=======================================================================
 
 
     !-------------------------------------------------------------------------------
-    !> This subroutine returns the value f of a smooth step function \n
+    !> This subroutine returns the value f of a smooth step function using a cosine function \n
     !> The sharp step function would be 1 if x<=t and 0 if x>t \n
     !> h is the semi-size of the smoothing area, so \n
     !> f is 1 if x<=t-h \n
     !> f is 0 if x>t+h \n
     !> f is variable (smooth) in between
     !-------------------------------------------------------------------------------
-    function smoothstep2(x,t,h)
+    function step_cosine3(x,t,h)
         
         use module_globals
 
         implicit none
         real(kind=rk), intent(in)  :: x,t,h
-        real(kind=rk)              :: smoothstep2
-
+        real(kind=rk)              :: step_cosine3
+        real(kind=rk)              :: x_rel
+        x_rel = x - t
         !-------------------------------------------------
         ! cos shaped smoothing (compact in phys.space)
         !-------------------------------------------------
-        if (x<=t-h) then
-            smoothstep2 = 1.0_rk
-        elseif (((t-h)<x).and.(x<(t+h))) then
-            smoothstep2 = 0.5_rk * (1.0_rk + dcos((x-t+h) * pi / (2.0_rk*h)) )
+        if (x_rel<=-h) then
+            step_cosine3 = 1.0_rk
+        elseif (x_rel >=+h) then
+            step_cosine3 = 0.0_rk
         else
-            smoothstep2 = 0.0_rk
+            step_cosine3 = 0.5_rk * (1.0_rk + dcos((x_rel+h) * pi / (2.0_rk*h)) )
         endif
 
-    end function smoothstep2
+    end function step_cosine3
+
+
+    !-------------------------------------------------------------------------------
+    !> This subroutine returns the value f of a smooth step function using a cosine function \n
+    !> The sharp step function would be 1 if x<=t and 0 if x>t \n
+    !> h is the semi-size of the smoothing area, so \n
+    !> f is 1 if x<=t-h \n
+    !> f is 0 if x>t+h \n
+    !> f is variable (smooth) in between
+    !-------------------------------------------------------------------------------
+    function step_cosine4(x,t,h,safety)
+        
+        use module_globals
+
+        implicit none
+        real(kind=rk), intent(in)  :: x,t,h,safety  ! safety ignored for cosine, has to be h but is passed for interfacing
+        real(kind=rk)              :: step_cosine4
+        real(kind=rk)              :: x_rel
+        x_rel = x - t
+        !-------------------------------------------------
+        ! cos shaped smoothing (compact in phys.space)
+        !-------------------------------------------------
+        if (x_rel<=-h) then
+            step_cosine4 = 1.0_rk
+        elseif (x_rel >=+h) then
+            step_cosine4 = 0.0_rk
+        else
+            step_cosine4 = 0.5_rk * (1.0_rk + dcos((x_rel+h) * pi / (2.0_rk*h)) )
+        endif
+
+    end function step_cosine4
+
+
+    !-------------------------------------------------------
+    ! Hester-style smooth step function (tanh-based).
+    ! Matches the form used in draw_channel/draw_lamballais:
+    !   chi = 0.5 * (1 - tanh( 2 * (x - t) / (delta * epsilon) ))
+    !
+    ! Here, epsilon controls the transition thickness.
+    ! In the discontinuous limit (epsilon <= 0), returns a sharp step.
+    !-------------------------------------------------------
+    real(kind=rk) function step_hester3(x, epsilon_hester, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, epsilon_hester, safety
+        real(kind=rk), parameter  :: delta = 2.64822828_rk
+        if (x > safety) then
+            step_hester3 = 0.0_rk
+        elseif (x < -safety) then
+            step_hester3 = 1.0_rk
+        else
+            step_hester3 = 0.5_rk * (1.0_rk - tanh(2.0_rk*x/delta/epsilon_hester))
+        endif
+    end function step_hester3
+
+
+    !-------------------------------------------------------
+    ! Hester-style smooth step function (tanh-based).
+    ! Matches the form used in draw_channel/draw_lamballais:
+    !   chi = 0.5 * (1 - tanh( 2 * (x - t) / (delta * epsilon) ))
+    !
+    ! Here, epsilon controls the transition thickness.
+    ! In the discontinuous limit (epsilon <= 0), returns a sharp step.
+    !-------------------------------------------------------
+    real(kind=rk) function step_hester4(x, t, epsilon_hester, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, t, epsilon_hester, safety
+        real(kind=rk) :: x_rel
+        real(kind=rk), parameter :: delta = 2.64822828_rk
+        x_rel = x - t
+        if (x_rel > safety) then
+            step_hester4 = 0.0_rk
+        elseif (x_rel < -safety) then
+            step_hester4 = 1.0_rk
+        else
+            step_hester4 = 0.5_rk * (1.0_rk - tanh(2.0_rk*x_rel/delta/epsilon_hester))
+        endif
+    end function step_hester4
+
+
+    !-------------------------------------------------------
+    ! Discontinuous step function
+    ! Returns 1 if x <= t, and 0 otherwise.
+    ! The small tolerance is to avoid numerical issues with floating point comparisons. The boundary itself is included in the step, i.e. step_disc(t,t) = 1.
+    !-------------------------------------------------------
+    real(kind=rk) function step_disc2(x, t)
+        implicit none
+        real(kind=rk), intent(in) :: x, t
+
+        if (x <= t + 1e-12) then
+            step_disc2 = 1.0_rk
+        else
+            step_disc2 = 0.0_rk
+        endif
+        return
+    end function step_disc2
+
+    !-------------------------------------------------------
+    ! Discontinuous step function
+    ! Returns 1 if x <= t, and 0 otherwise.
+    ! The small tolerance is to avoid numerical issues with floating point comparisons. The boundary itself is included in the step, i.e. step_disc(t,t) = 1.
+    !-------------------------------------------------------
+    real(kind=rk) function step_disc4(x, t, h, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, t, h, safety  ! smoothing h and safety ignored for disc, but needed for interfacing
+
+        if (x <= t + 1e-12) then
+            step_disc4 = 1.0_rk
+        else
+            step_disc4 = 0.0_rk
+        endif
+        return
+    end function step_disc4
 
 
 
@@ -630,10 +736,11 @@ contains
 
     ! source: http://fortranwiki.org/fortran/show/String_Functions
     ! Modified to correctly work with blanks (ie replace "a " by "b", note the blank after a)
-    FUNCTION str_replace_text (strInput, strFind, strReplace)  RESULT(strOutput)
-        CHARACTER(*) :: strInput, strFind, strReplace
-        CHARACTER(LEN(strInput)) :: strOutput     ! provide strOutput with extra 100 char len
-        INTEGER :: i, nt
+    pure function str_replace_text (strInput, strFind, strReplace)  result(strOutput)
+        implicit none
+        character(len=*), intent(in) :: strInput, strFind, strReplace
+        character(len=LEN(strInput)) :: strOutput     ! provide strOutput with extra 100 char len
+        integer :: i, nt
 
         ! copy
         strOutput = strInput
@@ -646,33 +753,134 @@ contains
             ! concatenate output string
             strOutput = strOutput(:i-1) // strReplace // strOutput(i+nt:)
         END DO
-    END FUNCTION str_replace_text
+    end function str_replace_text
 
+
+    !> We have timestamps for our files that have length 12 for 12.6f.
+    !! This can overflow for the string if using i12.12, so we decompose it into two parts. This is a helper-wrapper function for that
+    function timestr(time) result (timestamp_str)
+        implicit none
+        character(len=cshort) :: timestamp_str
+        real(kind=rk), intent(in) :: time
+
+        write (timestamp_str, '(i6.6, i6.6)') int(time+1.0e-12_rk, kind=ik), nint(max((time-floor(time+1.0e-12_rk))*1.0e6_rk, 0.0_rk), kind=ik)
+    end function timestr
+
+
+    ! !-------------------------------------------------------------------------!
+    ! !> @brief remove (multiple) blancs as separators in a string
+    ! subroutine merge_blanks(string_merge)
+    !     ! this routine removes blanks at the beginning and end of an string
+    !     ! and multiple blanks which are right next to each other
+
+    !     implicit none
+    !     character(len=*), intent(inout) :: string_merge
+    !     integer(kind=ik) :: i, j, len_str, count
+
+    !     len_str = len(string_merge)
+    !     count = 0
+
+    !     string_merge = string_merge
+    !     do i=1,len_str-1
+    !         if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
+    !             count = count + 1
+    !             string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+    !         end if
+    !     end do
+
+    !     string_merge = adjustl(string_merge)
+
+    ! end subroutine merge_blanks
 
     !-------------------------------------------------------------------------!
-    !> @brief remove (multiple) blancs as separators in a string
+    !> @brief remove (multiple) blancs as separators in a string using only a single pass
     subroutine merge_blanks(string_merge)
-        ! this routine removes blanks at the beginning and end of an string
-        ! and multiple blanks which are right next to each other
-
         implicit none
         character(len=*), intent(inout) :: string_merge
-        integer(kind=ik) :: i, j, len_str, count
+        integer(kind=ik) :: i, j, n
+        logical :: prev_space
 
-        len_str = len(string_merge)
-        count = 0
+        n = len(string_merge)
+        j = 0
+        prev_space = .true.   ! treat start as space -> strips leading blanks too
 
-        string_merge = string_merge
-        do i=1,len_str-1
-            if (string_merge(i:i)==" " .and. string_merge(i+1:i+1)==" ") then
-                count = count + 1
-                string_merge(i+1:len_str-1) = string_merge(i+2:len_str)
+        ! we loop through all characters and copy them to the left, but only if they are not a space, or if they are the first space after a non-space character
+        do i = 1, n
+            if (string_merge(i:i) == ' ') then
+                if (.not. prev_space) then
+                    j = j + 1
+                    string_merge(j:j) = ' '
+                    prev_space = .true.
+                end if
+            else
+                j = j + 1
+                string_merge(j:j) = string_merge(i:i)
+                prev_space = .false.
             end if
         end do
 
-        string_merge = adjustl(string_merge)
-
+        ! strip trailing space emitted by the loop
+        if (j > 0) then
+            if (string_merge(j:j) == ' ') j = j - 1
+        end if
+        ! wipe the end, which is now only spaces
+        if (j < n) string_merge(j+1:n) = ' '
     end subroutine merge_blanks
+
+    !> Changes a string to lower case
+    pure function to_lower (str) Result (string)
+        implicit None
+        character(*), Intent(In) :: str
+        character(len(str))      :: string
+        integer :: ic, i
+        character(26), Parameter :: cap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(26), Parameter :: low = 'abcdefghijklmnopqrstuvwxyz'
+
+        ! Make each letter smol if it is uppercase
+        string = str
+        do i = 1, LEN_TRIM(str)
+            ic = INDEX(cap, str(i:i))
+            if (ic > 0) string(i:i) = low(ic:ic)
+        end do
+    end function to_lower
+
+    !> Changes a string to upper case
+    pure function to_upper (str) Result (string)
+        implicit None
+        character(*), Intent(In) :: str
+        character(len(str))      :: string
+        integer :: ic, i
+        character(26), Parameter :: cap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(26), Parameter :: low = 'abcdefghijklmnopqrstuvwxyz'
+
+        ! Capitalize each letter if it is lowecase
+        string = str
+        do i = 1, LEN_TRIM(str)
+            ic = INDEX(low, str(i:i))
+            if (ic > 0) string(i:i) = cap(ic:ic)
+        end do
+
+    End Function to_upper
+
+    !-------------------------------------------------------------------------!
+    !> @brief compare if strings are similar, so allow for upper-lower case and "-" or "_" to be the same
+    logical function strings_are_similar(str1, str2)
+        implicit none
+        character(len=*), intent(in) :: str1, str2
+
+        strings_are_similar = (standardize_string(str1) == standardize_string(str2))
+
+    end function strings_are_similar
+
+    !-------------------------------------------------------------------------!
+    !> @brief standardize string by setting it to all lower-case and changing "_" to "-"
+    pure function standardize_string(str_in) result(str_out)
+        implicit none
+        character(len=*), intent(in) :: str_in
+        character(len=len(str_in)) :: str_out
+
+        str_out = adjustl(str_replace_text(to_lower(str_in),"_","-"))
+    end function standardize_string
 
     !-------------------------------------------------------------------------!
     !> @brief count number of vector elements in a string
@@ -1143,7 +1351,7 @@ contains
         integer(kind=ik), optional, intent(in) :: digits       ! how many digits should be printed?
         logical, optional, intent(in) :: append                ! if true, data is appended to file
 
-        integer :: ii, apply_digits
+        integer :: iy, iz, apply_digits
         logical :: toInt, apply_append
         character(len=120) :: formatter
 
@@ -1166,15 +1374,33 @@ contains
             open(unit=32, file=file, status='unknown', position='append')
             write(32, '(A)') ""  ! empty line
         endif
-        do ii = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
-            if (toInt) then
-                write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
-                write(32, formatter) nint(u(:, ii, 1, 1))
-            else
-                write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
-                write(32, formatter) u(:, ii, 1, 1)
-            endif
-        enddo
+        if (size(u, 3) == 1) then
+            do iy = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+                if (toInt) then
+                    write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                    write(32, formatter) nint(u(:, iy, 1, 1))
+                else
+                    write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                    write(32, formatter) u(:, iy, 1, 1)
+                endif
+            enddo
+        else
+            ! write 3D block by writing all slices one after another
+            do iz = 1, size(u, 3)
+                write(32, '(A, I0)') "iz = ", iz  ! indicate which slice is printed
+                write(32, '(A)') ""  ! empty line between slices
+                do iy = size(u, 2), 1, -1  ! print bottom to top to have y-direction that is intuitive
+                    if (toInt) then
+                        write(formatter, '("(", i0, "(i", i0, ","",""))")') size(u, 1), apply_digits
+                        write(32, formatter) nint(u(:, iy, iz, 1))
+                    else
+                        write(formatter, '("(", i0, "(es", i0, ".", i0, ","",""))")') size(u, 1), apply_digits+7, apply_digits
+                        write(32, formatter) u(:, iy, iz, 1)
+                    endif
+                enddo
+                write(32, '(A)') ""  ! empty line between slices
+            enddo
+        endif
         close(32)
     end subroutine
 

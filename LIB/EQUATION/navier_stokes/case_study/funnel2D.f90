@@ -328,17 +328,17 @@ function draw_walls(x,r,funnel,h)
   ! wall in south and north (i.e. in radial direction)
   if (abs(x-funnel%pump_x_center)> funnel%pump_diameter*0.5_rk) then
     ! mask for r>R_domain-wall_thickness   (outer wall)
-         !mask=mask+smoothstep(R_domain-funnel%wall_thickness-r,h)
+         !mask=mask+step_cosine(R_domain-funnel%wall_thickness-r,h)
          mask=mask+hardstep(R_domain-funnel%wall_thickness-r)
   else
         ! +h because the sponge domain should not overlap with the walls
         mask=mask+hardstep(R_domain-0.333_rk*funnel%wall_thickness+h-r)
 
-         !mask=mask+smoothstep(R_domain-0.333_rk*funnel%wall_thickness+h-r,h)
+         !mask=mask+step_cosine(R_domain-0.333_rk*funnel%wall_thickness+h-r,h)
   endif
 
   ! wall in east
-  !mask=mask+smoothstep(x-funnel%wall_thickness,h)
+  !mask=mask+step_cosine(x-funnel%wall_thickness,h)
   if ( r > funnel%jet_radius) then
       mask=mask+hardstep(x-funnel%wall_thickness)
   else
@@ -348,18 +348,18 @@ function draw_walls(x,r,funnel,h)
   if (  r > funnel%jet_radius  ) then
       mask=mask+hardstep(x-funnel%plate(1)%x0(1))*hardstep(r-funnel%r_out_cappilary)
 
-         !mask=mask+smoothstep(x-funnel%plate(1)%x0(1),h)*smoothstep(r-funnel%r_out_cappilary,h)
+         !mask=mask+step_cosine(x-funnel%plate(1)%x0(1),h)*step_cosine(r-funnel%r_out_cappilary,h)
   endif
 
 
   ! wall in WEST
   if ( r > funnel%min_inner_diameter*0.5_rk) then
-        !  mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+        !  mask=mask+step_cosine(domain_size(1)-x-funnel%wall_thickness,h)
 
          mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness)
   else
         mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk)
-        ! mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
+        ! mask=mask+step_cosine(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
   endif
 
    ! is needed because mask of walls overlap
@@ -417,9 +417,9 @@ function draw_jet(x,r,funnel,h)
 
   !if (r< funnel%jet_radius) then
     ! wall in EAST
-    draw_jet=soft_bump2(x,funnel%wall_thickness*0.5_rk+h,length_of_jet,h)*smoothstep(r-funnel%jet_radius+h,h)
+    draw_jet=soft_bump2(x,funnel%wall_thickness*0.5_rk+h,length_of_jet,h)*step_cosine(r-funnel%jet_radius+h,h)
 
-    !draw_jet=smoothstep(x-funnel%wall_thickness,h)-smoothstep(x-funnel%wall_thickness/2.0_rk,h)
+    !draw_jet=step_cosine(x-funnel%wall_thickness,h)-step_cosine(x-funnel%wall_thickness/2.0_rk,h)
   !else
   !endif
 
@@ -434,9 +434,9 @@ function draw_outlet(x,r,funnel,h)
   real(kind=rk)                         ::draw_outlet
 
          ! wall in WEST
-    !draw_outlet=smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+    !draw_outlet=step_cosine(domain_size(1)-x-funnel%wall_thickness,h)
 draw_outlet=soft_bump2(x,domain_size(1)-funnel%wall_thickness,funnel%wall_thickness*0.5_rk,h)&
-            *smoothstep(r-(funnel%min_inner_diameter*0.5_rk-h),h)
+            *step_cosine(r-(funnel%min_inner_diameter*0.5_rk-h),h)
 
 end function draw_outlet
 
@@ -449,7 +449,7 @@ function draw_sink(x,r,funnel,h)
   real(kind=rk)                         ::draw_sink,radius
 
   radius     = sqrt((x-domain_size(1)+funnel%wall_thickness*0.6_rk)**2+r**2)
-  draw_sink  = smoothstep(r-funnel%min_inner_diameter*0.4_rk,h)
+  draw_sink  = step_cosine(r-funnel%min_inner_diameter*0.4_rk,h)
 
 
 end function draw_sink

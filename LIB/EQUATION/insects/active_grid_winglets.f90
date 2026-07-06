@@ -1,12 +1,12 @@
-subroutine draw_active_grid_winglets(time, Insect, xx0, ddx, mask, mask_color, us)
+subroutine draw_active_grid_winglets(time, Insect_id, xx0, ddx, mask, mask_color, us)
     implicit none
 
     real(kind=rk), intent(in) :: time
-    type(diptera), intent(inout) :: Insect
+    integer(kind=ik), intent(in) :: Insect_id
     real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
     real(kind=rk),intent(inout)  :: mask(0:,0:,0:)
     real(kind=rk),intent(inout)  :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+    real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
 
     real(kind=rk), parameter :: smoothing = 3._rk ! 1.5_rk
     real(kind=rk), parameter :: offset = 4.0_rk / 20.0_rk
@@ -16,8 +16,13 @@ subroutine draw_active_grid_winglets(time, Insect, xx0, ddx, mask, mask_color, u
     integer(kind=2) :: color_val
     integer :: i
 
-    Insect%smooth = Insect%C_smooth*maxval(ddx)
-    Insect%safety = 3.5_rk*Insect%smooth
+    Insects(Insect_id)%smooth = Insects(Insect_id)%C_smooth*maxval(ddx)
+    if (Insects(Insect_id)%smoothing_type == "hester") then
+        Insects(Insect_id)%smooth = Insects(Insect_id)%epsilon_hester
+        Insects(Insect_id)%safety = max(5.0_rk*Insects(Insect_id)%epsilon_hester, 2*maxval(ddx))
+    else
+        Insects(Insect_id)%safety = 3.5_rk*Insects(Insect_id)%smooth
+    end if
 
     ! color_val = 1
     ! call draw_single_winglet( time, (/x0, 1.5_rk, 0.0_rk/), omega(1), alpha0(1), 'z', color_val,&
@@ -62,7 +67,7 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
     real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
     real(kind=rk),intent(inout)  :: mask(0:,0:,0:)
     real(kind=rk),intent(inout)  :: us(0:,0:,0:,1:)
-    integer(kind=2),intent(inout) :: mask_color(0:,0:,0:)
+    real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
 
     real(kind=rk) :: x_glob(1:3), x_wing(1:3), H, h1, h2, h3, M=1.0_rk, tmp, tmp2, MM(1:3,1:3), M2(1:3,1:3)
     real(kind=rk) :: alpha, sigma
@@ -92,8 +97,8 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
                     ! offset
                     H = abs(H) - (M-M*scaling_winglet)/2.0
 
-                    tmp = max( steps( abs(x_wing(2)), H, sm) * steps( abs(x_wing(1)), t_winglet, sm ), & ! winglet
-                               steps( sqrt(x_wing(2)**2+x_wing(1)**2), r_axis, sm ) ) ! rod
+                    tmp = max( step_cosine( abs(x_wing(2)), H, sm) * step_cosine( abs(x_wing(1)), t_winglet, sm ), & ! winglet
+                               step_cosine( sqrt(x_wing(2)**2+x_wing(1)**2), r_axis, sm ) ) ! rod
 
                     if (tmp > mask(ix,iy,iz) .and. (tmp>1.0e-10)) then
                         mask(ix,iy,iz) = tmp
@@ -122,8 +127,8 @@ subroutine draw_single_winglet(time, x0, omega, alpha0, orientation, color_val, 
                     ! offset
                     H = abs(H) - (M-M*scaling_winglet)/2.0
 
-                    tmp = max( steps( abs(x_wing(3)), H, sm) * steps( abs(x_wing(1)), t_winglet, sm), & ! winglet
-                               steps( sqrt(x_wing(3)**2+x_wing(1)**2), r_axis, sm) ) ! rod
+                    tmp = max( step_cosine( abs(x_wing(3)), H, sm) * step_cosine( abs(x_wing(1)), t_winglet, sm), & ! winglet
+                               step_cosine( sqrt(x_wing(3)**2+x_wing(1)**2), r_axis, sm) ) ! rod
 
                     if (tmp >= mask(ix,iy,iz) .and. (tmp>1.0e-10)) then
                         mask(ix,iy,iz) = tmp

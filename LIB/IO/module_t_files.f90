@@ -15,9 +15,10 @@ module module_t_files
 
     ! precision statement
     integer(kind=ik), save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
-    integer(kind=ik), parameter :: max_parallel_files = 150
-    integer(kind=ik), parameter :: max_columns = 160
+    integer(kind=ik), parameter :: max_parallel_files = 80
+    integer(kind=ik), parameter :: max_columns = 80
     integer(kind=ik), save :: mpirank = 7
+    character(len=1), parameter :: tfile_separator = ";"
 
     ! variables
     real(kind=rk), save, allocatable :: data_buffer(:,:,:)
@@ -50,7 +51,7 @@ contains
         character(len=*), dimension(:), optional, intent(in) :: header  !< Optional array of headers to be written in first line
         logical, intent(in) :: overwrite  !< If file should be cleared if it already exists
 
-        integer :: fileID, mpicode
+        integer :: fileID, mpicode, i_column
         logical :: exists
         character(len=cshort) :: format
 
@@ -62,6 +63,7 @@ contains
         if (mpirank/=0) return
 
         if (.not. allocated(data_buffer) ) then
+            ! size of this array is not large, but not tiny either
             allocate(data_buffer(1:flush_frequency, 1:max_columns, 1:max_parallel_files))
             allocate(iteration(1:max_parallel_files))
             allocate(n_columns(1:max_parallel_files))
@@ -98,9 +100,13 @@ contains
             open (55, file=fname, status='replace')
             if (present(header)) then
                 ! make format string
-                write(format, '(A,i3.3,A)') "('%',", size(header,1) ,"(A15,1x))"
+                write(format, '(A,i3.3,A,A,A)') "('%',", size(header,1)-1, "(A,'", tfile_separator, "'),A)"  ! note: last column is written without comma at the end
                 ! write header
-                write(55, format) header
+                write(55, '(A,A)', advance='no') '% ', trim(adjustl(header(1)))
+                do i_column = 2, size(header,1)
+                    write(55, '(A,A)', advance='no') tfile_separator, trim(adjustl(header(i_column)))
+                end do
+                write(55,*) ""  ! new line after header
             endif
             close(55)
         endif
@@ -187,7 +193,7 @@ contains
 
         do i = 1, iteration(fileID)-1
             ! make format string
-            write(format, '(A,i3.3,A)') "(", n_columns(fileID), "(es15.8,1x))"
+            write(format, '(A,i3.3,A,A,A)') "(", n_columns(fileID)-1, '(es15.8,"', tfile_separator, '"),es15.8)'  ! note: last column is written without comma at the end
             ! write data
             write(14,format) data_buffer( i, 1:n_columns(fileID), fileID  )
         enddo

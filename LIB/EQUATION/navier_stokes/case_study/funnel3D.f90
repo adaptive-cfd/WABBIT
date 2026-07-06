@@ -365,7 +365,7 @@ end subroutine compute_penal3D
 
 
     ! wall in east
-    !mask=mask+smoothstep(x-funnel%wall_thickness,h)
+    !mask=mask+step_cosine(x-funnel%wall_thickness,h)
     if ( r > funnel%jet_radius) then
         mask=mask+hardstep(x-funnel%wall_thickness)
     else
@@ -375,18 +375,18 @@ end subroutine compute_penal3D
     if (  r > funnel%jet_radius  ) then
         mask=mask+hardstep(x-funnel%plate(1)%x0(1))*hardstep(r-funnel%r_out_cappilary)
 
-           !mask=mask+smoothstep(x-funnel%plate(1)%x0(1),h)*smoothstep(r-funnel%r_out_cappilary,h)
+           !mask=mask+step_cosine(x-funnel%plate(1)%x0(1),h)*step_cosine(r-funnel%r_out_cappilary,h)
     endif
 
 
     ! wall in WEST
     if ( r > funnel%min_inner_diameter*0.5_rk) then
-          !  mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness,h)
+          !  mask=mask+step_cosine(domain_size(1)-x-funnel%wall_thickness,h)
 
            mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness)
     else
           mask=mask+hardstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk)
-          ! mask=mask+smoothstep(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
+          ! mask=mask+step_cosine(domain_size(1)-x-funnel%wall_thickness*0.5_rk,h)
     endif
 
      ! is needed because mask off walls overlap
@@ -415,8 +415,8 @@ end subroutine compute_penal3D
     r2_rel=(x-funnel%pump_x_center)**2+(z-R_domain)**2 ! squaring is cheaper then taking the root
     R2_pump=(funnel%pump_diameter*0.5_rk)**2 !squared pump diameter
 
-    mask = smoothstep(r0-r,h)*smoothstep(r2_rel-(R2_pump-h),h) &
-         * smoothstep(abs(y-R_domain)-(R_domain-0.666_rk*funnel%wall_thickness),h)
+    mask = step_cosine(r0-r,h)*step_cosine(r2_rel-(R2_pump-h),h) &
+         * step_cosine(abs(y-R_domain)-(R_domain-0.666_rk*funnel%wall_thickness),h)
 
 
     draw_pumps_volume_flow3D=mask
@@ -439,6 +439,6 @@ end subroutine compute_penal3D
     r2_rel=(x-funnel%pump_x_center)**2+(z-R_domain)**2 ! squaring is cheaper then taking the root
     R2_pump=(funnel%pump_diameter*0.5_rk)**2 !squared pump diameter
 
-    draw_pumps_sink3D = smoothstep(r2_rel-(R2_pump-h),h) * soft_bump2(abs(y-R_domain),r0,depth,h)
+    draw_pumps_sink3D = step_cosine(r2_rel-(R2_pump-h),h) * soft_bump2(abs(y-R_domain),r0,depth,h)
   end function draw_pumps_sink3D
   !==========================================================================

@@ -20,8 +20,9 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     ! in fortran, we work with indices:
     integer                             :: y0=3, y1=4, y2=5, F1=6, tmp(1:3)
     integer, parameter                  :: y00=1, F0=2
-    integer(kind=ik)                    :: i, k, s, hvy_id, grhs, Neqn_RHS
+    integer(kind=ik)                    :: i, k, s, hvy_id, grhs, Neqn_RHS, i_insect
     real(kind=rk)                       :: tau, t_call, t_stage
+    real(kind=rk), allocatable, save    :: state_vector_write(:)
     logical, save                       :: setup_complete = .false.
     logical, save                       :: informed = .false.
 
@@ -52,13 +53,17 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         call abort(06091916, "not enough registers for runge-kutta-chebychev method")
     endif
 
+    ! ToDo: Make this possible for NSPP as well, we should move the forces and stuff to the insects for that
     if (.not. params%physics_type=="ACM-new") then
-        call abort(1202211,"this special FSI time stepper works only with the ACM")
+        call abort(1202211,"this special FSI time stepper works only with the ACM for now")
     endif
+    if (.not. allocated(state_vector_write)) allocate(state_vector_write(1:23 * n_insects + 1))
 
-    if (.not. allocated(Insect%rhs)) then
-        allocate(Insect%rhs(1:20, 1:size(hvy_work,6)))
-    endif
+    do i_insect = 1, n_insects
+        if (.not. allocated(Insects(i_insect)%rhs)) then
+            allocate(Insects(i_insect)%rhs(1:20, 1:size(hvy_work,6)))
+        endif
+    enddo
 
     if (s<4) then
         call abort(1715929,"runge-kutta-chebychev: s cannot be less than 4")
@@ -79,8 +84,10 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         ! we need two copies (one is an iteration variable, the other (above) is kept constant)
         hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0  ) = hvy_block(:,:,:,1:Neqn_RHS,hvy_id)
     enddo
-    Insect%rhs(:,y00) = Insect%STATE
-    Insect%rhs(:,y0 ) = Insect%STATE
+    do i_insect = 1, n_insects
+        Insects(i_insect)%rhs(:,y00) = Insects(i_insect)%STATE
+        Insects(i_insect)%rhs(:,y0 ) = Insects(i_insect)%STATE
+    enddo
 
     ! F0 (RHS at initial time, old time level)
     ! note: call sync_ghosts on input data before
@@ -90,8 +97,10 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
 
     ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
     t_call = MPI_wtime()
-    call rigid_solid_rhs( time, iteration, Insect%STATE, Insect%rhs(:,F0), &
-    params_acm%force_insect_g, params_acm%moment_insect_g, Insect )
+    do i_insect = 1, n_insects
+        call rigid_solid_rhs( time, iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,F0), &
+        params_acm%force_insect_g(:,i_insect), params_acm%moment_insect_g(:,i_insect), Insects(i_insect) )
+    enddo
     call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
 
     ! euler step
@@ -102,7 +111,9 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y1 ) = hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y0) &
         + mu_tilde(s,1) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F0)
     enddo
-    Insect%rhs(:,y1) = Insect%rhs(:,y0) + mu_tilde(s,1) * dt * Insect%rhs(:,F0)
+    do i_insect = 1, n_insects
+        Insects(i_insect)%rhs(:,y1) = Insects(i_insect)%rhs(:,y0) + mu_tilde(s,1) * dt * Insects(i_insect)%rhs(:,F0)
+    enddo
     call toc( "timestep (Euler step)", 22, MPI_wtime()-t_call)
 
     ! runge-kutta-chebychev stages
@@ -122,8 +133,10 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         call toc( "timestep (RHS wrapper)", 21, MPI_wtime()-t_call)
         ! the rhs wrapper has computed params_acm%force_insect_g and moment_insect_g
         t_call = MPI_wtime()
-        call rigid_solid_rhs(tau, iteration, Insect%rhs(:,y1), Insect%rhs(:,F1), &
-        params_acm%force_insect_g, params_acm%moment_insect_g, Insect)
+        do i_insect = 1, n_insects
+            call rigid_solid_rhs(tau, iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,F1), &
+            params_acm%force_insect_g(:,i_insect), params_acm%moment_insect_g(:,i_insect), Insects(i_insect))
+        enddo
         call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
 
         ! main formula
@@ -138,11 +151,13 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
             + gamma_tilde(s,i) * dt * hvy_work(:,:,:,1:Neqn_RHS,hvy_id, F0 )
         enddo
 
-        Insect%rhs(:,y2) = (1.0_rk-mu(s,i)-nu(s,i))*Insect%rhs(:,y00) &
-        + mu(s,i) * Insect%rhs(:,y1) &
-        + nu(s,i) * Insect%rhs(:,y0) &
-        + mu_tilde(s,i) * dt * Insect%rhs(:,F1) &
-        + gamma_tilde(s,i) * dt * Insect%rhs(:,F0)
+        do i_insect = 1, n_insects
+            Insects(i_insect)%rhs(:,y2) = (1.0_rk-mu(s,i)-nu(s,i))*Insects(i_insect)%rhs(:,y00) &
+            + mu(s,i) * Insects(i_insect)%rhs(:,y1) &
+            + nu(s,i) * Insects(i_insect)%rhs(:,y0) &
+            + mu_tilde(s,i) * dt * Insects(i_insect)%rhs(:,F1) &
+            + gamma_tilde(s,i) * dt * Insects(i_insect)%rhs(:,F0)
+        enddo
 
         ! iteration. note in last stage, do not iterate (we return y0 otherwise)
         if ( i < s) then
@@ -162,10 +177,21 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         hvy_block(:,:,:,1:Neqn_RHS,hvy_id ) = hvy_work(:,:,:,1:Neqn_RHS,hvy_id, y2 )
     enddo
 
-    Insect%STATE = Insect%rhs(:,y2)
+    do i_insect = 1, n_insects
+        Insects(i_insect)%STATE = Insects(i_insect)%rhs(:,y2)
+    enddo
 
-    call append_t_file( 'insect_state_vector.t', (/time+dt, Insect%STATE, params_acm%force_insect_g/) )
+    ! We write the insect state vector
+    ! in order to avoid writing many files, everything is set into one, we only have to write the exact data
+    state_vector_write = 0.0_rk
+    state_vector_write(1) = time + dt
+    do i_insect = 1, n_insects
+        state_vector_write( (i_insect-1)*23 + 2 : i_insect*23 + 1) = (/ Insects(i_insect)%STATE, params_acm%force_insect_g(:,i_insect) /)
+    enddo
+    call append_t_file( 'insect_state_vector.t', state_vector_write )
 
-    Insect%time = Insect%time+dt
+    do i_insect = 1, n_insects
+        Insects(i_insect)%time = Insects(i_insect)%time + dt
+    enddo
 
 end subroutine RungeKuttaChebychev_FSI

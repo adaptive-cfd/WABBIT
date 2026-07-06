@@ -1,6 +1,4 @@
 subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
-    ! to test update insect here (HACK)
-    use module_ACM
     use module_timing
     implicit none
 
@@ -18,6 +16,8 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     t_cycle = MPI_wtime()
     Bs      = params%Bs
     g       = params%g
+    x0       = 0.0_rk
+    dx       = 0.0_rk
     Jactive = maxActiveLevel_tree(tree_ID_flow)
     Jmax    = params%Jmax
     tree_n  = params%forest_size ! used only for resetting at this point
@@ -26,16 +26,10 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     if (.not. params%penalization) return
 
     ! HACK
-    if (params%physics_type /= "ACM-new") return
+    if (params%physics_type /= "ACM-new" .and. params%physics_type /= "NSPP") return
 
-    ! HACK:
-    ! some mask functions have initialization routines (insects) which are to be called once and not for each
-    ! block (efficiency). Usually, this would be a staging concept as well, but as only Thomas uses it anyways, cleanup
-    ! is left as FIXME
-    ! You look outside the window and see Julius shaking his head in disapproval ...
-    if (params_acm%geometry=="Insect") then
-        call Update_Insect_wrapper(time)
-    endif
+    ! some mask need an init stage, this is only called once for each processor to initialze some things (like updating insects or preparing geometries)
+    call CREATE_MASK_meta( params%physics_type, time, x0, dx, Bs, g, hvy_mask(:,:,:,:,1), "init_stage" )
 
     if (params%forest_size < 3) call abort(190719,"Forest size is too small (increase to at least 3 in parameter file)")
 

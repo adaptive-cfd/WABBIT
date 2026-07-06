@@ -127,6 +127,16 @@ subroutine proto_GS_multigrid(params)
     call setup_wavelet(params, params%g)
     call setup_laplacian_stencils(params, params%g)
 
+    if (params%rank==0) write(*,'("INIT: checking if g and predictor for Poisson equation work together")')
+    read(params%poisson_order_predictor(17:17), *) i_cycle
+    if (i_cycle == 1) read(params%poisson_order_predictor(17:18), *) i_cycle
+    if (params%g < i_cycle/2) then
+        if (params%rank==0) then
+        write(*, "(A, i0, A, i0)") "WARNING: 'number_ghost_nodes' was set smaller as required for Poisson predictor, adapting it from ", params%g, " to ", i_cycle/2
+        endif
+        params%g = i_cycle/2
+    end if
+
     t_block = MPI_Wtime()
     call fft_initialize(params)
     call toc( "fft initialize", 10101, MPI_Wtime()-t_block )
@@ -186,6 +196,8 @@ subroutine proto_GS_multigrid(params)
     !    in order to avoid leaf-wise refinement status hacking for now
     ! ------------------------------------------------------------
 
+    call init_t_file('poisson_solver.t', .true., (/ "           time", "        i_cycle", "  residual_Linf", "   residual_rel" /))
+    
     call init_t_file('multigrid-cycle.t', .true., (/'    residual L2', '    residual L1', 'residual Linfty', '           time'/))
     call init_t_file('multigrid-iteration.t', .true., (/'direction', 'iteration', '     time'/))
     if (exist_u) then
@@ -257,11 +269,11 @@ subroutine proto_GS_multigrid(params)
             enddo
             ! compute norms
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L2", norm, threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L2: ", norm(1), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral L2: ", norm(1), " ---"
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L1", norm(nc+1:2*nc), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral L1: ", norm(nc+1), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral L1: ", norm(nc+1), " ---"
             call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "Linfty", norm(2*nc+1:3*nc), threshold_state_vector=.false.)
-            if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral Linfty: ", norm(2*nc+1), " ---"
+            if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral Linfty: ", norm(2*nc+1), " ---"
 
             if (exist_uFD) then
                 ! compute difference to FD accuracy
@@ -272,11 +284,11 @@ subroutine proto_GS_multigrid(params)
                 enddo
                 ! compute norms
                 call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L2", norm(3*nc+1:4*nc), threshold_state_vector=.false.)
-                if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral FD L2: ", norm(3*nc+1), " ---"
+                if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral FD L2: ", norm(3*nc+1), " ---"
                 call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "L1", norm(4*nc+1:5*nc), threshold_state_vector=.false.)
-                if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral FD L1: ", norm(4*nc+1), " ---"
+                if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral FD L1: ", norm(4*nc+1), " ---"
                 call componentWiseNorm_tree(params, hvy_work(:,:,:,1:nc,:,1), tree_ID, "Linfty", norm(5*nc+1:6*nc), threshold_state_vector=.false.)
-                if (params%rank == 0) write(*, '(A, es10.4, A)') "--- Diff spectral FD Linfty: ", norm(5*nc+1), " ---"
+                if (params%rank == 0) write(*, '(A, es10.3, A)') "--- Diff spectral FD Linfty: ", norm(5*nc+1), " ---"
 
                 call append_t_file('multigrid-compare.t', (/dble(i_cycle), norm(1), norm(2), norm(3), norm(4), norm(5), norm(6)/))
             else

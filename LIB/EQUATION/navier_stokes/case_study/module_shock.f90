@@ -512,7 +512,7 @@ end subroutine shock_tube_penalization2D
                   !default is 0
                   phi(ix,iy,iz,nF)=0.0_rk
                   ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
-                  b      = smoothstep(x0_shock -X(alpha),h)
+                  b      = step_cosine(x0_shock -X(alpha),h)
                   phi(ix,iy,iz,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
               end do !ix
           end do !iy
@@ -530,7 +530,7 @@ end subroutine shock_tube_penalization2D
                   !default is 0
                   phi(ix,iy,1,nF)=0.0_rk
                   ! at this stage we decide which coordinate x_alpha (alpha=1,2,3) the shock front travels along
-                  b      = smoothstep(x0_shock -X(alpha),h)
+                  b      = step_cosine(x0_shock -X(alpha),h)
                   phi(ix,iy,1,nF) = phi_left(nF)-b*(phi_left(nF)-phi_right(nF))
               end do !ix
           end do !iy

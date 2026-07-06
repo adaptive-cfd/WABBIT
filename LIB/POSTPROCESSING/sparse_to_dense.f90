@@ -25,7 +25,8 @@ subroutine sparse_to_dense(params)
     character(len=cshort)                   :: operator
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik)                        :: number_dense_blocks, Nb_file
+    integer(kind=ik)                        :: number_dense_blocks, Nb_file, max_active_level
+    integer(kind=ik)                        :: number_blocks_old_est, number_blocks_safe_est
     logical                                 :: error_OOM
 
     ! this routine works only on one tree
@@ -94,8 +95,8 @@ subroutine sparse_to_dense(params)
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
     call setup_wavelet(params, params%g, params%g_rhs)
 
-    params%useCoarseExtension = params%isLiftedWavelet
-    params%useSecurityZone = params%isLiftedWavelet
+    call get_cmd_arg( "--useCoarseExtension", params%useCoarseExtension, default=params%isLiftedWavelet )
+    params%useSecurityZone = params%useCoarseExtension
 
     ! in postprocessing, it is important to be sure that the parameter struct is correctly filled:
     ! most variables are unfortunately not automatically set to reasonable values. In simulations,
@@ -149,7 +150,10 @@ subroutine sparse_to_dense(params)
     params%domain_size(3) = domain(3)
 
     if (operator=="--sparse-to-dense") then
-        params%number_blocks = ceiling( 4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs) )
+        number_blocks_old_est = ceiling(4.0*dble(max(lgt_n(tree_ID), number_dense_blocks)) / dble(params%number_procs))
+        number_blocks_safe_est = ceiling(max(lgt_n(tree_ID), number_dense_blocks) / dble(params%number_procs) * &
+            2.0_rk**params%dim / (2.0_rk**params%dim - 1.0_rk)) + 7_ik
+        params%number_blocks = max(number_blocks_old_est, number_blocks_safe_est)
     elseif ((operator=="--refine-everywhere").or.(operator=="--refine-everywhere-forced")) then
         params%number_blocks = (2**params%dim)*lgt_n(tree_ID) / params%number_procs + 7_ik
     elseif (operator=="--coarsen-everywhere") then
@@ -188,6 +192,12 @@ subroutine sparse_to_dense(params)
     call sync_ghosts_tree( params, hvy_block, tree_ID )
 
     if (operator=="--sparse-to-dense") then
+        max_active_level = maxActiveLevel_tree(tree_ID)
+
+        if (level < max_active_level) then
+            call coarsenToLevel_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
+        endif
+
         call refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level=level)
 
     elseif ((operator=="--refine-everywhere").or.(operator=="--refine-everywhere-forced")) then

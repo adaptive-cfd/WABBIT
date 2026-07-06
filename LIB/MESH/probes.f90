@@ -305,7 +305,7 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             have_unit = .true.
         endif
 
-        write(write_format, '(A,I0,A)') '(ES15.8, ', params%n_probes * params%N_probe_variables + sum(params%probe_line_npoints(1:params%n_probe_lines)) * params%N_probe_variables, '(",", ES15.8))'
+        write(write_format, '(A,I0,A)') '(ES15.8, ', params%n_probes * params%N_probe_variables + sum(params%probe_line_npoints(1:params%n_probe_lines)) * params%N_probe_variables, '(";", ES15.8))'
         write(iu_local, write_format) time, vals(1:params%n_probes * params%N_probe_variables + sum(params%probe_line_npoints(1:params%n_probe_lines)) * params%N_probe_variables)
 
         write_counter = write_counter + 1

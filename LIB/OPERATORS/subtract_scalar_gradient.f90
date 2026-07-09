@@ -64,4 +64,7 @@ subroutine subtract_scalar_gradient(u, dx, Bs, g, discretization, p)
         end do
     end if
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_r)) deallocate(FD1_r)
+
 end subroutine subtract_scalar_gradient

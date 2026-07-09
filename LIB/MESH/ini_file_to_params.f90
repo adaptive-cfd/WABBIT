@@ -314,6 +314,8 @@ subroutine ini_file_to_params( params, filename )
          params%g = FD_max_size/2
       end if
    endif
+
+   if (allocated(filter_dummy)) deallocate(filter_dummy)
  
 end subroutine ini_file_to_params
 

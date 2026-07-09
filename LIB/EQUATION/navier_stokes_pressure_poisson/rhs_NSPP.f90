@@ -622,8 +622,10 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
         endif
     endif
     
-    ! Clean up allocated stencil arrays
-    deallocate(FD1_l, FD1_r, FD2)
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD1_r)) deallocate(FD1_r)
+    if (allocated(FD2)) deallocate(FD2)
 
 end subroutine RHS_NSPP_Velocity
 
@@ -896,6 +898,10 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
         endif
     end do ! loop over scalars
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD2)) deallocate(FD2)
+
 end subroutine RHS_3D_scalar
 
 
@@ -1117,5 +1123,9 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
         endif
     end do ! loop over scalars
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD2)) deallocate(FD2)
 
 end subroutine RHS_2D_scalar

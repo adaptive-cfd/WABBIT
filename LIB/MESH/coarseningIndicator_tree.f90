@@ -144,7 +144,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
             endif
         else
             ! use hardcoded values for the norm
-            norm(1:N_thresholding_components) = params%eps_normalized_hardcode(1:N_thresholding_components)
+            norm(1:size(params%eps_normalized_hardcode,dim=1)) = params%eps_normalized_hardcode(1:size(params%eps_normalized_hardcode,dim=1))
         endif
 
         ! HACK

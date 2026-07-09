@@ -164,4 +164,9 @@ subroutine compute_derivative(u, dx, Bs, g, derivative_dim, derivative_order, di
         call abort(240321, "ERROR: derivative_order in compute_derivative is unknown")
     end select
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD2)) deallocate(FD2)
+    if (allocated(FD1X)) deallocate(FD1X)
+
 end subroutine compute_derivative

@@ -32,34 +32,55 @@ subroutine post_extract_slice(params)
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk), dimension(4)             :: xi
-    real(kind=rk)                           :: time, x_query
+    real(kind=rk)                           :: time, cut_pos
     real(kind=rk), allocatable              :: hvy_block_2Dslice(:, :, :, :, :)
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:), treecode(:)
-    integer(kind=tsize)                     :: tc_b
+    integer(kind=tsize)                     :: tc_3D, tc_2D
     integer(kind=ik), allocatable           :: lgt_block_2Dslice(:,:)
     integer(kind=ik), allocatable           :: lgt_active_2Dslice(:,:), hvy_active_2Dslice(:,:)
 
-    integer(kind=ik)  :: Nblocks, g
-    real(kind=rk)    :: x,y,z, x_query_normalized
+    integer(kind=ik)  :: Nblocks, Nblocks_total, Nblocks_max, g, cut_dim
+    real(kind=rk)    :: x,y,z, cut_pos_normalized
     real(kind=rk)    :: maxi,mini,squari,meani,qi
     real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: ix,iy,iz,mpicode, ioerr, i
+    integer(kind=ik) :: icut, ixyz(1:3),mpicode, ioerr, i_hvy, i_lgt
+    logical          :: help1, help2, help3
 
     ! this routine works only on one tree
     allocate( hvy_n(1), lgt_n(1) )
 
-    call get_cmd_arg("--file", fname, "not given")
+    call get_cmd_arg( "--help", help1, default=.false. )
+    call get_cmd_arg( "--h", help2, default=.false. )
+    call get_cmd_arg( "-h", help3, default=.false. )
+
+    ! does the user need help?
+    if (help1 .or. help2 .or. help3 .and. params%rank==0) then
+        if (params%rank==0) then
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " Wabbit extract slice: extract a 2D slice from a 3D dataset"
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " ./wabbit-post --extract-slice --file=FILE.h5 --output=SLICE.h5 --dim=1 --pos=0.5 --wavelet=CDF20"
+            write(*,'(A)') ""
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " --file                - input file (3D data)"
+            write(*,'(A)') " --output=slice_00.h5  - output file (2D slice)"
+            write(*,'(A)') " --dim                 - dimension along which the slice is extracted (1:x, 2:y, 3:z)"
+            write(*,'(A)') " --pos                 - position of the slice along the specified dimension"
+            write(*,'(A)') " --wavelet=CDF20       - wavelet used for synching the data"
+            write(*,'(A)') "-----------------------------------------------------------"
+        end if
+        return
+    endif
+
+    call get_cmd_arg("--file", fname, "none")
     call get_cmd_arg("--output", fname_out, "slice_00.h5")
-    call get_cmd_arg("--x", x_query, 0.0_rk)
+    call get_cmd_arg("--dim", cut_dim, -1)
+    call get_cmd_arg("--pos", cut_pos, -1.0_rk)
+    if (cut_dim<1 .or. cut_dim>3) call abort(260707, "--dim must be 1 (x), 2 (y) or 3 (z)")
+    if (cut_pos<0.0_rk) call abort(260707, "--pos must be >= 0.0")
 
     call check_file_exists( fname )
-
-    if (params%number_procs > 1) then
-        ! it shouldn't be difficult, buut I did not do it. problem: active lists for 2D slice
-        ! are no longer simple vectors 1:N
-        call abort(21060301, "This routine cannot be run in parallel right now.")
-    endif
 
     ! get some parameters from the file
     call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, dim, &
@@ -75,11 +96,13 @@ subroutine post_extract_slice(params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    params%number_blocks = lgt_n(tree_ID)
+    params%number_blocks = ceiling(  real(lgt_n(tree_ID))/real(params%number_procs) )
     params%block_distribution = "sfc_hilbert"
     params%order_predictor = "multiresolution_4th"
     allocate(params%symmetry_vector_component(1:3))
     params%symmetry_vector_component(1:3) = "0"
+    params%wavelet = "CDF20"
+    call setup_wavelet(params)
 
     call allocate_forest(params, hvy_block)
 
@@ -97,28 +120,32 @@ subroutine post_extract_slice(params)
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
+        if ((x0(cut_dim) <= cut_pos) .and. (cut_pos < x0(cut_dim)+real(Bs(cut_dim)-1,kind=rk)*dx(cut_dim))) then
             Nblocks = Nblocks +1
         endif
     end do
+    ! we need to allreaduce Nblocks inplace to get how many blocks will really be sliced in total, and how many at maximum on one rank
+    call MPI_Allreduce(Nblocks, Nblocks_total, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, mpicode)
+    call MPI_Allreduce(Nblocks, Nblocks_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, mpicode)
+    if (params%rank==0) write(*,'(A,I0,A,I0,A,I0,A)') "out of the total ", lgt_n(tree_ID)," blocks, ", Nblocks_total, " are concerned by slicing, with at max ", Nblocks_max, " on one rank."
 
-    write(*,*) "out of the total ", lgt_n(tree_ID)," blocks, ", Nblocks, " are concerned by slicing"
-
-    allocate( hvy_block_2Dslice(1:Bs(2)+2*g, 1:Bs(3)+2*g, 1, 1, 1:Nblocks) )
-    allocate( lgt_block_2Dslice(1:Nblocks, 1:EXTRA_LGT_FIELDS))
-    allocate( lgt_active_2Dslice(1:Nblocks, 1), hvy_active_2Dslice(1:Nblocks, 1))
+    allocate( hvy_block_2Dslice(1:Bs(2)+2*g, 1:Bs(3)+2*g, 1, 1, 1:Nblocks_max) )
+    allocate( lgt_block_2Dslice(1:Nblocks_max*params%number_procs, 1:EXTRA_LGT_FIELDS))
+    allocate( lgt_active_2Dslice(1:Nblocks_max*params%number_procs, 1), hvy_active_2Dslice(1:Nblocks_max*params%number_procs, 1))
 
     hvy_block_2Dslice = 0.0_rk
     lgt_block_2Dslice = -1
 
-    i = 1
+    i_hvy = 1  ! this is the index where we will write the next block in the 2D slice
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)
 
         call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+        tc_3D = get_tc(lgt_block(lgt_id, IDX_TC_1:IDX_TC_2))
+        level = lgt_block(lgt_id, IDX_MESH_LVL)
         call get_block_spacing_origin( params, lgt_id, x0, dx )
 
-        if ((x0(1) <= x_query) .and. (x_query < x0(1)+real(Bs(1)-1,kind=rk)*dx(1))) then
+        if ((x0(cut_dim) <= cut_pos) .and. (cut_pos < x0(cut_dim)+real(Bs(cut_dim)-1,kind=rk)*dx(cut_dim))) then
             !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             ! floor index: in our notation, this is point 1 (the second point)
             ! where: | is location of interpolation
@@ -130,74 +157,97 @@ subroutine post_extract_slice(params)
             !            ^
             !           ix
             !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            ix = floor( (x_query-x0(1))/dx(1) ) + g+1
+            icut = floor( (cut_pos-x0(cut_dim))/dx(cut_dim) ) + g+1
 
             ! coordinate in the local coordinate system (above), where the point IX corresonds
             ! to 1.
-            x_query_normalized = 1 + ( x_query - x0(1)+real(ix-g-1, kind=rk)*dx(1) )
+            cut_pos_normalized = 1 + ( cut_pos - x0(cut_dim)+real(icut-g-1, kind=rk)*dx(cut_dim) )
 
-            if ((ix<g+1) .or. (ix>Bs(1)+g)) then
-                write(*,*) ix
-                write(*,*) x0, ":", dx, ":", x_query
+            if ((icut<g+1) .or. (icut>Bs(cut_dim)+g)) then
+                write(*,*) icut
+                write(*,*) x0, ":", dx, ":", cut_pos
                 call abort(716717, "well")
             endif
 
             xi = (/0.0_rk, 1.0_rk, 2.0_rk, 3.0_rk/)
 
             ! interpolate the slice along the x-direction
-            hvy_block_2Dslice(:, :, 1, 1, i) = &
-            +lagrange_polynomial(x_query_normalized, xi, 1)*hvy_block( ix-1, :, :, 1, hvy_id) &
-            +lagrange_polynomial(x_query_normalized, xi, 2)*hvy_block( ix  , :, :, 1, hvy_id) &
-            +lagrange_polynomial(x_query_normalized, xi, 3)*hvy_block( ix+1, :, :, 1, hvy_id) &
-            +lagrange_polynomial(x_query_normalized, xi, 4)*hvy_block( ix+2, :, :, 1, hvy_id)
+            if (cut_dim==1) then
+                hvy_block_2Dslice(:, :, 1, 1, i_hvy) = &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 1)*hvy_block( icut-1, :, :, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 2)*hvy_block( icut  , :, :, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 3)*hvy_block( icut+1, :, :, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 4)*hvy_block( icut+2, :, :, 1, hvy_id)
+            elseif (cut_dim==2) then
+                hvy_block_2Dslice(:, :, 1, 1, i_hvy) = &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 1)*hvy_block( :, icut-1, :, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 2)*hvy_block( :, icut  , :, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 3)*hvy_block( :, icut+1, :, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 4)*hvy_block( :, icut+2, :, 1, hvy_id)
+            elseif (cut_dim==3) then
+                hvy_block_2Dslice(:, :, 1, 1, i_hvy) = &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 1)*hvy_block( :, :, icut-1, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 2)*hvy_block( :, :, icut  , 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 3)*hvy_block( :, :, icut+1, 1, hvy_id) &
+                    +lagrange_polynomial(cut_pos_normalized, xi, 4)*hvy_block( :, :, icut+2, 1, hvy_id)
+            endif
 
-            ! this is just the inverse of what get_block_spacing_origin_array computes
-            ! we use it to create the 2D treecode
-            iy = 1 + nint( x0(2) / (dx(2)*real(Bs(2)-1, kind=rk)) )
-            iz = 1 + nint( x0(3) / (dx(3)*real(Bs(3)-1, kind=rk)) )
-
-            level = lgt_block(lgt_id, IDX_MESH_LVL)
+            ! from the treecode, we compute the ix,iy,iz of the 2D slice
+            call decoding_b(ixyz, tc_3D, dim=params%dim, level=level, max_level=tc_length)
 
             ! note 2D data is (x,y) but our slice is (y,z) hence the oddity (iy,iz,1)
             ! NOTE: in paraview I saw that I had to invert iy,iz to iz,iy although I do not
             ! copletely understand why.
-            ! call encoding_revised(treecode, (/iz,iy/), 2, level)
-            call encoding_b((/iz,iy/), tc_b, dim=2, level=level, max_level=tc_length)
+            if (cut_dim==1) then
+                call encoding_b((/ixyz(2),ixyz(3)/), tc_2D, dim=2, level=level, max_level=tc_length)
+            elseif (cut_dim==2) then
+                call encoding_b((/ixyz(1),ixyz(3)/), tc_2D, dim=2, level=level, max_level=tc_length)
+            elseif (cut_dim==3) then
+                call encoding_b((/ixyz(1),ixyz(2)/), tc_2D, dim=2, level=level, max_level=tc_length)
+            endif
+
+            ! for writing in the 2D slice, we need to compute the new lgt_id
+            call hvy2lgt(i_lgt, i_hvy, params%rank, Nblocks_max)
 
             ! copy computed treecode and som other information to lgt_block for the 2D slice
-            lgt_block_2Dslice(i, :)   = -1
-            ! lgt_block_2Dslice(i, 1:level) = treecode(1:level)
-            lgt_block_2Dslice(i, IDX_MESH_LVL)   = level
-            lgt_block_2Dslice(i, IDX_TREE_ID)    = 1
-            lgt_block_2Dslice(i, IDX_REFINE_STS) = 0
-            call set_tc(lgt_block_2Dslice( i, IDX_TC_1:IDX_TC_2), tc_b)
-            i = i + 1
+            lgt_block_2Dslice(i_lgt, :)   = -1
+            ! lgt_block_2Dslice(i_lgt, 1:level) = treecode(1:level)
+            lgt_block_2Dslice(i_lgt, IDX_MESH_LVL)   = level
+            lgt_block_2Dslice(i_lgt, IDX_TREE_ID)    = 1
+            lgt_block_2Dslice(i_lgt, IDX_REFINE_STS) = 0
+            call set_tc(lgt_block_2Dslice( i_lgt, IDX_TC_1:IDX_TC_2), tc_2D)
+            i_hvy = i_hvy + 1
         endif
     end do
 
     ! save 2D slice to disk, change code to now expect 2D data
     params%dim = 2
-    params%Bs = (/Bs(2), Bs(3), 1/)
-    params%domain_size = (/domain(2), domain(3), 0.0_rk/)
-
-    do i = 1, Nblocks
-        lgt_active_2Dslice(i, tree_ID) = i
-        hvy_active_2Dslice(i, tree_ID) = i
-    enddo
-
+    ! ToDo: Julius - tbh I am not sure if this is correct for data where Bs(1) != Bs(2) != Bs(3)
+    if (cut_dim==1) then
+        params%Bs = (/Bs(2), Bs(3), 1/)
+        params%domain_size = (/domain(2), domain(3), 0.0_rk/)
+    elseif (cut_dim==2) then
+        params%Bs = (/Bs(1), Bs(3), 1/)
+        params%domain_size = (/domain(1), domain(3), 0.0_rk/)
+    elseif (cut_dim==3) then
+        params%Bs = (/Bs(1), Bs(2), 1/)
+        params%domain_size = (/domain(1), domain(2), 0.0_rk/)
+    endif
 
     ! -------------------
+    ! reinitialize all arrays with our 2D data
     deallocate(lgt_block, lgt_active, hvy_active)
     allocate(lgt_block(size(lgt_block_2Dslice,1), size(lgt_block_2Dslice,2)))
     allocate(lgt_active(size(lgt_active_2Dslice,1), size(lgt_active_2Dslice,2)))
     allocate(hvy_active(size(hvy_active_2Dslice,1), size(hvy_active_2Dslice,2)))
 
+    ! we only need to set lgt_block and the amount of blocks, the rest will be updated later on
     lgt_block  = lgt_block_2Dslice
-    lgt_active = lgt_active_2Dslice
-    hvy_active = hvy_active_2Dslice
-    hvy_n(tree_ID) = Nblocks
-    lgt_n(tree_ID) = Nblocks
+    params%number_blocks = Nblocks_max
     ! -------------------
+    ! now correct meta information and everything
+    call synchronize_lgt_data( params, refinement_status_only=.false. )  ! this syncs the lgt_block between the processors
+    call updateMetadata_tree(params, tree_ID, search_overlapping=.true.)  ! this updates the active lists and neighbor/family relations
 
     call saveHDF5_tree( fname_out, time, iteration, 1, params, hvy_block_2Dslice, tree_ID)
 

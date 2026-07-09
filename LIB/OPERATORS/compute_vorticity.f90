@@ -61,6 +61,9 @@ subroutine compute_vorticity(u, dx, Bs, g, discretization, vorticity)
         end do
     end if
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+
 end subroutine compute_vorticity
 
 
@@ -113,6 +116,9 @@ subroutine compute_vorticity_abs(u, dx, Bs, g, discretization, vor_abs)
     else
         call abort(23321, "ERROR: vor-abs makes not much sense for 2D data.")
     end if
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
 
 end subroutine compute_vorticity_abs
 
@@ -174,6 +180,9 @@ subroutine compute_helicity(u, dx, Bs, g, discretization, helicity)
     else
         call abort(23322, "ERROR: helicity makes not much sense for 2D data.")
     end if
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
 
 end subroutine compute_helicity
 
@@ -237,6 +246,9 @@ subroutine compute_helicity_abs(u, dx, Bs, g, discretization, hel_abs)
     else
         call abort(23323, "ERROR: helicity-abs makes not much sense for 2D data.")
     end if
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
 
 end subroutine compute_helicity_abs
 
@@ -354,5 +366,8 @@ subroutine compute_vorticity_stretching(u, dx, Bs, g, discretization, vor_stretc
         ! 2D case: vorticity stretching is not meaningful in 2D
         call abort(23324, "ERROR: vorticity stretching is only defined for 3D flows.")
     end if
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
 
 end subroutine compute_vorticity_stretching

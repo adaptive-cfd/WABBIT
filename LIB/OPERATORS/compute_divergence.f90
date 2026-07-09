@@ -55,4 +55,7 @@ subroutine compute_divergence(u, dx, Bs, g, discretization, div)
         end do
     end if
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+
 end subroutine compute_divergence

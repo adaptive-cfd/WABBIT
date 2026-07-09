@@ -1219,7 +1219,7 @@ contains
 
         value = default
         if (rank == 0) then
-            write(*,'(" COMMAND-LINE-PARAMETER: read ",A," = ",g15.8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
+            write(*,'("COMMAND-LINE-PARAMETER: read ",A," = ",g15.8," THIS IS THE DEFAULT!")') trim(adjustl(name)), value
         endif
 
     end subroutine

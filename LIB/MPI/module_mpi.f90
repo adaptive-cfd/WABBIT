@@ -53,7 +53,7 @@ module module_MPI
     real(kind=rk), allocatable    :: line_buffer(:)
 
     ! restricted/predicted data buffer
-    real(kind=rk), allocatable    :: res_pre_data(:,:,:,:), tmp_block(:,:,:,:)
+    real(kind=rk), allocatable    :: res_pre_data(:,:,:,:)
 
     ! it is faster to use named consts than strings, although strings are nicer to read
     integer(kind=ik), PARAMETER   :: SENDER = 1, RECVER = 2, RESPRE = 3
@@ -286,7 +286,6 @@ subroutine xfer_ensure_correct_buffer_size(params, hvy_block)
     integer(kind=ik) :: i,j,k, Bs(1:3), g, nx, ny, nz, nc
 
     if (allocated(res_pre_data)) deallocate(res_pre_data)
-    if (allocated(tmp_block)) deallocate(tmp_block)
 
     Bs = params%Bs
     g  = params%g
@@ -302,17 +301,11 @@ subroutine xfer_ensure_correct_buffer_size(params, hvy_block)
 
     allocate( res_pre_data( i, j, k, nc) )
 
-    if (params%dim == 3) then
-        allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, Bs(3)+2*g, nc) )
-    else
-        allocate( tmp_block( Bs(1)+2*g, Bs(2)+2*g, 1, nc) )
-    endif
-
     ! initialize that no block is currently filtered
     restricted_hvy_ID = -1
 
     if (allocated(hvy_restricted)) then
-        if (nc > size(hvy_restricted, 4)) deallocate(hvy_restricted)
+        if (nc > size(hvy_restricted, 4) .or. nx /= size(hvy_restricted, 1) .or. ny /= size(hvy_restricted, 2) .or. nz /= size(hvy_restricted, 3)) deallocate(hvy_restricted)
     endif
     if (.not. allocated(hvy_restricted)) allocate(hvy_restricted(1:nx, 1:ny, 1:nz, 1:nc) )
 

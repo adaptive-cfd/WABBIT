@@ -98,7 +98,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     t_call = MPI_wtime()
     do i_insect = 1, n_insects
         call rigid_solid_rhs( time, iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,F0), &
-        insects(i_insect)%force_g(i_insect), insects(i_insect)%moment_g(i_insect), Insects(i_insect) )
+        insects(i_insect)%force_g, insects(i_insect)%moment_g, Insects(i_insect) )
     enddo
     call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
 
@@ -134,7 +134,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
         t_call = MPI_wtime()
         do i_insect = 1, n_insects
             call rigid_solid_rhs(tau, iteration, Insects(i_insect)%STATE, Insects(i_insect)%rhs(:,F1), &
-            insects(i_insect)%force_g(i_insect), insects(i_insect)%moment_g(i_insect), Insects(i_insect))
+            insects(i_insect)%force_g, insects(i_insect)%moment_g, Insects(i_insect))
         enddo
         call toc( "timestep (RHS rigid solid)", 24, MPI_wtime()-t_call)
 
@@ -185,7 +185,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     state_vector_write = 0.0_rk
     state_vector_write(1) = time + dt
     do i_insect = 1, n_insects
-        state_vector_write( (i_insect-1)*26 + 2 : i_insect*26 + 1) = (/ Insects(i_insect)%STATE, insects(i_insect)%force_g(i_insect), insects(i_insect)%moment_g(i_insect) /)
+        state_vector_write( (i_insect-1)*26 + 2 : i_insect*26 + 1) = (/ Insects(i_insect)%STATE, insects(i_insect)%force_g, insects(i_insect)%moment_g /)
     enddo
     call append_t_file( 'insect_state_vector.t', state_vector_write )
 

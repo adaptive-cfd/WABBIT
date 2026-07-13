@@ -77,7 +77,7 @@ contains
             endif
 
         case default
-            call abort(1212,'unknown physics...say whaaat?')
+            call abort(1312,'unknown physics...say whaaat?')
 
         end select
 

@@ -315,10 +315,10 @@ program main
 
             ! refine the mesh after refinement_indicator, usually "everywhere" or "significant". When using
             ! "significant", the refinement flags from the last call to adapt_tree call are reused. 
-            ! This might not be given for the first iteration so we just skip this (as adapt_tree was not called yet)
-            ! and use the "everywhere" indicator. Note: after resuming a run from backup, this works as well, because
-            ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks.
-            if (params%refinement_indicator == "significant" .and. iteration == 0) then
+            ! This might not be given for the first iteration so we just skip this (if adapt_tree was not called yet)
+            ! and use the "everywhere" indicator. Note: after resuming a run from backup, this can be the case as well, because
+            ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks, resulting in spikes for blocks_rhs
+            if (params%refinement_indicator == "significant" .and. iteration == 0 .and. .not. params%adapt_inicond) then
                 call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time )
             else
                 call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time )
@@ -418,22 +418,10 @@ program main
         t4 = MPI_wtime()
         ! adapt the mesh
         if ( params%adapt_tree ) then
-            ! some coarsening indicators require us to know the mask function (if
-            ! it is considered as secondary criterion, e.g.). Creating the mask is a high-level
-            ! routine that relies on forests and pruned trees, which are not available in the module_mesh.
-            ! Hence the mask is created here.
-            if (params%threshold_mask) then
-                ! create mask function at current time
-                call createMask_tree(params, time, hvy_mask, hvy_tmp)
-
-                ! actual coarsening (including the mask function)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_mask=hvy_mask, hvy_work=hvy_work)
-            else
-                ! actual coarsening (no mask function is required)
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
-                    hvy_work=hvy_work)
-            endif
+            ! actual coarsening (including the mask function)
+            ! if we adapt after the mask as well, the mask is created in adapt_tree
+            call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, &
+                hvy_mask=hvy_mask, hvy_work=hvy_work)
         endif
         call toc( "TOPLEVEL: adapt mesh", 14, MPI_wtime()-t4)
         Nblocks = lgt_n(tree_ID_flow)

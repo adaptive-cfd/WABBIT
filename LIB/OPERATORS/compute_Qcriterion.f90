@@ -56,4 +56,8 @@ subroutine compute_Qcriterion(u, dx, Bs, g, discretization, Qcrit)
     else
         call abort(0112181, "ERROR: Q-criterion for 2D not implemented.")
     end if
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    
 end subroutine compute_Qcriterion

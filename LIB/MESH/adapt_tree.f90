@@ -239,9 +239,11 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! At this point the coarsening is done. All blocks that can be coarsened are coarsened
     ! they may have passed several level also and non-leafs have been deleted. Rebalance for optimal loadbalancing
     ! ToDo: we sync directly afterwards so we could only transfer inner points, but this needs the buffering from xfer_bock_data
-    t_block = MPI_Wtime()
-    call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time )
-    call toc( "adapt_tree (balanceLoad_tree)", 106, MPI_Wtime()-t_block )
+    if (.not. params%no_loadbalance_after_adapt_tree) then  ! experimental feature to skip loadbalance after coarsening, as it only concerns saving
+        t_block = MPI_Wtime()
+        call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time )
+        call toc( "adapt_tree (balanceLoad_tree)", 106, MPI_Wtime()-t_block )
+    endif
 
     ! synchronize ghost nodes - final synch to update all neighbours with the new values
     ! Just once here at the end after reconstruct so everything is in order

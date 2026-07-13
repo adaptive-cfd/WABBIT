@@ -43,7 +43,7 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     rhs = 0.0_rk
 
     if (Insect%BodyMotion /= "free_flight") then
-        call abort(900,"Insect%BodyMotion"//trim(adjustl(Insect%BodyMotion))//" but using free-flight?")
+        call abort(900,"Insect%BodyMotion="//trim(adjustl(Insect%BodyMotion))//" but using free-flight? Überbestimmtes System")
     endif
 
     ! copy some shortcuts (this is easier to code)
@@ -144,24 +144,28 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
     real(kind=rk), ALLOCATABLE :: array(:,:)
     integer :: mpicode, n_lines, n_cols, n_header, it, n_candidates
     real(kind=rk), dimension(0:3) :: ep
+    logical :: file_exists
 
     Insect%time = time
     Insect%STATE = 0.0_rk
-    n_header = 0
+    n_header = 1
 
     if (root) write(*,'(A)') "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
     if (root) write(*,'("rigid solid init at time=",es12.4)')  Insect%time
     if (root) write(*,'(A)') "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
 
-    if (resume_backup) then
+    ! check if the backup file exists, if not, we do not resume from backup
+    if (root) inquire(file='insect_state_vector.t', exist=file_exists)
+    call MPI_BCAST(file_exists, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, mpicode)
+
+    if (resume_backup .and. file_exists) then
         ! resuming the rigid solid solver from a backup
         ! NOTE: in old versions, this read a single *.fsi_bckp file which contained the state vector.
         ! In WABBIT, we write the state vector to *.t file in every time step, and so we look for the
         ! data in this file. As simulations may fail and be resumed from a different time step, we use the
         ! last suitable entry in this file.
         if (root) then
-            write(*,'(A)') "Rigid solid solver is resuming from file: we read Insect%STATE from ./insect_state_vector.t"
-            write(*,*) "time=", time
+            write(*,'(A, es16.8)') "Rigid solid solver is resuming from file: we read Insect%STATE from ./insect_state_vector.t, time=",time
 
             call count_lines_in_ascii_file('insect_state_vector.t', n_lines, n_header)
             call count_cols_in_ascii_file('insect_state_vector.t', n_cols, n_header)
@@ -169,6 +173,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
             if (n_cols < 21) call abort(202117021, "For some reason insect_state_vector.t contains not enough columns....something is wrong?")
 
             allocate( array(1:n_lines, 1:n_cols) )
+            array = 0.0_rk
             call read_array_from_ascii_file('insect_state_vector.t', array, n_header)
 
             n_candidates = 0
@@ -176,7 +181,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
                 if ( abs(array(it,1)-time) <= 1.0e-6 ) n_candidates = n_candidates +1
             end do
 
-            write(*,*) "In insect_state_vector.t we found ", n_candidates, "possible time stamps and we use the last one!"
+            write(*,'(A, i0, A)') "In insect_state_vector.t we found ", n_candidates, " possible time stamps and we use the last one!"
 
             if (n_candidates == 0) then
                 call abort(20210291, "Resuming from insect_state_vector.t was impossible as no time stamp is sufficiently close to what we need.")
@@ -186,7 +191,7 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
                 if ( abs(array(it,1)-time) <= 1.0e-6 ) then
                     ! each insect does 23 entries in state-vector: 20 state vector and 3 forces
                     Insect%STATE = array(it,2+23*(Insect_ID-1):21+23*(Insect_ID-1))
-                    write(*,*) "Found suitable entry in line=", it, " time=", array(it,1)
+                    write(*,'(A, i0, A, es16.8)') "Found suitable entry in line=", it, " time=", array(it,1)
                     write(*,'("Insect%STATE=(",20(es15.8,1x),")")')  Insect%STATE
                     exit
                 endif
@@ -199,6 +204,12 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
         call MPI_BCAST( Insect%STATE, size(Insect%STATE), MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpicode )
 
     else ! no backup
+        if (root) then
+            write(*,'(A, es16.8)') "Rigid solid solver is initializing from parameter file"
+            if (resume_backup .and. .not. file_exists) then
+                write(*,'(A)') "WARNING: Rigid solver resumes simulation at later time, but ./insect_state_vector.t was not found. We initialize from parameter file instead. This might be correct, if you insert a free_flying insect at a later time."
+            endif
+        endif
 
         ! free flight solver based on quaternions. the task here is to initialize
         ! the "attitude" quaternion (Insect%quaternion) from yaw, pitch and roll

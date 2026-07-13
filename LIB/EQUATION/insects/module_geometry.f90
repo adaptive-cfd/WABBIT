@@ -10,7 +10,7 @@ module module_geometry
     PRIVATE
 
     ! functions
-    PUBLIC :: signed_distance_triangle_2D, signed_distance_circle_2D, signed_distance_rectangle_2D, signed_distance_sphere_3D, signed_distance_cylinder_3D, signed_distance_cylinder_rounded_3D, draw_sphere, draw_cylinder, draw_cylinder_rounded, draw_circle, draw_rectangle, draw_triangle, init_primitives_collection, draw_primitives_collection
+    PUBLIC :: signed_distance_triangle_2D, signed_distance_circle_2D, signed_distance_rectangle_2D, signed_distance_sphere_3D, signed_distance_cylinder_3D, signed_distance_cylinder_rounded_3D, draw_sphere, draw_cylinder, draw_cylinder_rounded, draw_circle, draw_rectangle, draw_triangle, init_primitives_collection, draw_primitives_collection, primitives_collection_geometry_indicator
 
     ! for 2d wing section optimization
     type :: primitives_collection

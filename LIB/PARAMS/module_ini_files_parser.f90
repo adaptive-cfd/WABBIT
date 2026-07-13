@@ -107,6 +107,8 @@ module module_ini_files_parser
                 i = i + 1
                 ! if we're past the header AND the read worked (i.e. not end of file)
                 if (i > n_header .and. io_error==0) then
+                    ! read assumes comma or space as separator. T-files (can) contain semicolon, so we deal with that now
+                    dummy = str_replace_text(str_replace_text(dummy,",","."),";",",")
                     read(dummy,*,iostat=io_error) array(i-n_header,:)
                 endif
 
@@ -162,6 +164,8 @@ module module_ini_files_parser
                 i = i + 1
                 ! if we're past the header AND the read worked (i.e. not end of file)
                 if (i > n_header .and. io_error==0) then
+                    ! read assumes comma or space as separator. T-files (can) contain semicolon, so we deal with that now
+                    dummy = str_replace_text(str_replace_text(dummy,",","."),";",",")
                     read(dummy,*) array(i-n_header,:)
                     !        write(*,fmt) array(i-n_header,:)
                 endif
@@ -224,6 +228,8 @@ module module_ini_files_parser
                     if (ncols == 1) then
                         array(i-n_header,1) = trim(adjustl(dummy))
                     else
+                        ! read assumes comma or space as separator. T-files (can) contain semicolon, so we deal with that now
+                        dummy = str_replace_text(str_replace_text(dummy,",","."),";",",")
                         read(dummy,*,iostat=io_error) array(i-n_header,:)
                     endif
                 endif
@@ -550,10 +556,10 @@ module module_ini_files_parser
             call GetValue(PARAMS, section, keyword, value)
 
             if (value .ne. '') then
-                params_string = value
+                params_string = trim(adjustl(value))
             else
                 value = trim(adjustl(defaultvalue))//" (default!)"
-                params_string = defaultvalue
+                params_string = trim(adjustl(defaultvalue))
             endif
 
             ! sometimes we read in file-names. If the file is not there, then quirky things happen, so lets check that here

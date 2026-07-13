@@ -357,6 +357,9 @@ contains
 
         ! it would be tempting to parallelize over ic here, but the temporary work array can become quite large.
         ! It is no benefit to parallelize anyway, as in memory they are very far apart.
+        if (allocated(u_tmp)) then
+            if (size(u_tmp,1) /= nx .or. size(u_tmp,2) /= ny .or. size(u_tmp,3) /= nz) deallocate(u_tmp)
+        endif
         if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz) )
 
         do ic = 1, nc
@@ -395,7 +398,7 @@ contains
             endif
         enddo
 
-    end subroutine
+    end subroutine blockFilterXYZ_vct
 
     ! filter everywhere where possible: do not start at the interior points, but
     ! start at the support of the filter
@@ -455,6 +458,9 @@ contains
             call abort(202302209, "For applying the filter, not enough ghost nodes")
         endif
 
+        if (allocated(u_tmp)) then
+            if (size(u_tmp,1) /= nx .or. size(u_tmp,2) /= ny .or. size(u_tmp,3) /= nz .or. size(u_tmp,4) /= nc) deallocate(u_tmp)
+        endif
         if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx,1:ny,1:nz,1:nc) )
         u_tmp = u
 
@@ -489,11 +495,11 @@ contains
                     u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz, :) = u_filtered(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz, :) &
                     + u_tmp(-fl_l+1:nx-fl_r:s, -fl_l+1:ny-fl_r:s, iz+shift, :)*coefs_filter(shift)
                 enddo
-            enddo\
+            enddo
 
         endif
 
-    end subroutine
+    end subroutine blockFilterXYZ_wherePossible_vct
 
 
     ! applies one of params% HD GD HR GR filters in each direction
@@ -519,6 +525,9 @@ contains
         !-----------------------------------------------------------------------
         ! Filter x
         !-----------------------------------------------------------------------
+        if (allocated(u_tmp)) then
+            if (size(u_tmp,1) /= nx .or. size(u_tmp,2) /= ny .or. size(u_tmp,3) /= nz .or. size(u_tmp,4) /= nc) deallocate(u_tmp)
+        endif
         if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx, 1:ny, 1:nz, 1:nc) )
         u_tmp = u
 
@@ -680,7 +689,7 @@ contains
             enddo
         enddo
 
-    end subroutine
+    end subroutine blockFilterCustom_vct
 
     !-------------------------------------------------------------------------------
     ! applies one of params% HD GD HR GR filters in one direction
@@ -703,6 +712,9 @@ contains
         g  = params%g
         Bs = params%Bs
 
+        if (allocated(u_tmp)) then
+            if (size(u_tmp,1) /= nx .or. size(u_tmp,2) /= ny .or. size(u_tmp,3) /= nz .or. size(u_tmp,4) /= nc) deallocate(u_tmp)
+        endif
         if (.not. allocated(u_tmp)) allocate( u_tmp(1:nx, 1:ny, 1:nz, 1:nc) )
         u_tmp = u
 
@@ -1544,6 +1556,8 @@ contains
             write(*, '(20("╭─╮ "))')
             write(*, '(20("╯ ╰─"))')
         endif
+
+        if (allocated(h_ntilde)) deallocate(h_ntilde)
     end subroutine
 
 

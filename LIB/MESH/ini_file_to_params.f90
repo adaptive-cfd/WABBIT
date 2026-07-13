@@ -219,6 +219,12 @@ subroutine ini_file_to_params( params, filename )
 
    call read_param_mpi(FILE, 'Debug', 'verbose_level', params%verbose_level, 1)
 
+   ! The following parts can contain experimental features that one might want to use on the clusters but which are not yet completely optimized or tested
+
+   ! Usually we do 3 loadbalances: 1) predictive before refinement to avoid overloading a rank, 2) after refinement to fully balance the RHS grid 3) after coarsening to balance the adapted grid
+   ! However, for very large grids (>50k blocks) the loadbalance will become very expensive. As experimental feature, we can do only loadbalance 1) and 2), as 3) only concerns saving.
+   call read_param_mpi(FILE, 'Debug', 'no_loadbalance_after_adapt_tree', params%no_loadbalance_after_adapt_tree, .false.)
+
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
    ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
@@ -314,6 +320,8 @@ subroutine ini_file_to_params( params, filename )
          params%g = FD_max_size/2
       end if
    endif
+
+   if (allocated(filter_dummy)) deallocate(filter_dummy)
  
 end subroutine ini_file_to_params
 
@@ -384,7 +392,7 @@ subroutine ini_domain(params, FILE )
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
 
    if (params%rank==0 .and. .not. all(params%periodic_BC)) then
-      write(*, '(A)') "Symmetric BC are currently an experimental feature, you should know what you are doing!"
+      write(*, '(A)') "Warning!! Symmetric BC are currently an experimental feature, you should know what you are doing!"
    endif
 
    params%symmetry_BC = .not. params%periodic_BC
@@ -465,9 +473,22 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'number_ghost_nodes_rhs', params%g_RHS, g_RHS_default )  ! might be overwritten later if larger is needed
    call read_param_mpi(FILE, 'Blocks', 'number_blocks', params%number_blocks, -1 )
    call read_param_mpi(FILE, 'Blocks', 'number_equations', params%n_eqn, 1 )
+   allocate(tmp(1:params%n_eqn))
    call read_param_mpi(FILE, 'Blocks', 'number_equations_rhs', params%n_eqn_rhs, params%n_eqn )
    call read_param_mpi(FILE, 'Blocks', 'eps', params%eps, 1e-3_rk )
    call read_param_mpi(FILE, 'Blocks', 'eps_normalized', params%eps_normalized, .false. )
+   if (params%eps_normalized) then
+      tmp = 0.0_rk
+      allocate(params%eps_normalized_hardcode(1:params%n_eqn))
+      call read_param_mpi(FILE, 'Blocks', 'eps_normalized_hardcode', tmp, tmp )
+      params%eps_normalized_hardcode = tmp
+      if (all(params%eps_normalized_hardcode(:) == 0.0_rk) .and. params%rank == 0) then
+         if (params%rank==0) write(*, '(A)') "INIT: Normalizing eps for all components after the norm at each time instant."
+      else
+         if (params%rank==0) write(*, '(A)') "INIT: Normalizing eps for all components after the hardcoded norms."
+      endif
+   endif
+   
    call read_param_mpi(FILE, 'Blocks', 'eps_norm', params%eps_norm, "Linfty" )
    call read_param_mpi(FILE, 'Blocks', 'azzalini_iterations', params%azzalini_iterations, 1 )
    call read_param_mpi(FILE, 'Blocks', 'threshold_wc', params%threshold_wc, .false. )
@@ -524,7 +545,6 @@ subroutine ini_blocks(params, FILE )
 
    ! Which components of the state vector (if indicator is "threshold-state-vector") shall we use?
    ! in ACM, it can be good NOT to apply it to the pressure (=0) or treat the velocity together (>1)
-   allocate(tmp(1:params%n_eqn))
    allocate(params%threshold_state_vector_component(1:params%n_eqn))
    ! as default, use ones (all components used for indicator)
    tmp = 1.0_rk

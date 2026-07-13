@@ -25,6 +25,11 @@ module module_mesh
 
     implicit none
 
+    ! ToDo JB: I think we should allocate buffers for saving here, as currently they fly under the radar
+    ! ! for saving, we allocate quite a lot of memory in order to load/save contiguous blocks of data. This is a buffer that is used for this purpose
+    ! ! It has size Bs(1), Bs(2), Bs(3), number_blocks. Usually we have factors of (BS)**d / (BS+2*g)**d = 0.2-0.5, so it doesn't take up too much space overall
+    ! real(kind=rk), allocatable    :: hvy_block_buffer(:,:,:,:)
+
 contains
 
 ! Poisson solver tree-level operations (absorbed from module_poisson to avoid circular dependency)

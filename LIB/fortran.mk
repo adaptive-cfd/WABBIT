@@ -5,10 +5,10 @@ proc_to_lgt_data_start_id.f90 lgt2hvy.f90 hvy2lgt.f90 lgt2proc.f90 init_random_s
 init_physics_modules.f90 sparse_to_dense.f90 dense_to_sparse.f90 mult_mask.f90 compute_vorticity_post.f90 compute_poisson_post.f90 compute_scalar_field_post.f90 \
 keyvalues.f90 compare_keys.f90 flusi_to_wabbit.f90 post_mean.f90 post_rhs.f90 post_stl2dist.f90 post_add_two_masks.f90 post_prune_tree.f90 \
 post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f90 adaption_test.f90 post_generate_forest.f90 post_create_grid.f90 \
-post_dump_neighbors.f90 post_meta_analyse.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_filtertest.f90 post_extract_slice.f90 \
+post_dump_neighbors.f90 post_meta_analyse.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_extract_slice.f90 \
 post_evaluate_thresholding.f90 post_unit_test.f90 post_compression_unit_test.f90 post_denoising.f90 post_cvs_invertibility_test.f90 \
 post_wavelet_transform.f90 post_wavelet_contributions.f90 post_denoising_test.f90 post_derivative.f90 proto_GS_multigrid.f90 proto_pressure_multigrid.f90 \
-post_pressure_interpolation.f90 post_sort.f90 post_external_adapt.f90
+post_pressure_interpolation.f90 post_sort.f90 post_external_adapt.f90 post_filter.f90
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -283,7 +283,8 @@ $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statis
 
 $(OBJDIR)/module_NSPP.o: module_NSPP.f90 rhs_NSPP.f90 create_mask.f90 save_data_NSPP.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_NSPP.f90 time_statistics_NSPP.f90 inicond_NSPP.f90 boundcond_NSPP.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o \
+	statistics_NSPP.f90 time_statistics_NSPP.f90 inicond_NSPP.f90 boundcond_NSPP.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_timing.o: module_timing.f90
@@ -324,7 +325,8 @@ $(OBJDIR)/module_time_step.o: module_time_step.f90 $(OBJDIR)/module_params.o $(O
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_indicators.o: module_indicators.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_operators.o \
-	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_wavelets.o refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
+	$(OBJDIR)/module_mpi.o $(OBJDIR)/module_wavelets.o $(OBJDIR)/module_physics_metamodule.o \
+	refinementIndicator_tree.f90 coarseningIndicator_block.f90 threshold_block.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_helpers.o: module_helpers.f90 $(OBJDIR)/module_globals.o most_common_element.f90 rotation_matrices.f90

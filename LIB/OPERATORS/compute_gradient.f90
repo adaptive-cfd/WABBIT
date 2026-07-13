@@ -55,4 +55,7 @@ subroutine compute_gradient(fld, dx, Bs, g, discretization, grad_fld)
         end do
     end if
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+
 end subroutine compute_gradient

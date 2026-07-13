@@ -11,18 +11,20 @@
 !! -2 block will refine and be merged with her sisters
 ! ********************************************************************************************
 
-subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
+subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
+    use module_physics_metamodule, only : geometry_indicator_meta  ! this is unfortunate
     implicit none
     type (type_params), intent(in)      :: params
     character(len=*), intent(in)        :: indicator                            !> how to choose blocks for refinement
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
     integer(kind=ik), intent(in)        :: tree_ID
+    real(kind=rk), intent(in), optional :: time  !> current simulation time, used for mask checking
 
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
-    real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
-    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level
-    real(kind=rk) :: a, b
+    real(kind=rk) :: ref_chance, r, max_grid_density, current_grid_density
+    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level, ref_status
+    real(kind=rk) :: mask_max, mask_min, x0(1:3), dx(1:3)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -56,26 +58,35 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         do k = 1, hvy_n(tree_ID)
             ! hvy_id of the block we're looking at
             hvy_id = hvy_active(k, tree_ID)
-
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
             level = lgt_block( lgt_id, IDX_MESH_LVL)
+            ! get block spacing and origin for the geometry indicator
+            call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
+                params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
-            ! do not use normalizaiton (mask is inherently normalized to 0...1)
-            nnorm = 1.0_rk
-
-            if (params%dim == 3) then
-                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-            else
-                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
-                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
-            endif
+            mask_max = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+            mask_min = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
-            if ( abs(a - b)>1.0e-7_rk ) then
+            if ( abs(mask_max - mask_min) > 1.0e-7_rk ) then
+                ! max and min value are different - the mask is not all constant on this block.
+                ! set block status to REFINE.
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
+            endif
+
+            ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
+            ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
+            ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
+            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
+            if (ref_status == +1) then
+                ! The origin of the object (geometry) is in fact inside this block.
+                ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
+                ! the rare exception did occur and we accidentally did not create the mask. 
+                if (mask_max < 1.0e-9_rk) then
+                    lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+                endif
             endif
         enddo
 
@@ -98,17 +109,26 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator)
         do k = 1, hvy_n(tree_ID)
             ! hvy_id of the block we're looking at
             hvy_id = hvy_active(k, tree_ID)
-
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+
+            ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
+            ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
+            ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
+            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
+            if (ref_status == +1) then
+                ! The origin of the object (geometry) is in fact inside this block.
+                ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
+                ! the rare exception did occur and we accidentally did not create the mask. 
+                if (mask_max < 1.0e-9_rk) then
+                    lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+                endif
+            endif
 
             ! merge selects 2D or 3D bounds depending on params%dim
             if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
-            ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 6, hvy_id) > 0.0_rk)) then
-            !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
-            ! endif
         enddo
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.

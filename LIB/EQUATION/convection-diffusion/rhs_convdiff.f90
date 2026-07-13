@@ -469,6 +469,10 @@ subroutine RHS_convdiff_new(time, g, Bs, dx, x0, phi, rhs, boundary_flag)
       rhs = rhs - gamma * (phi-1) * phi**2
     endif
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD2)) deallocate(FD2)
+
 end subroutine RHS_convdiff_new
 
 

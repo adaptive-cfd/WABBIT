@@ -21,7 +21,7 @@ module module_params
         real(kind=rk) :: time_max=0.0_rk, walltime_max=1760.0_rk
         ! CFL criteria for time step calculation
         real(kind=rk) :: CFL=0.0_rk, krylov_err_threshold=1.0e-3_rk
-        character(len=cshort) :: time_step_method="RungeKuttaGeneric"
+        character(len=cshort) :: time_step_method="rungekuttageneric"
         character(len=cshort) :: krylov_subspace_dimension="fixed"
         logical :: RKC_custom_scheme=.false.
         real(kind=rk), dimension(1:60) :: RKC_mu=0.0_rk, RKC_mu_tilde=0.0_rk, RKC_nu=0.0_rk, RKC_gamma_tilde=0.0_rk, RKC_c=0.0_rk
@@ -58,6 +58,7 @@ module module_params
         ! threshold for wavelet indicator
         real(kind=rk) :: eps=0.0_rk
         logical :: eps_normalized = .false.
+        real(kind=rk), allocatable, dimension(:) :: eps_normalized_hardcode
         integer :: azzalini_iterations = 1
         logical :: threshold_wc = .false.
         character(len=cshort) :: eps_norm="Linfty"
@@ -206,6 +207,7 @@ module module_params
         logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
         logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
         logical :: debug_poisson = .false.
+        logical :: no_loadbalance_after_adapt_tree = .false.
 
         integer :: verbose_level = 1
 

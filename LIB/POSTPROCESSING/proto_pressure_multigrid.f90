@@ -1073,6 +1073,10 @@ subroutine compute_NonLinear(params, hvy_u, hvy_NL, order_discretization, treeID
         endif
     enddo
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD1_r)) deallocate(FD1_r)
+
 end subroutine compute_NonLinear
 
 
@@ -1289,6 +1293,11 @@ subroutine compute_NSI_RHS(params, hvy_u, hvy_mask, hvy_RHS, order_discretizatio
         endif
     enddo
 
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD1_r)) deallocate(FD1_r)
+    if (allocated(FD2)) deallocate(FD2)
+
 end subroutine compute_NSI_RHS
 
 
@@ -1366,4 +1375,8 @@ subroutine compute_projection(params, hvy_u, hvy_p, hvy_u_div0, order_discretiza
             enddo
         endif
     enddo
+
+    ! deallocate the stencils if they were allocated
+    if (allocated(FD1_l)) deallocate(FD1_l)
+    if (allocated(FD1_r)) deallocate(FD1_r)
 end subroutine compute_projection

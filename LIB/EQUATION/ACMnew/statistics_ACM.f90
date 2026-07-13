@@ -52,7 +52,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
     ! Color defines which objects belong together, default values are:
     ! Color         Description
-    !   1-n         full geometries
+    !   1-n         full geometries (= for example a fractal tree, or an entire insect composed of up to 5 individual colors)
     !   n+1-n+5     parts of insect1 (body, left wing, right wing, left wing2, right wing2)
     !   n+6-n+10    parts of insect2 (body, left wing, right wing, left wing2, right wing2)
     !   ...

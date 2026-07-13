@@ -261,28 +261,13 @@ subroutine primitives_collection_geometry_indicator(time, i_collection, BS, g, x
     block_extent(1:dim) = dx(1:dim) * real(BS(1:dim), kind=rk)
     xend(1:dim) = x0(1:dim) + block_extent(1:dim)
 
-    ! It would be tempting just to point to the center locations, but we actually need to point to a point on the BOUNDARY of the geometry
+    ! Let's report back a relevant point for each geometry, either center or on the boundary
     do i_geom = 1, geom_array(i_collection)%n_objects
         select case (trim(standardize_string(geom_array(i_collection)%geometric_type(i_geom))))
-        case ("sphere", "circle")
-            ! boundary + r in one direction
+        case default
+            ! coordinates of one point are defined in entries 1:dim
+            ! works for "sphere", "circle", "cylinder", "triangle", "cylinder-rounded", "capsule", "rectangle" (so currently all geometries)
             point_check(1:dim) = geom_array(i_collection)%geometric_data(i_geom,1:dim)
-            point_check(1) = point_check(1) + geom_array(i_collection)%geometric_data(i_geom,4)  ! center + radius in x-direction
-        case ("cylinder", "triangle")
-            ! endpoint_1 or vertex_1 is part of the boundary
-            point_check(1:dim) = geom_array(i_collection)%geometric_data(i_geom,1:dim)
-        case ("cylinder-rounded", "capsule")
-            ! endpoint_1 is not included, we need to extend it by the radius in the negative direction of the 
-            ! first construct direction vector
-            vec_normed = geom_array(i_collection)%geometric_data(i_geom,4:6) - geom_array(i_collection)%geometric_data(i_geom,1:3)
-            ! now norm it
-            vec_normed = vec_normed / sqrt(dot_product(vec_normed, vec_normed))
-            point_check(1:dim) = geom_array(i_collection)%geometric_data(i_geom,1:dim) - geom_array(i_collection)%geometric_data(i_geom,7)*vec_normed(1:dim)  ! endpoint_1 minus radius in the direction of the cylinder
-        case ("rectangle")
-            ! center + first half_size in the direction of the angle
-            point_check(1:dim) = geom_array(i_collection)%geometric_data(i_geom,1:dim)
-            point_check(1) = point_check(1) + abs(geom_array(i_collection)%geometric_data(i_geom,3))*cos(geom_array(i_collection)%geometric_data(i_geom,5))
-            point_check(2) = point_check(2) + abs(geom_array(i_collection)%geometric_data(i_geom,3))*sin(geom_array(i_collection)%geometric_data(i_geom,5))
         end select
         if (all(point_check(1:dim) >= x0(1:dim)) .and. all(point_check(1:dim) <= xend(1:dim))) then
             geometry_in_block = .true.

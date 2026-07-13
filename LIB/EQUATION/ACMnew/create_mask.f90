@@ -368,11 +368,6 @@ subroutine geometry_indicator_acm( time, Bs, g, x0, dx, refinement_status, stage
             ! those are free geometries, so insect handles movement - get insect ID
             call get_insect_id(i_geom, insect_id)
             pos_check = Insects(insect_id)%STATE(1:params_acm%dim)
-            if (strings_are_similar(params_acm%geometries(i_geom), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i_geom), "sphere-free")) then
-                pos_check(1) = pos_check(1) + params_acm%R_cyl  ! go onto the boundary
-            else
-                pos_check(1) = pos_check(1) + params_acm%length  ! go onto the boundary for the plate
-            endif
             ! check if state is in block
             if (all(pos_check >= x0(1:params_acm%dim)) .and. all(pos_check <= xend(1:params_acm%dim)) ) then
                 geometry_in_block = .true.
@@ -395,9 +390,8 @@ subroutine geometry_indicator_acm( time, Bs, g, x0, dx, refinement_status, stage
         ! 2D cases
         !------------------
         case ('circle', 'cylinder', 'sphere-fixed')
-            ! check if x_cntr + r is in block
+            ! check if x_cntr is in block
             pos_check = params_acm%x_cntr(1:params_acm%dim)
-            pos_check(1) = pos_check(1) + params_acm%R_cyl  ! go onto the boundary
             if (all(pos_check >= x0(1:params_acm%dim)) .and. all(pos_check <= xend(1:params_acm%dim)) ) then
                 geometry_in_block = .true.
             endif
@@ -407,16 +401,15 @@ subroutine geometry_indicator_acm( time, Bs, g, x0, dx, refinement_status, stage
                 geometry_in_block = .true.
             endif
         case ('lamballais', 'lamballais-local')
-            ! check if x_cntr + R0 is in block
+            ! check if x_cntr is in block
             pos_check = params_acm%x_cntr(1:params_acm%dim)
-            pos_check(1) = pos_check(1) + params_acm%R0  ! go onto the boundary
             if (all(pos_check >= x0(1:params_acm%dim)) .and. all(pos_check <= xend(1:params_acm%dim)) ) then
                 geometry_in_block = .true.
             endif
         case ('two-circels', 'two-cylinders')
-            ! check if one of the centers + r is in block
-            if ((all((/0.5884_rk+params_acm%R_cyl, 0.4116_rk/)*params_acm%domain_size(1:2) >= x0(1:params_acm%dim)) .and. all((/0.5884_rk+params_acm%R_cyl, 0.4116_rk/)*params_acm%domain_size(1:2) <= xend(1:params_acm%dim))) .or. &
-                (all((/0.4116_rk+params_acm%R_cyl, 0.5884_rk/)*params_acm%domain_size(1:2) >= x0(1:params_acm%dim)) .and. all((/0.4116_rk+params_acm%R_cyl, 0.5884_rk/)*params_acm%domain_size(1:2) <= xend(1:params_acm%dim)))) then
+            ! check if one of the centers is in block
+            if ((all((/0.5884_rk, 0.4116_rk/)*params_acm%domain_size(1:2) >= x0(1:params_acm%dim)) .and. all((/0.5884_rk, 0.4116_rk/)*params_acm%domain_size(1:2) <= xend(1:params_acm%dim))) .or. &
+                (all((/0.4116_rk, 0.5884_rk/)*params_acm%domain_size(1:2) >= x0(1:params_acm%dim)) .and. all((/0.4116_rk, 0.5884_rk/)*params_acm%domain_size(1:2) <= xend(1:params_acm%dim)))) then
                 geometry_in_block = .true.
             endif
         case ('cavity')

@@ -151,9 +151,6 @@ program main_post
     case ("--pod")
         call post_POD(params)
 
-    case ("--filter")
-        call post_filtertest(params)
-
     case ("--pod-reconstruct")
         call post_reconstruct(params)
 
@@ -189,6 +186,9 @@ program main_post
     
     case ("--sort")
         call post_sort(params)
+    
+    case ("--filter")
+        call post_filter(params)
         
     case default
 
@@ -239,6 +239,7 @@ program main_post
             write(*, '(A)') "--analyse-sisters"
             write(*, '(A)') "--analyse-levels"
             write(*, '(A)') "--sort"
+            write(*, '(A)') "--filter"
             ! tests
             write(*, '(A)') "--compression-unit-test"
             write(*, '(A)') "--performance-test"

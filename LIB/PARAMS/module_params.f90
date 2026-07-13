@@ -207,6 +207,7 @@ module module_params
         logical :: debug_balanceLoad = .false., debug_refinement = .false., debug_wavelet_decompose = .false.
         logical :: debug_wavelet_reconstruct = .false., debug_sync = .false., debug_pruned2full = .false.
         logical :: debug_poisson = .false.
+        logical :: no_loadbalance_after_adapt_tree = .false.
 
         integer :: verbose_level = 1
 

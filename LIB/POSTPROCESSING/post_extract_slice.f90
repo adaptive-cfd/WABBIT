@@ -25,26 +25,20 @@ subroutine post_extract_slice(params)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
     integer(kind=ik)                        :: tree_ID=1, hvy_id
 
-    integer(hsize_t), dimension(4)          :: size_field
-    integer(hid_t)                          :: file_id
-    integer(kind=ik)                        :: lgt_id, k, nz, iteration, tc_length, dim, level
+    integer(kind=ik)                        :: lgt_id, k, iteration, tc_length, dim, level
     integer(kind=ik), dimension(3)          :: Bs
     real(kind=rk), dimension(3)             :: x0, dx
     real(kind=rk), dimension(3)             :: domain
     real(kind=rk), dimension(4)             :: xi
     real(kind=rk)                           :: time, cut_pos
     real(kind=rk), allocatable              :: hvy_block_2Dslice(:, :, :, :, :)
-    integer(hsize_t), dimension(2)          :: dims_treecode
-    integer(kind=ik), allocatable           :: tree(:), sum_tree(:), blocks_per_rank(:), treecode(:)
     integer(kind=tsize)                     :: tc_3D, tc_2D
     integer(kind=ik), allocatable           :: lgt_block_2Dslice(:,:)
     integer(kind=ik), allocatable           :: lgt_active_2Dslice(:,:), hvy_active_2Dslice(:,:)
 
     integer(kind=ik)  :: Nblocks, Nblocks_total, Nblocks_max, g, cut_dim
-    real(kind=rk)    :: x,y,z, cut_pos_normalized
-    real(kind=rk)    :: maxi,mini,squari,meani,qi
-    real(kind=rk)    :: maxl,minl,squarl,meanl,ql
-    integer(kind=ik) :: icut, ixyz(1:3),mpicode, ioerr, i_hvy, i_lgt
+    real(kind=rk)    :: cut_pos_normalized
+    integer(kind=ik) :: icut, ixyz(1:3),mpicode, i_hvy, i_lgt
     logical          :: help1, help2, help3
 
     ! this routine works only on one tree

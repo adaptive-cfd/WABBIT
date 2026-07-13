@@ -52,16 +52,15 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
     ! Color defines which objects belong together, default values are:
     ! Color         Description
-    !   0           Boring parts (channel walls, cavity)
-    !   1           Interesting parts (e.g. a cylinder), for the insects this is BODY
-    !   2           Other parts, for the insects, this is LEFT WING
-    !   3           For the insects, this is RIGHT WING
-    !   4           Other parts, for the insects, this is 2ND LEFT WING
-    !   5           For the insects, this is 2ND RIGHT WING
+    !   1-n         full geometries
+    !   n+1-n+5     parts of insect1 (body, left wing, right wing, left wing2, right wing2)
+    !   n+6-n+10    parts of insect2 (body, left wing, right wing, left wing2, right wing2)
+    !   ...
     integer(kind=2) :: color
     logical :: is_insect, has_two_wings
     integer :: i_insect
     character(len=64) :: fname
+    real(kind=rk) :: buffer_write(1:2, 1:100)  ! buffer for writing to file, usefull to write several columns instead of several files
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: STATISTICS_ACM called but ACM not initialized"
 
@@ -470,9 +469,6 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call aero_power (Insects(i_insect), apowtotal(i_insect))
                 call inert_power(Insects(i_insect), ipowtotal(i_insect), iwmoment(i_insect, :, :))
 
-                ! store simplified insect state (which is NOT the same as the state vector that we use in free_flight simulations)
-                call append_t_file( 'insect_state.t', (/time, Insects(i_insect)%xc_body_g(1:3), Insects(i_insect)%vc_body_g(1:3), &
-                    Insects(i_insect)%gamma, Insects(i_insect)%beta, Insects(i_insect)%psi /) )
             enddo
         endif
 
@@ -521,39 +517,63 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
                     ! information for each insect
                     do i_insect = 1, n_insects
-                        ! total moment w.r.t body center is computed in zeroth color slot:
-                        color = insects(i_insect)%color_geometry
-                        call append_t_file( 'moments.t', (/time, params_acm%moment_color(:,color), dble(i_insect)/) )
-
-                        ! body
-                        color = insects(i_insect)%color_body
-                        call append_t_file( 'forces_body.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
-                        call append_t_file( 'moments_body.t', (/time, params_acm%moment_color(:,color), dble(i_insect)/) )
-
-                        ! left wing
-                        color = insects(i_insect)%color_l
-                        call append_t_file( 'forces_leftwing.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
-                        call append_t_file( 'moments_leftwing.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
-
-                        ! right wing
-                        color = insects(i_insect)%color_r
-                        call append_t_file( 'forces_rightwing.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
-                        call append_t_file( 'moments_rightwing.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
-
-                        ! kinematics data ('kinematics.t')
-                        if (Insects(i_insect)%second_wing_pair) then
-                            ! second left wing
-                            color = insects(i_insect)%color_l2
-                            call append_t_file( 'forces_leftwing2.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
-                            call append_t_file( 'moments_leftwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
-
-                            ! second right wing
-                            color = insects(i_insect)%color_r2
-                            call append_t_file( 'forces_rightwing2.t', (/time, params_acm%force_color(:,color), dble(i_insect)/) )
-                            call append_t_file( 'moments_rightwing2.t', (/time, params_acm%moment_color(:,color), iwmoment(i_insect, :, color), dble(i_insect)/) )
-
-                        endif
+                        buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%force_color(:,insects(i_insect)%color_geometry)
+                        buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%moment_color(:,insects(i_insect)%color_geometry)
                     enddo
+                    call append_t_file( 'forces_insect.t', (/time, buffer_write(1, 1:3*n_insects)/) )
+                    call append_t_file( 'moments_insect.t', (/time, buffer_write(2, 1:3*n_insects)/) )
+
+                    ! body
+                    do i_insect = 1, n_insects
+                        buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%force_color(:,insects(i_insect)%color_body)
+                        buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%moment_color(:,insects(i_insect)%color_body)
+                    enddo
+                    call append_t_file( 'forces_body.t', (/time, buffer_write(1, 1:3*n_insects)/) )
+                    call append_t_file( 'moments_body.t', (/time, buffer_write(2, 1:3*n_insects)/) )
+
+                    ! left wing
+                    do i_insect = 1, n_insects
+                        buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%force_color(:,insects(i_insect)%color_l)
+                        buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%moment_color(:,insects(i_insect)%color_l)
+                    enddo
+                    call append_t_file( 'forces_leftwing.t', (/time, buffer_write(1, 1:3*n_insects)/) )
+                    call append_t_file( 'moments_leftwing.t', (/time, buffer_write(2, 1:3*n_insects)/) )
+
+                    ! right wing
+                    do i_insect = 1, n_insects
+                        buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%force_color(:,insects(i_insect)%color_r)
+                        buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%moment_color(:,insects(i_insect)%color_r)
+                    enddo
+                    call append_t_file( 'forces_rightwing.t', (/time, buffer_write(1, 1:3*n_insects)/) )
+                    call append_t_file( 'moments_rightwing.t', (/time, buffer_write(2, 1:3*n_insects)/) )
+
+                    if (has_two_wings) then
+                        ! second left wing
+                        do i_insect = 1, n_insects
+                            if (Insects(i_insect)%second_wing_pair) then
+                                buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%force_color(:,insects(i_insect)%color_l2)
+                                buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%moment_color(:,insects(i_insect)%color_l2)
+                            else
+                                buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = 0.0_rk
+                                buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = 0.0_rk
+                            endif
+                        enddo
+                        call append_t_file( 'forces_leftwing2.t', (/time, buffer_write(1, 1:3*n_insects)/) )
+                        call append_t_file( 'moments_leftwing2.t', (/time, buffer_write(2, 1:3*n_insects)/) )
+
+                        ! second right wing
+                        do i_insect = 1, n_insects
+                            if (Insects(i_insect)%second_wing_pair) then
+                                buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%force_color(:,insects(i_insect)%color_r2)
+                                buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = params_acm%moment_color(:,insects(i_insect)%color_r2)
+                            else
+                                buffer_write(1, (i_insect-1)*3+1:(i_insect-1)*3+3) = 0.0_rk
+                                buffer_write(2, (i_insect-1)*3+1:(i_insect-1)*3+3) = 0.0_rk
+                            endif
+                        enddo
+                        call append_t_file( 'forces_rightwing2.t', (/time, buffer_write(1, 1:3*n_insects)/) )
+                        call append_t_file( 'moments_rightwing2.t', (/time, buffer_write(2, 1:3*n_insects)/) )
+                    endif
                 endif
 
                 call append_t_file( 'mask_volume.t', (/time, params_acm%mask_volume(1:ncolors), params_acm%sponge_volume/) )

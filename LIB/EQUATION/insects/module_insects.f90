@@ -597,6 +597,9 @@ contains
 
       integer :: i, i_check
       logical :: do_init
+      character(len=clong) :: header(1:43*n_insects+1)
+
+      header(1) = "time"
 
       do i=1,n_insects
          do_init = .true.
@@ -606,55 +609,94 @@ contains
          enddo
          if (.not. do_init) cycle
 
-         call init_t_file(Insects(i)%kinematics_file, overwrite, (/&
-          "           time", &
-          "    xc_body_g_x", "    xc_body_g_y", "    xc_body_g_z", &
-          "      psi (rad)", "     beta (rad)", "    gamma (rad)", "      eta (rad)", &
-          "  alpha_l (rad)", "    phi_l (rad)", "  theta_l (rad)", &
-          "  alpha_r (rad)", "    phi_r (rad)", "  theta_r (rad)", &
-          "  rot_rel_l_w_x", "  rot_rel_l_w_y", "  rot_rel_l_w_z", &
-          "  rot_rel_r_w_x", "  rot_rel_r_w_y", "  rot_rel_r_w_z", &
-          "   rot_dt_l_w_x", "   rot_dt_l_w_y", "   rot_dt_l_w_z", &
-          "   rot_dt_r_w_x", "   rot_dt_r_w_y", "   rot_dt_r_w_z", &
-          " alpha_l2 (rad)", "   phi_l2 (rad)", " theta_l2 (rad)", &
-          " alpha_r2 (rad)", "   phi_r2 (rad)", " theta_r2 (rad)", &
-          " rot_rel_l2_w_x", " rot_rel_l2_w_y", " rot_rel_l2_w_z", &
-          " rot_rel_r2_w_x", " rot_rel_r2_w_y", " rot_rel_r2_w_z", &
-          "  rot_dt_l2_w_x", "  rot_dt_l2_w_y", "  rot_dt_l2_w_z", &
-          "  rot_dt_r2_w_x", "  rot_dt_r2_w_y", "  rot_dt_r2_w_z", &
-          "      insect_id" /) )
+         write(header(1+(i-1)*43), '(A, i0.2, A)') "I", i, ":xc_body_g_x"
+         write(header(2+(i-1)*43), '(A, i0.2, A)') "I", i, ":xc_body_g_y"
+         write(header(3+(i-1)*43), '(A, i0.2, A)') "I", i, ":xc_body_g_z"
+         write(header(4+(i-1)*43), '(A, i0.2, A)') "I", i, ":psi (rad)"
+         write(header(5+(i-1)*43), '(A, i0.2, A)') "I", i, ":beta (rad)"
+         write(header(6+(i-1)*43), '(A, i0.2, A)') "I", i, ":gamma (rad)"
+         write(header(7+(i-1)*43), '(A, i0.2, A)') "I", i, ":eta (rad)"
+         write(header(8+(i-1)*43), '(A, i0.2, A)') "I", i, ":alpha_l (rad)"
+         write(header(9+(i-1)*43), '(A, i0.2, A)') "I", i, ":phi_l (rad)"
+         write(header(10+(i-1)*43), '(A, i0.2, A)') "I", i, ":theta_l (rad)"
+         write(header(11+(i-1)*43), '(A, i0.2, A)') "I", i, ":alpha_r (rad)"
+         write(header(12+(i-1)*43), '(A, i0.2, A)') "I", i, ":phi_r (rad)"
+         write(header(13+(i-1)*43), '(A, i0.2, A)') "I", i, ":theta_r (rad)"
+         write(header(14+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_l_w_x"
+         write(header(15+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_l_w_y"
+         write(header(16+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_l_w_z"
+         write(header(17+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_r_w_x"
+         write(header(18+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_r_w_y"
+         write(header(19+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_r_w_z"
+         write(header(20+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_l_w_x"
+         write(header(21+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_l_w_y"
+         write(header(22+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_l_w_z"
+         write(header(23+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_r_w_x"
+         write(header(24+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_r_w_y"
+         write(header(25+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_r_w_z"
+         write(header(26+(i-1)*43), '(A, i0.2, A)') "I", i, ":alpha_l2 (rad)"
+         write(header(27+(i-1)*43), '(A, i0.2, A)') "I", i, ":phi_l2 (rad)"
+         write(header(28+(i-1)*43), '(A, i0.2, A)') "I", i, ":theta_l2 (rad)"
+         write(header(29+(i-1)*43), '(A, i0.2, A)') "I", i, ":alpha_r2 (rad)"
+         write(header(30+(i-1)*43), '(A, i0.2, A)') "I", i, ":phi_r2 (rad)"
+         write(header(31+(i-1)*43), '(A, i0.2, A)') "I", i, ":theta_r2 (rad)"
+         write(header(32+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_l2_w_x"
+         write(header(33+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_l2_w_y"
+         write(header(34+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_l2_w_z"
+         write(header(35+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_r2_w_x"
+         write(header(36+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_r2_w_y"
+         write(header(37+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_rel_r2_w_z"
+         write(header(38+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_l2_w_x"
+         write(header(39+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_l2_w_y"
+         write(header(40+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_l2_w_z"
+         write(header(41+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_r2_w_x"
+         write(header(42+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_r2_w_y"
+         write(header(43+(i-1)*43), '(A, i0.2, A)') "I", i, ":rot_dt_r2_w_z"
       enddo
    end subroutine Init_insect_data
 
    !-------------------------------------------------------------------------------
-   ! Write kinematics log of all insects
+   ! Write kinematics log of all insects - we assume that all share the same kinematics file
    !-------------------------------------------------------------------------------
    subroutine Write_insect_data( time )
       implicit none
       real(kind=rk), intent(in) :: time
+      real(kind=rk), allocatable, dimension(:) :: buffer_local
+      integer :: i, n_entries
 
-      integer :: i
+      n_entries = 43
+
+      if (allocated(buffer_local)) then
+         if (size(buffer_local) < n_entries*n_insects) deallocate(buffer_local)
+      endif
+      if (.not. allocated(buffer_local)) allocate(buffer_local(1:n_entries*n_insects))
 
       do i=1,n_insects
+         if (insects(i)%kinematics_file /= Insects(1)%kinematics_file) then
+            write(*,'("ERROR! insects have different kinematics files: ",a," and ",a, " . We will use the first one.")') &
+            Insects(i)%kinematics_file, Insects(1)%kinematics_file
+         endif
+
          if (Insects(i)%second_wing_pair) then
-            call append_t_file( Insects(i)%kinematics_file, (/time, Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
-            Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
-            Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
-            Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
-            Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
-            Insects(i)%alpha_l2, Insects(i)%phi_l2, Insects(i)%theta_l2, &
-            Insects(i)%alpha_r2, Insects(i)%phi_r2, Insects(i)%theta_r2, &
-            Insects(i)%rot_rel_wing_l2_w, Insects(i)%rot_rel_wing_r2_w, &
-            Insects(i)%rot_dt_wing_l2_w, Insects(i)%rot_dt_wing_r2_w, dble(i) /) )
+            buffer_local((i-1)*n_entries+1:i*n_entries) = (/Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
+               Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
+               Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
+               Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
+               Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
+               Insects(i)%alpha_l2, Insects(i)%phi_l2, Insects(i)%theta_l2, &
+               Insects(i)%alpha_r2, Insects(i)%phi_r2, Insects(i)%theta_r2, &
+               Insects(i)%rot_rel_wing_l2_w, Insects(i)%rot_rel_wing_r2_w, &
+               Insects(i)%rot_dt_wing_l2_w, Insects(i)%rot_dt_wing_r2_w /)
          else
-            call append_t_file( Insects(i)%kinematics_file, (/time, Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
-            Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
-            Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
-            Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
-            Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
-            0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, dble(i) /) )
+            buffer_local((i-1)*n_entries+1:i*n_entries) = (/Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
+               Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
+               Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
+               Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
+               Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
+               0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk /)
          endif
       enddo
+      call append_t_file( Insects(1)%kinematics_file, (/time, buffer_local(1:n_entries*n_insects) /) )
    end subroutine Write_insect_data
 
 
@@ -751,61 +793,6 @@ contains
       if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
          geometry_in_block = .true.
       endif
-
-      ! Now, this point might be included but we only want to resolve the boundary, so we check if we resolve a body with sufficient size, say 8 points
-      ! This is very arbitrary for different insects (and sometimes hardcoded), so I just try a simple check
-      select case (trim(standardize_string(Insects(insect_id)%BodyType)))
-         case ("nobody")
-            ! body is not present, wings might be but then yet again we don't really know about any sizes - just return and be sad
-            geometry_in_block = .false.
-            return
-         case ("suzuki-thin-rod")
-            char_length = 0.5_rk  ! this is the length of the rod
-
-         case ("superstl")
-            ! just take maximum extent
-            char_length = maxval(Insects(insect_id)%body_superSTL_g(:,1))-minval(Insects(insect_id)%body_superSTL_g(:,1))
-            char_length = max(char_length, maxval(Insects(insect_id)%body_superSTL_g(:,2))-minval(Insects(insect_id)%body_superSTL_g(:,2)))
-            char_length = max(char_length, maxval(Insects(insect_id)%body_superSTL_g(:,3))-minval(Insects(insect_id)%body_superSTL_g(:,3)))
-
-         case ("jerry")
-            char_length = 1.0_rk  ! L_body of Jerry
-
-         case ("hawkmoth")
-            char_length = 1.0_rk  ! L_body of Hawkmoth
-
-         case ("platicle")
-            char_length = 1.0_rk  ! L_body of Platicle
-
-         case ("coin")
-            char_length = 0.5_rk  ! R of the coin
-
-         case ("sphere")
-            char_length = Insects(insect_id)%L_body
-
-         case ("drosophila_maeda","drosophila_slim")
-            char_length = 1.0_rk  ! I didn't understand this one, but I think 1 is good
-
-         case ("bumblebee")
-            char_length = 1.0_rk  ! I think 1 is a good fit
-
-         case ("emundus")
-            char_length = 1.0_rk  ! 1 should work
-
-         case ("paratuposa_simple")
-            char_length = 0.84_rk ! body length relative to wings
-
-         case ("mosquito_iams")
-            char_length = 0.2628_rk ! thorax parameter for triaxial ellipsiod
-
-         case ("cone")
-            char_length = Insects(insect_id)%b_body
-
-         case default
-            char_length = 1.0_rk  ! default, if we don't know anything about the insect
-      end select
-      ! now check if the characteristic length is resolved by 8 points or less - then we refine further
-      geometry_in_block = geometry_in_block .and. ( (char_length <= 8.0_rk*dx(1)) )
 
       ! Check if wing is contained - this is tricky, as we usually only have the pivot point (which often outside the wing) and complex shapes
       ! so for now, I skip this and hope that (fingers cross), resolving the body is enough to draw the wings as well

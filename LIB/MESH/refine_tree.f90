@@ -102,7 +102,6 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     call refinement_execute_tree( params, hvy_block, tree_ID, time=time )
     call toc( "refine_tree (refinement_execute)", 144, MPI_Wtime()-t1 )
 
-
     !> (e) as the grid changed now with the refinement, we have to update the list of
     !! active blocks so other routines can loop just over these active blocks
     !! and do not have to ensure that the active list is up-to-date

@@ -22,9 +22,9 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
 
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
-    real(kind=rk) :: ref_chance, r, nnorm(1:size(hvy_block,4)), max_grid_density, current_grid_density
+    real(kind=rk) :: ref_chance, r, max_grid_density, current_grid_density
     integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level, ref_status
-    real(kind=rk) :: a, b, x0(1:3), dx(1:3)
+    real(kind=rk) :: mask_max, mask_min, x0(1:3), dx(1:3)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -65,30 +65,23 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
-            ! sometimes, no point of the mask is contained in the block, so we check for the actual geometries as well - this is a task for the physics modules, as they know about the geometries
-            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "refinement")
-            
-            if (ref_status == +1) then
-                ! block has to refine, no need to check mask point-wise
-                lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                cycle
-            endif
-
-            ! do not use normalizaiton (mask is inherently normalized to 0...1)
-            nnorm = 1.0_rk
-
-            if (params%dim == 3) then
-                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id))
-            else
-                a = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
-                b = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id))
-            endif
+            mask_max = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+            mask_min = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
-            if ( abs(a - b)>1.0e-7_rk ) then
+            if ( abs(mask_max - mask_min)>1.0e-7_rk ) then
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
+            endif
+
+            ! check globally if a geometry is contained within a block
+            ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
+            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
+            if (ref_status == +1) then
+                ! block has to stay if geometry_indicator says so AND the whole mask is 0 - then we can assume that the mask did not yet hit the geometry
+                if (mask_max < 1.0e-9_rk) then
+                    lgt_block(lgt_ID, IDX_REFINE_STS) = ref_status
+                endif
             endif
         enddo
 
@@ -117,7 +110,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             ! sometimes, no point of the mask is contained in the block, so we check for the actual geometries as well - this is a task for the physics modules, as they know about the geometries
             call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "refinement")
             if (ref_status == +1) then
-                ! block has to refine, no need to check mask point-wise
+                ! block contains geometry, for this refinement indicator we always refine it, cause we contain boundary + interior parts
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
                 cycle
             endif

@@ -23,7 +23,7 @@ subroutine adaption_test(params)
   integer(kind=ik) :: i, dim, fsize, n_eps, rank, iteration
   integer(kind=ik) :: j, n_components=1, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
-  logical :: verbose = .false., save_all = .true., save_ref=.false.
+  logical :: verbose = .false., save_all = .true., save_ref=.false., adaption_only=.false.
   character(len=clong) :: write_statement
   real(kind=rk), allocatable :: norm(:), norm_tmp(:)
 
@@ -49,6 +49,7 @@ subroutine adaption_test(params)
           write(*,*) " --eps-norm           normalization of wavelets"
           write(*,*) " --save_all           saves adapted snapshots"
           write(*,*) " --save_ref           saves the adapted snapshots on the original grid"
+          write(*,*) " --adaption-only      Do not compute error, only adapt the snapshots"
           write(*,*) "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
       end if
       return
@@ -59,6 +60,7 @@ subroutine adaption_test(params)
   !----------------------------------
   call get_cmd_arg( "--save_all", save_all, default=.false.)
   call get_cmd_arg( "--save_ref", save_ref, default=.false.)
+  call get_cmd_arg( "--adaption-only", adaption_only, default=.false.)
   call get_cmd_arg_str( "--eps-norm", params%eps_norm, default="L2" )
   call get_cmd_arg_str( "--wavelet", params%wavelet, default="CDF44" )
   call get_cmd_arg( "--list", params%input_files )
@@ -119,85 +121,115 @@ subroutine adaption_test(params)
   !----------------------------------
   ! allocate data
   !----------------------------------
-  call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
+  call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp, neqn_hvy_tmp=params%n_eqn)
 
   call reset_forest(params)
 
+  if (.not. adaption_only) then
+    if (params%rank==0) write(*,"(A)") "Adaption test: computing error for eps_list"
 
-  hvy_neighbor = -1_ik
-  tree_n= 0_ik ! reset number of trees in forest
-  tree_ID_input = 1
-  tree_ID_adapt = 2
-  call readHDF5vct_tree(params%input_files, params, hvy_block, tree_ID_input, verbosity=.false.)
+    tree_n= 0_ik ! reset number of trees in forest
+    tree_ID_input = 1
+    tree_ID_adapt = 2
+    call readHDF5vct_tree(params%input_files, params, hvy_block, tree_ID_input, verbosity=.false.)
 
-  !###########################################################
-  ! actual error calculation:
-  ! error_epsilon=|| u_input - u_epsilon||_2 / ||u_input||_2
-  !###########################################################
-  ! need the L2 norm of the input for the relative error
-  ! L2norm = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_input, verbose )
-  call componentWiseNorm_tree(params, hvy_block, tree_ID_input, which_norm="L2", norm=norm)
+    !###########################################################
+    ! actual error calculation:
+    ! error_epsilon=|| u_input - u_epsilon||_2 / ||u_input||_2
+    !###########################################################
+    ! need the L2 norm of the input for the relative error
+    ! L2norm = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_input, verbose )
+    call componentWiseNorm_tree(params, hvy_block, tree_ID_input, which_norm="L2", norm=norm)
 
-  do i = 1, n_eps
-    ! copy form original data
-    call copy_tree(params, hvy_block, tree_ID_adapt, tree_ID_input)
-    ! adapt to given eps:
-    read (unit=eps_str_list(i),fmt=*) params%eps
-    call adapt_tree( 0.0_rk, params, hvy_block, tree_ID_adapt, params%coarsening_indicator, hvy_tmp)
-
-    lgt_n_tmp = lgt_n(tree_ID_adapt)
-    Jmin = minActiveLevel_tree(tree_ID_adapt)
-    Jmax = maxActiveLevel_tree(tree_ID_adapt)
-
-    if (save_all) then
-      do j = 1, n_components
-          write( file_out, '("u",i1,"-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time)))
-
-          call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_adapt)
-      end do
-    end if
-
-    if (save_ref) then
-      ! refine the tree back to the other one
-      call refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
-      do j = 1, n_components
-          write( file_out, '("u",i1,"-full-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time)))
-          call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_input)
-      end do
-    end if
-
-    ! compare to original data:
-    call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
-
-    ! compute L2 norm
-    call componentWiseNorm_tree(params, hvy_block, tree_ID_adapt, which_norm="L2", norm=norm_tmp)
-    ! error(i) = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_adapt, verbose )
-    error(i) = sum(norm_tmp / norm)
-    Nb_adapt(i) = lgt_n_tmp
-
-    ! give some output
-    if (rank == 0) then
-      write(write_statement, '(A, i0, A)') '(A, es10.2, A, ', params%n_eqn, '(es10.2, 1x), A, i6, A, f6.1, A, f5.1, A, i2, A, i2, A)'
-      write(*,write_statement) "Field adapted to eps=", params%eps, " rel err=", norm_tmp / norm, " Nblocks=", lgt_n_tmp, &
-              " Nb_adapt/Nb_dense=", 100.0*dble(lgt_n_tmp)/dble( (2**params%Jmax)**params%dim ), &
-              "% Nb_adapt/Nb_input=", 100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), "% [Jmin,Jmax]=[", Jmin, ',', Jmax, "]"
-    endif
-  end do
-  ! elapsed time for reading and coarsening the data
-  t_elapse(1)= MPI_Wtime()-t_elapse(1)
-
-  !  Save values
-  if (save_all .and. params%rank==0) then
-    file_out ="compression_error.txt"
-    write(*,'( "compresion error saved to: ", A30 )') file_out
-    write(*,*)
-    open(14,file=file_out, status='replace')
-    write(14,'("eps", 1x, " L2error", 1x ,"Nb blocks", 1x , "Nb_adapt/Nb_input")')
     do i = 1, n_eps
-      write(14,FMT='(A," ",es15.8," ",i7," ",es10.3)') &
-      trim(adjustl(eps_str_list(i))),error(i),Nb_adapt(i), 1.0_rk*dble(Nb_adapt(i))/dble(lgt_n(tree_ID_input))
-    enddo
-    close(14)
+      ! copy form original data
+      call copy_tree(params, hvy_block, tree_ID_adapt, tree_ID_input)
+      ! adapt to given eps:
+      read (unit=eps_str_list(i),fmt=*) params%eps
+      call adapt_tree( 0.0_rk, params, hvy_block, tree_ID_adapt, params%coarsening_indicator, hvy_tmp)
+
+      lgt_n_tmp = lgt_n(tree_ID_adapt)
+      Jmin = minActiveLevel_tree(tree_ID_adapt)
+      Jmax = maxActiveLevel_tree(tree_ID_adapt)
+
+      if (save_all) then
+        do j = 1, n_components
+            write( file_out, '("u",i1,"-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time)))
+
+            call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_adapt)
+        end do
+      end if
+
+      if (save_ref) then
+        ! refine the tree back to the other one
+        call refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
+        do j = 1, n_components
+            write( file_out, '("u",i1,"-full-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time)))
+            call saveHDF5_tree(file_out, time, iteration, j, params, hvy_block, tree_ID_input)
+        end do
+      end if
+
+      ! compare to original data:
+      call substract_two_trees(params, hvy_block, hvy_tmp, tree_ID_adapt, tree_ID_input)
+
+      ! compute L2 norm
+      call componentWiseNorm_tree(params, hvy_block, tree_ID_adapt, which_norm="L2", norm=norm_tmp)
+      ! error(i) = compute_tree_L2norm( params, hvy_block, hvy_tmp, tree_ID_adapt, verbose )
+      error(i) = sum(norm_tmp / norm)
+      Nb_adapt(i) = lgt_n_tmp
+
+      ! give some output
+      if (rank == 0) then
+        write(write_statement, '(A, i0, A)') '(A, es10.2, A, ', params%n_eqn, '(es10.2, 1x), A, i6, A, f6.1, A, f5.1, A, i2, A, i2, A)'
+        write(*,write_statement) "Field adapted to eps=", params%eps, " rel err=", norm_tmp / norm, " Nblocks=", lgt_n_tmp, &
+                " Nb_adapt/Nb_dense=", 100.0*dble(lgt_n_tmp)/dble( (2**params%Jmax)**params%dim ), &
+                "% Nb_adapt/Nb_input=", 100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), "% [Jmin,Jmax]=[", Jmin, ',', Jmax, "]"
+      endif
+    end do
+    ! elapsed time for reading and coarsening the data
+    t_elapse(1)= MPI_Wtime()-t_elapse(1)
+
+    !  Save values
+    if (save_all .and. params%rank==0) then
+      file_out ="compression_error.txt"
+      write(*,'( "compresion error saved to: ", A30 )') file_out
+      write(*,*)
+      open(14,file=file_out, status='replace')
+      write(14,'("eps", 1x, " L2error", 1x ,"Nb blocks", 1x , "Nb_adapt/Nb_input")')
+      do i = 1, n_eps
+        write(14,FMT='(A," ",es15.8," ",i7," ",es10.3)') &
+        trim(adjustl(eps_str_list(i))),error(i),Nb_adapt(i), 1.0_rk*dble(Nb_adapt(i))/dble(lgt_n(tree_ID_input))
+      enddo
+      close(14)
+    end if
+  else
+    if (params%rank==0) write(*,"(A)") "Adaption test: only adapting the snapshots, no error calculation"
+
+    do i = 1, n_eps
+      tree_ID_input = 1
+      call readHDF5vct_tree(params%input_files, params, hvy_block, tree_ID_input, verbosity=.false.)
+      read (unit=eps_str_list(i),fmt=*) params%eps
+      call adapt_tree( 0.0_rk, params, hvy_block, tree_ID_input, params%coarsening_indicator, hvy_tmp)
+      lgt_n_tmp = lgt_n(tree_ID_input)
+      Jmin = minActiveLevel_tree(tree_ID_input)
+      Jmax = maxActiveLevel_tree(tree_ID_input)
+
+      if (save_all) then
+        do j = 1, n_components
+            ! HACK: write other time so that paraview can easily distiunguish the different epsilons
+            write( file_out, '("u",i1,"-eps", A,"_",a ,".h5")') j, trim(adjustl(eps_str_list(i))), trim(adjustl(timestr(time+params%eps)))
+            call saveHDF5_tree(file_out, time+params%eps, iteration, j, params, hvy_block, tree_ID_input)
+        end do
+      end if
+
+      ! give some output
+      if (rank == 0) then
+        write(write_statement, '(A)') '(A, es10.2, A, i6, A, f6.1, A, f5.1, A, i2, A, i2, A)'
+        write(*,write_statement) "Field adapted to eps=", params%eps," Nblocks=", lgt_n_tmp,&
+                " Nb_adapt/Nb_dense=", 100.0*dble(lgt_n_tmp)/dble( (2**params%Jmax)**params%dim ), &
+                "% Nb_adapt/Nb_input=", 100.0*dble(lgt_n_tmp)/dble(lgt_n(tree_ID_input)), "% [Jmin,Jmax]=[", Jmin, ',', Jmax, "]"
+      endif
+    end do
   end if
 
 

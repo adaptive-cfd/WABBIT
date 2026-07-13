@@ -562,7 +562,41 @@ contains
 
 
     !> \brief Plan communication for standard/refine_predictive balancing modes
-    !> \details Walk through SFC and assign contiguous segments to ranks sequentially
+    !> \details Walk through the SFC-sorted block list and assign contiguous segments to
+    !! ranks sequentially, such that each rank ends up owning blocksPerRank_balanced(rank)
+    !! "units" of load. In standard balancing 1 unit = 1 existing block. In
+    !! refine_predictive mode, a block that is flagged for refinement costs 2**dim units,
+    !! since it will turn into 2**dim children that all stay on whichever rank ends up
+    !! owning the parent - all other blocks still cost 1 unit.
+    !!
+    !! WHY THE ROUNDING LOGIC BELOW IS NEEDED:
+    !! A block can never be split between two ranks, it is always sent as a whole. In
+    !! standard mode every block costs exactly 1 unit, so it always fits into whatever
+    !! budget is left on the current rank - no rounding error is possible. In
+    !! refine_predictive mode a block can cost 2**dim units, and this will frequently NOT
+    !! fit exactly into what remains of the current rank's budget. If such a block were
+    !! always assigned to the current rank regardless of the overshoot this creates, the
+    !! error would silently vanish: the current rank ends up with more blocks than
+    !! intended, but the NEXT rank simply starts again with its own, unmodified budget -
+    !! the excess is never subtracted from anyone. Since this can happen at every single
+    !! rank boundary, the lost budget accumulates along the whole rank list and, with many
+    !! mpiranks, can grow large enough to consume an entire rank's budget - which then gets
+    !! ZERO blocks. Such an empty rank in the middle of the SFC forces any corrective load
+    !! balancing done later (e.g. right after the actual refinement) to shift the ENTIRE
+    !! remainder of the grid over by one rank ("pearls on a string"), which is precisely the
+    !! global imbalance we want to avoid.
+    !!
+    !! The fix is to never let the mismatch simply disappear: whenever giving the current
+    !! block to the current rank would create a WORSE error than deferring it would, we
+    !! close out the current rank early and hand its unused ("undershoot") budget to the
+    !! next rank as a bonus, instead of discarding it. Concretely we compare "assigning here
+    !! overshoots by (weight - budget)" against "deferring undershoots by budget" and always
+    !! take the smaller error - which is exactly "defer while budget < weight/2", written
+    !! without integer division as "2*budget < weight". This keeps every carry strictly
+    !! smaller than half of the largest possible block weight (2**dim), i.e. the local error
+    !! can never exceed +/- 2**(dim-1) - and, crucially, it can no longer accumulate over
+    !! many ranks, because it is paid back at the very next opportunity instead of drifting
+    !! all the way to the end of the rank list.
     subroutine plan_communication_standard(params, sfc_sorted_list, N_sfc_blocks, blocksPerRank_balanced, &
                                           balance_id, sfc_com_list, com_N, num_blocks_count)
         implicit none
@@ -575,57 +609,74 @@ contains
         integer(kind=ik), intent(out)       :: com_N               !> number of communications planned
         integer(kind=ik), intent(inout)     :: num_blocks_count(3) !> debug counters
         
-        integer(kind=ik) :: k, mpirank_shouldBe, mpirank_currently, lgt_id
-        
+        integer(kind=ik) :: k, mpirank_shouldBe, mpirank_currently, lgt_id, block_weight
+
         ! mpirank_shouldBe: rank responsible for current part of SFC
         ! mpirank_currently: rank currently holding the block
-        
+
         ! we start the loop on the root rank (0), then assign the first elements
         ! of the SFC, then to second rank, etc. (thus: mpirank_shouldBe is a loop variable)
         mpirank_shouldBe = 0
-        
+
         ! communication counter. each communication (=send and receive) is stored in a long list
         com_N = 0
-        
+
         ! prepare lists for transfering of blocks
         ! ATTENTION: this loop is unusual because it does not loop over the active lists, but the sfc_sorted_list
         ! hence you find no lgt_active(k, tree_ID) here.
         ! COLLECTIVE OPERATION
         do k = 1, N_sfc_blocks
+            lgt_id = sfc_sorted_list(1, k)
+
+            ! Cost of this block in blocksPerRank_balanced units, see subroutine header.
+            if ((lgt_block(lgt_id, IDX_REFINE_STS) == +1) .and. (mod(balance_id, 10) == 2)) then
+                ! block will be refined, resulting in 2**D blocks (refine_predictive mode)
+                block_weight = 2**params%dim
+            else
+                ! either standard balancing or block will not be refined, resulting in 1 block in both cases
+                block_weight = 1
+            endif
+
             ! Determine which mpirank should own the current portion of the SFC.
             !
-            ! if the current owner of the SFC is supposed to have zero blocks
-            ! then it does not really own this part of the SFC. So we look for the
-            ! first rank which is supposed to hold at least one block, and declare it as owner
-            ! of this part. NOTE: as we try to minimize communication during send/recv in
-            ! load balancing, it may well be that the list of active mpiranks (ie those
-            ! which have nonzero number of blocks) is non contiguous, i.e.
-            ! blocksPerRank_balanced = 1 1 1 0 0 0 0 1 0 1
+            ! If the remaining budget of the current SFC owner is too small to take this
+            ! block without causing a larger error than deferring it would, close out this
+            ! rank and hand its leftover ("undershoot") budget to the next rank instead of
+            ! discarding it - see the detailed explanation in the subroutine header comment.
+            ! "2*budget < block_weight" is equivalent to "budget < block_weight/2" without
+            ! relying on integer division; for block_weight==1 (i.e. every block in standard
+            ! mode, and non-refining blocks in refine_predictive mode) this reduces to
+            ! "budget <= 0", i.e. exactly the original, error-free behaviour.
+            ! NOTE: as we try to minimize communication during send/recv in load balancing,
+            ! it may well be that the list of active mpiranks (ie those which have nonzero
+            ! number of blocks) is non contiguous, i.e. blocksPerRank_balanced = 1 1 1 0 0 0 0 1 0 1
             ! can happen.
-            do while ( blocksPerRank_balanced(mpirank_shouldBe+1) <= 0 )
-                ! why <= 0 ? Because in refine_predictive mode, we may end up with a slight imbalance
-                ! as we distribute chunks of 2**D or 1 future block - the desired number of blocks is not automatically
-                ! divisible by this number
+            do while ( 2*blocksPerRank_balanced(mpirank_shouldBe+1) < block_weight )
+                ! Safety: there must always be a next rank left to carry the leftover budget
+                ! to. If this fails, blocksPerRank_balanced does not actually sum up to the
+                ! total weight of the SFC block list - a conservation bug elsewhere.
+                if (mpirank_shouldBe >= params%number_procs - 1) then
+                    call abort(262981, "balanceLoad_tree: ran out of mpiranks while blocks are still left to &
+                                        &distribute (blocksPerRank_balanced does not sum up to the SFC block weight)")
+                endif
+
+                ! carry the unused ("undershoot") budget of this rank forward to the next
+                ! rank instead of throwing it away
+                blocksPerRank_balanced(mpirank_shouldBe+2) = blocksPerRank_balanced(mpirank_shouldBe+2) &
+                                                            + blocksPerRank_balanced(mpirank_shouldBe+1)
                 mpirank_shouldBe = mpirank_shouldBe + 1
             end do
-            
-#ifdef DEV
-            ! Should never happen...
-            if (mpirank_shouldBe>params%number_procs-1) then
-                call abort(262981,"Very unusual, we still have blocks leftover but no more mpiranks for distribution")
-            endif
-#endif
-            
+
             ! find out on which mpirank lies the block that we're looking at
-            call lgt2proc( mpirank_currently, sfc_sorted_list(1, k), params%number_blocks )
-            
+            call lgt2proc( mpirank_currently, lgt_id, params%number_blocks )
+
             ! does this block lie on the right mpirank, i.e., the current part of the
             ! SFC? if so, nothing needs to be done. otherwise, the following if is active
             if ( mpirank_shouldBe /= mpirank_currently ) then
                 ! as this block is one the wrong rank, it will be sent away from its
                 ! current owner (mpirank_currently) to the owner of this part of the
                 ! SFC (mpirank_shouldBe)
-                
+
                 ! save this send+receive operation in the list of planned communications
                 ! column
                 !    1     sender mpirank
@@ -634,9 +685,9 @@ contains
                 com_N = com_N + 1
                 sfc_com_list(1, com_N) = mpirank_currently      ! sender mpirank
                 sfc_com_list(2, com_N) = mpirank_shouldBe       ! receiver mpirank
-                sfc_com_list(3, com_N) = sfc_sorted_list(1,k)   ! light id of block
+                sfc_com_list(3, com_N) = lgt_id                 ! light id of block
             end if
-            
+
             if (params%debug_balanceLoad) then
                 ! Development checks - count how many blocks are send, received or kept
                 if ( params%rank == mpirank_currently .and. mpirank_currently /= mpirank_shouldBe ) then
@@ -650,21 +701,17 @@ contains
                     num_blocks_count(3) = num_blocks_count(3) + 1
                 endif
             endif
-            
-            ! The blocksPerRank_balanced defines how many blocks this rank should have, and
-            ! we just treated one (which either already was on the mpirank or will be on
-            ! it after communication), so remove one item from the blocksPerRank_balanced
-            lgt_id = sfc_sorted_list(1,k)
-            if ((lgt_block(lgt_id , IDX_REFINE_STS) == +1).and.(balance_id == 2)) then
-                ! block will be refined, resulting in 2**D blocks (refine_predictive mode)
-                blocksPerRank_balanced( mpirank_shouldBe+1 ) = blocksPerRank_balanced( mpirank_shouldBe+1 ) - 2**params%dim
-            else
-                ! either standard balancing or block will not be refined, resulting in 1 block in both cases
-                blocksPerRank_balanced( mpirank_shouldBe+1 ) = blocksPerRank_balanced( mpirank_shouldBe+1 ) - 1
-            endif
-            
+
+            ! The blocksPerRank_balanced defines how many units this rank should still get, and
+            ! we just treated one block (which either already was on the mpirank or will be on
+            ! it after communication), so remove its cost from blocksPerRank_balanced. This may
+            ! drive the value negative (an accepted overshoot, bounded to less than half of
+            ! block_weight by the rounding logic above) - that debt is picked up by the
+            ! while-loop above the next time this rank's budget is checked.
+            blocksPerRank_balanced( mpirank_shouldBe+1 ) = blocksPerRank_balanced( mpirank_shouldBe+1 ) - block_weight
+
         end do
-        
+
     end subroutine plan_communication_standard
 
     !> \brief Helper function to check if a block matches the filter criteria

@@ -31,7 +31,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! local block spacing and origin
     real(kind=rk) :: dx(1:3), x0(1:3), crsn_chance, R
     real(kind=rk), allocatable, save :: norm(:)
-    logical :: consider_hvy_tmp, inputIsWD
+    logical :: consider_hvy_tmp, inputIsWD, use_hardcode_norm
     real(kind=rk) :: t0  !< timing for debugging
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -132,7 +132,15 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! if we coarsen randomly or everywhere, well, why compute the norm ?
     if ( params%eps_normalized .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/="threshold-cvs" .and. indicator/="threshold-image-denoise" .and. indicator/="undo_refinement") then
         t0 = MPI_Wtime()
-        if (all(params%eps_normalized_hardcode(:) == 0.0_rk)) then
+        use_hardcode_norm = .false.
+        if (allocated(params%eps_normalized_hardcode)) then
+            use_hardcode_norm = .not. all(params%eps_normalized_hardcode(:) == 0.0_rk)
+        endif
+
+        if (use_hardcode_norm) then
+            ! use hardcoded values for the norm
+            norm(1:size(params%eps_normalized_hardcode,dim=1)) = params%eps_normalized_hardcode(1:size(params%eps_normalized_hardcode,dim=1))
+        else
             if ( .not. consider_hvy_tmp .and. .not. input_is_WD) then
                 ! Apply thresholding directly to the statevector (hvy_block), not to derived quantities
                 call componentWiseNorm_tree(params, hvy_block, tree_ID, params%eps_norm, norm)
@@ -142,9 +150,6 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
                 ! norm is computed from original values, not WD values
                 call componentWiseNorm_tree(params, hvy_tmp, tree_ID, params%eps_norm, norm)
             endif
-        else
-            ! use hardcoded values for the norm
-            norm(1:size(params%eps_normalized_hardcode,dim=1)) = params%eps_normalized_hardcode(1:size(params%eps_normalized_hardcode,dim=1))
         endif
 
         ! HACK
@@ -375,21 +380,10 @@ subroutine coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, i
         ! Note this behavior can be bypassed using the ignore_maxlevel switch.
         if (params%force_maxlevel_dealiasing .and. .not. ignore_maxlevel .and. (level==Jmax)) cycle
 
-        ! check globally if a geometry is contained within a block
-        ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
-        call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, refinement_status_geometry, "coarsening")
-        if (max(refinement_status, refinement_status_geometry) >= 0) then
-            ! block has to stay, no need to check mask point-wise
-            lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
-            cycle
-        endif
-
         ! Now check point-wise
         ! t0 = MPI_Wtime()
         ! even if the global eps is very large, we want the fluid/solid (mask interface) to be on the finest level
         refinement_status_mask = -1_ik ! default we coarsen
-        mask_max = 0.0_rk
-        mask_min = 2.0_rk
 
         ! check if any interface point is within the block
         ! merge selects 2D or 3D bounds depending on params%dim
@@ -407,6 +401,16 @@ subroutine coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, i
         ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
         refinement_status = max(refinement_status, refinement_status_mask)
         lgt_block(lgt_ID, IDX_REFINE_STS) = refinement_status
+
+        ! check globally if a geometry is contained within a block
+        ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
+        call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, refinement_status_geometry, "coarsening")
+        if (max(refinement_status, refinement_status_geometry) >= 0) then
+            ! block has to stay if geometry_indicator says so AND the whole mask is 0 - then we can assume that the mask did not yet hit the geometry
+            if (mask_max < 1.0e-9_rk) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
+            endif
+        endif
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (mask_comp)", 1001, MPI_Wtime()-t0 )

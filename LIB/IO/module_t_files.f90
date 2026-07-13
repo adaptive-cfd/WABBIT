@@ -16,7 +16,7 @@ module module_t_files
     ! precision statement
     integer(kind=ik), save, public :: flush_frequency = 5 ! default value may be overwritten in ini_file_to_params
     integer(kind=ik), parameter :: max_parallel_files = 80
-    integer(kind=ik), parameter :: max_columns = 80
+    integer(kind=ik), parameter :: max_columns = 200
     integer(kind=ik), save :: mpirank = 7
     character(len=1), public, parameter :: tfile_separator = ";"
 

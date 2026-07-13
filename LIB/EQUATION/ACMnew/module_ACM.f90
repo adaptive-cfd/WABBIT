@@ -812,6 +812,7 @@ contains
       endif
       if (params_acm%penalization .or. params_acm%use_sponge) then
         call init_t_file('forces.t', overwrite, (/ "           time", "   sum_forces_X", "   sum_forces_Y", "   sum_forces_Z"/))
+        call init_t_file('moments.t', overwrite, (/ "           time", "  sum_moments_X", "  sum_moments_Y", "  sum_moments_Z"/))
 
         ! dynamic initialziation of force array so that it makes sense
         do i_color = 1, ncolors
@@ -828,7 +829,6 @@ contains
         call init_t_file('moments_color.t', overwrite, headers(1:3*ncolors+1) )
 
         if (is_insect) then
-            call init_t_file('moments.t', overwrite)
 
             ! headers for aero power file
             do i_insect = 1, n_insects
@@ -837,26 +837,33 @@ contains
             enddo
             call init_t_file('aero_power.t', overwrite, headers(1:2*n_insects+1) )
 
-            call init_t_file('forces_body.t', overwrite)
-            call init_t_file('moments_body.t', overwrite)
-            call init_t_file('forces_leftwing.t', overwrite)
-            call init_t_file('moments_leftwing.t', overwrite)
-            call init_t_file('forces_rightwing.t', overwrite)
-            call init_t_file('moments_rightwing.t', overwrite)
-
-            ! headers for insect state (which is not the one used by free flight)
+            ! individual parts
             do i_insect = 1, n_insects
-                write(headers((i_insect-1)*9 + 2),"(A,i0.2,A)") "I", i_insect, ":x-pos"
-                write(headers((i_insect-1)*9 + 3),"(A,i0.2,A)") "I", i_insect, ":y-pos"
-                write(headers((i_insect-1)*9 + 4),"(A,i0.2,A)") "I", i_insect, ":z-pos"
-                write(headers((i_insect-1)*9 + 5),"(A,i0.2,A)") "I", i_insect, ":x-vel"
-                write(headers((i_insect-1)*9 + 6),"(A,i0.2,A)") "I", i_insect, ":y-vel"
-                write(headers((i_insect-1)*9 + 7),"(A,i0.2,A)") "I", i_insect, ":z-vel"
-                write(headers((i_insect-1)*9 + 8),"(A,i0.2,A)") "I", i_insect, ":yaw"
-                write(headers((i_insect-1)*9 + 9),"(A,i0.2,A)") "I", i_insect, ":pitch"
-                write(headers((i_insect-1)*9 + 10),"(A,i0.2,A)") "I", i_insect, ":roll"
+                write(headers((i_insect-1)*3 + 2),"(A,i0.2,A)") "I", i_insect, ":force_X"
+                write(headers((i_insect-1)*3 + 3),"(A,i0.2,A)") "I", i_insect, ":force_Y"
+                write(headers((i_insect-1)*3 + 4),"(A,i0.2,A)") "I", i_insect, ":force_Z"
             enddo
-            call init_t_file('insect_state.t', overwrite, headers(1:9*n_insects+1) )
+            call init_t_file('forces_insect.t', overwrite, headers(1:3*n_insects+1) )
+            call init_t_file('forces_body.t', overwrite, headers(1:3*n_insects+1) )
+            call init_t_file('forces_leftwing.t', overwrite, headers(1:3*n_insects+1) )
+            call init_t_file('forces_rightwing.t', overwrite, headers(1:3*n_insects+1) )
+            if (has_two_wings) then
+                call init_t_file('forces_leftwing2.t', overwrite, headers(1:3*n_insects+1) )
+                call init_t_file('forces_rightwing2.t', overwrite, headers(1:3*n_insects+1) )
+            endif
+            do i_insect = 1, n_insects
+                write(headers((i_insect-1)*3 + 2),"(A,i0.2,A)") "I", i_insect, ":moment_X"
+                write(headers((i_insect-1)*3 + 3),"(A,i0.2,A)") "I", i_insect, ":moment_Y"
+                write(headers((i_insect-1)*3 + 4),"(A,i0.2,A)") "I", i_insect, ":moment_Z"
+            enddo
+            call init_t_file('moments_insect.t', overwrite, headers(1:3*n_insects+1) )
+            call init_t_file('moments_body.t', overwrite, headers(1:3*n_insects+1) )
+            call init_t_file('moments_leftwing.t', overwrite, headers(1:3*n_insects+1) )
+            call init_t_file('moments_rightwing.t', overwrite, headers(1:3*n_insects+1) )
+            if (has_two_wings) then
+                call init_t_file('moments_leftwing2.t', overwrite, headers(1:3*n_insects+1) )
+                call init_t_file('moments_rightwing2.t', overwrite, headers(1:3*n_insects+1) )
+            endif
 
             ! headers for state vector file
             if (params_acm%use_free_flight_solver) then
@@ -889,13 +896,7 @@ contains
                     write(headers((i_insect-1)*26 + 27),"(A,i0.2,A)") "I", i_insect, ":moment-g-z"
                 enddo
                 call init_t_file('insect_state_vector.t', overwrite, headers(1:26*n_insects+1) )
-            endif
-
-            if (has_two_wings) then
-                call init_t_file('forces_leftwing2.t', overwrite)
-                call init_t_file('moments_leftwing2.t', overwrite)
-                call init_t_file('forces_rightwing2.t', overwrite)
-                call init_t_file('moments_rightwing2.t', overwrite)
+                call init_t_file('forces_rk.t', overwrite)
             endif
 
             call init_insect_data(overwrite)
@@ -906,7 +907,6 @@ contains
         headers(ncolors+2) = "sponge_volume"
         call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+2) )
         call init_t_file('u_residual.t', overwrite)
-        call init_t_file('forces_rk.t', overwrite)
         call init_t_file('penal_power.t', overwrite, (/&
         "           time", &
         "  E_dot_f_solid"/))

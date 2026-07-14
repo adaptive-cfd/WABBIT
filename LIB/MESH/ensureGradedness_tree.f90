@@ -211,7 +211,7 @@ subroutine ensureGradedness_tree( params, tree_ID, check_daughters, stay_value, 
         !     call hvy2lgt(lgt_id, hvy_id, rank, N)
         !     ref_me = lgt_block( lgt_id , IDX_REFINE_STS )
         !     level_me     = lgt_block( lgt_id, IDX_MESH_LVL )
-        !     write(*, '(A, i0, A, i0, A, i0)') "I", counter, " B", lgt_id, " - ", lgt_block( lgt_id, IDX_REFINE_STS )
+        !     write(*, '(A, i0, A, i0, A, i0)') "insect", counter, " B", lgt_id, " - ", lgt_block( lgt_id, IDX_REFINE_STS )
         ! enddo
 
     end do ! end do of repeat procedure until grid_changed==.false.

@@ -322,7 +322,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
     ! ensures that regions with gradients in the mask function (the fluid/solid interface)
     ! are not coarsened (except for dealiasing, because all blocks on Jmax are coarsened)
     if (params%threshold_mask .and. present(hvy_mask) .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/='undo_refinement') then
-        call coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel )
+        call coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel )
     endif
 
     ! after modifying all refinement flags, we need to synchronize light data
@@ -335,7 +335,7 @@ end subroutine
 !! Since some indicators have to be decided globally and not using the mask (for example, if the mask is yet so coarse, that not a single point hits the actual geometry)
 !! and we might want to extend this for deciding it for each individual geometry, this gets it's own routine
 !! This is a tree-level routine
-subroutine coarseningIndicator_mask( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel)
+subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_ID, ignore_maxlevel)
     
     use module_physics_metamodule
 

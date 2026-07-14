@@ -24,7 +24,7 @@ subroutine post_dry_run(params)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
     character(len=cshort)               :: filename, fname, grid_list, headers(1:100)
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz, color
     real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal
     type(inifile) :: FILE
@@ -130,6 +130,8 @@ subroutine post_dry_run(params)
     deallocate(params%symmetry_vector_component)
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component = "0"
+    
+    flush_frequency = 1
 
     ! it is generally desired to create the mask on Jmax, which is the finest
     ! level used in the simulation. This is where the RHS is computed. If the dealiasing
@@ -176,7 +178,7 @@ subroutine post_dry_run(params)
     ! init t-file for mask volume - we assume 20 values
     headers(1) = "time"
     do k=1,20
-        write(headers(k+2),"(A,i0.3,A)") "c", k, ":mask_volume"
+        write(headers(k+1),"(A,i0.3,A)") "c", k, ":mask_volume"
     end do
     if (save_sponge) then
         headers(22) = "sponge_volume"
@@ -184,6 +186,7 @@ subroutine post_dry_run(params)
     else
         call init_t_file( 'mask_volume.t', overwrite=.true., header=headers(1:21) )
     endif
+    call init_t_file('eps_norm.t', overwrite=.true.)
 
     !-----------------------------------
     call init_insect_data(overwrite=.true.)
@@ -281,7 +284,11 @@ subroutine post_dry_run(params)
                 ! loop over all points
                 do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2); do iy = g+1,Bs(1)+g; do ix = g+1,Bs(1)+g
                     ! add volume of this point to the correct color
-                    mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) = mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
+                    color = int(hvy_mask(ix,iy,iz,5,hvy_id))
+                    if (color == 0 .or. color > size(mask_volume)) then
+                        call abort(071120251, "Error: Dry run generated a mask with color outside of range.")
+                    endif
+                    mask_volume(color) = mask_volume(color) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
                 enddo; enddo; enddo
                 if (save_sponge) then
                     ! sponge volume is in 6th entry

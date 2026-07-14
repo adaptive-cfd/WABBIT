@@ -791,15 +791,15 @@ contains
 
         ! dynamic initialziation of force array so that it makes sense
         do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "c", i_color, ":force_X"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "c", i_color, ":force_Y"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "c", i_color, ":force_Z"
+            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":force_X"
+            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":force_Y"
+            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":force_Z"
         enddo
         call init_t_file('forces_color.t', overwrite, headers(1:3*ncolors+1) )
         do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "c", i_color, ":moment_X"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "c", i_color, ":moment_Y"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "c", i_color, ":moment_Z"
+            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":moment_X"
+            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":moment_Y"
+            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":moment_Z"
         enddo
         call init_t_file('moments_color.t', overwrite, headers(1:3*ncolors+1) )
 
@@ -898,7 +898,7 @@ contains
             call init_insect_data(overwrite)
         endif
         do i_color = 1, ncolors
-            write(headers(i_color+1),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+            write(headers(i_color+1),"(A,i0.3,A)") "color", i_color, ":mask_volume"
         enddo
         headers(ncolors+2) = "sponge_volume"
         call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+2) )

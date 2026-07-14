@@ -272,7 +272,7 @@ subroutine ACM_remove_channel_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
 
-    real(kind=rk)                :: rhs_mean, dV, V_channel, y
+    real(kind=rk)                :: rhs_mean, dV, V_channel, y, safety_wall, u_bulk, tol, weight, y_lower, y_upper
     integer(kind=ik)             :: ix, iy, iz, k, hvy_id, mpierr, lgt_id, g, Bs(1:3)
     real(kind=rk), dimension(3)  :: dx, x0
 
@@ -287,7 +287,10 @@ subroutine ACM_remove_channel_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask
     Bs = params%Bs
 
     ! --- Step1: compute the mean rhs
-    rhs_mean = 0.0_rk
+    u_bulk = 0.0_rk
+    tol = 1.0e-12_rk
+    y_lower = params_acm%h_channel
+    y_upper = params_acm%domain_size(2) - params_acm%h_channel
     
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k, tree_ID)
@@ -298,20 +301,35 @@ subroutine ACM_remove_channel_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask
         ! volume element
         dV = product(dx)
 
+        ! safety distance to avoid round-off problems at the wall location
+        safety_wall = dx(2) * 0.1_rk
+
         do iy = g+1, Bs(2)+g
             y = x0(2) + dble(iy-(g+1)) * dx(2)
 
-            ! mean of rhs inside the fluid (excluding the channel walls) 
-            if (( y>params_acm%h_channel).and.(y<params_acm%domain_size(2)-params_acm%h_channel)) then
-                rhs_mean = rhs_mean + sum(hvy_rhs(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1, hvy_id))*dV
+            if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
+
+                        ! here we use the trapez-rule to solve the ingetral for u_bulk
+                        ! upper and lower channel wall: 1/2
+                        ! inner intervals: 1
+                        if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
+                            weight = 0.5_rk
+                        else
+                            weight = 1.0_rk
+                        endif
+
+                        u_bulk = u_bulk + weight * sum(hvy_rhs(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1, hvy_id)) * dV
             endif
         enddo
-    enddo
 
-    call MPI_ALLREDUCE(MPI_IN_PLACE, rhs_mean, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+     enddo
+
+    call MPI_ALLREDUCE(MPI_IN_PLACE, u_bulk, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
     
-    ! volume of fluid in the channel
+    ! volume of fluid in the channel with walls
     V_channel = params_acm%domain_size(1)*params_acm%domain_size(3)*(params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)
+    u_bulk = u_bulk/V_channel
 
     ! --- Step 2: remove it from RHS, so that the zero mode is not drifting
     do k = 1, hvy_n(tree_ID)
@@ -320,16 +338,16 @@ subroutine ACM_remove_channel_meanrhs(time, params, hvy_block, hvy_rhs, hvy_mask
         call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
         ! get block spacing for RHS
         call get_block_spacing_origin( params, lgt_id, x0, dx )
-
+            
         do iy = g+1, Bs(2)+g
-            y = x0(2) + dble(iy-(g+1)) * dx(2)
+                y = x0(2) + dble(iy-(g+1)) * dx(2)
 
-            ! exclude channel walls
-            if (( y>params_acm%h_channel).and.(y<params_acm%domain_size(2)-params_acm%h_channel)) then
-                hvy_rhs(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1, hvy_id) = hvy_rhs(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1, hvy_id) - rhs_mean / V_channel
-            end if
-        end do
-    end do
+                if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
+                    hvy_rhs(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1, hvy_id) = hvy_rhs(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1, hvy_id) - u_bulk
+                endif
+        enddo
+
+    enddo
 
 end subroutine
 

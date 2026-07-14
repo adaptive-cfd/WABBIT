@@ -153,8 +153,8 @@ subroutine init_ghost_nodes( params )
                 & that the ghost nodes layer can span beyond an entire finer block. Either decrease &
                 & number_ghost_nodes or increase number_block_nodes.")
             endif
-        ! for equidistant, we do not have level differences and therefore just need to ensure that g fits in the block
         else
+	        ! for equidistant grids, we do not have level differences and therefore just need to ensure that g fits in the block
             if (g>=(Bs(1)+1) .or. g>=(Bs(2)+1) .or. (g>=(Bs(3)+1) .and. params%dim==3)) then
                 call abort(921151369, "Young skywalker, you failed at set g>=(Bs+1) (in at least one direction) which implies &
                 & that the ghost nodes layer can span beyond an entire finer block. Either decrease &

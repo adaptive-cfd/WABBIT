@@ -688,8 +688,8 @@ contains
                Insects(i)%theta_l, Insects(i)%alpha_r, Insects(i)%phi_r, Insects(i)%theta_r, &
                Insects(i)%rot_rel_wing_l_w, Insects(i)%rot_rel_wing_r_w, &
                Insects(i)%rot_dt_wing_l_w, Insects(i)%rot_dt_wing_r_w, &
-               0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, &
-               0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk /)
+               0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, &
+               0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk /)
          endif
       enddo
       call append_t_file( Insects(1)%kinematics_file, (/time, buffer_local(1:n_entries*n_insects) /) )

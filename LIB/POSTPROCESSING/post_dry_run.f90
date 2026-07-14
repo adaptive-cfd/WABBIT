@@ -26,7 +26,7 @@ subroutine post_dry_run(params)
     character(len=cshort)               :: filename, fname, grid_list, headers(1:100)
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz, color
     real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
-    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal
+    logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect
     type(inifile) :: FILE
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -188,8 +188,12 @@ subroutine post_dry_run(params)
     endif
     call init_t_file('eps_norm.t', overwrite=.true.)
 
+    is_insect = .false.
+    if (any(params_acm%geometries(:) == "Insect").or.any(params_acm%geometries(:)=="active_grid") &
+    .or. any(params_acm%geometries(:)=="cylinder-free").or.any(params_acm%geometries(:)=="sphere-free").or.any(params_acm%geometries(:)=="plate-free")) is_insect = .true.
+
     !-----------------------------------
-    call init_insect_data(overwrite=.true.)
+    if (is_insect) call init_insect_data(overwrite=.true.)
     !-----------------------------------
 
     if (grid_list == "none" ) then
@@ -262,7 +266,7 @@ subroutine post_dry_run(params)
                     ! we did some refinements, but the grid is still on Jmin - nothing did trigger the refinement. 
                     ! This means no mask was created for some reason - maybe the object just moved out of the domain
                     ! or it is a bug somewhere. Is also possible on huge domains with tiny resolution: the object covers
-                    ! then less than 1 grid point. 
+                    ! then less than 1 grid point. NOTE: this latter case should be corrected by "geometry_indicator" (07/2026)
                     call abort(071120251, "Error: Dry run generated an empty mask. Possible causes: resolution too coarse, object out of domain, no mask defined.")
                 endif
             enddo
@@ -272,32 +276,38 @@ subroutine post_dry_run(params)
             Nmask = lgt_n(tree_ID_flow)
 
             ! write the kinematics file for the insects
-            call write_insect_data(time)
+            if (is_insect) call write_insect_data(time)
 
             ! we compute the mask (and sponge) volume for each color and write it to a file
             mask_volume(:) = 0.0_rk
             sponge_volume = 0.0_rk
-            do k=1,hvy_n(tree_ID_flow)
+            do k = 1, hvy_n(tree_ID_flow)
                 hvy_id = hvy_active(k,tree_ID_flow)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 call get_block_spacing_origin( params, lgt_id, x0, dx )
+
                 ! loop over all points
-                do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2); do iy = g+1,Bs(1)+g; do ix = g+1,Bs(1)+g
-                    ! add volume of this point to the correct color
-                    color = int(hvy_mask(ix,iy,iz,5,hvy_id))
-                    if (color == 0 .or. color > size(mask_volume)) then
-                        call abort(071120251, "Error: Dry run generated a mask with color outside of range.")
-                    endif
-                    mask_volume(color) = mask_volume(color) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
-                enddo; enddo; enddo
+                do iz = merge(1, g+1, params_acm%dim==2), merge(1, Bs(3)+g, params_acm%dim==2)
+                    do iy = g+1, Bs(2)+g
+                        do ix = g+1, Bs(1)+g
+                            ! add volume of this point to the correct color
+                            color = int(hvy_mask(ix,iy,iz,5,hvy_id))
+                            if (color == 0 .or. color > size(mask_volume)) then
+                                call abort(071120251, "Error: Dry run generated a mask with color outside of range.")
+                            endif
+                            mask_volume(color) = mask_volume(color) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
+                        enddo
+                    enddo
+                enddo
                 if (save_sponge) then
                     ! sponge volume is in 6th entry
                     sponge_volume = sponge_volume + sum(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, g+1, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 6, hvy_id)) * product(dx(1:params%dim))
                 endif
             enddo
+
             ! allreduce to get the total volume for each color
-            call MPI_ALLREDUCE(MPI_IN_PLACE, mask_volume, 100, MPI_REAL, MPI_SUM, WABBIT_COMM, ierr)
-            call MPI_ALLREDUCE(MPI_IN_PLACE, sponge_volume, 1, MPI_REAL, MPI_SUM, WABBIT_COMM, ierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, mask_volume, 100, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, ierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, ierr)
             ! usually, the physics module know how many colors there are, but we do not have access to it. So let's just assume 20 and write 20 values plus sponge volume
             if (save_sponge) then
                 call append_t_file( 'mask_volume.t', (/time, mask_volume(1:20), sponge_volume/) )

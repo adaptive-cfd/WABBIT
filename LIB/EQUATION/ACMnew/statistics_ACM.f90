@@ -47,7 +47,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk) :: force_block(1:3, 1:ncolors), moment_block(1:3, 1:ncolors), x_glob(1:3), x_lev(1:3)
     real(kind=rk) :: x0_moment(1:3, 1:ncolors), ipowtotal(1:n_insects), apowtotal(1:n_insects)
     real(kind=rk) :: CFL, CFL_eta, CFL_nu, penal_power_block(1:3), usx, usy, usz, chi, chi_sponge, dissipation_block
-    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0, V_channel
+    real(kind=rk) :: C_eta_inv, C_sponge_inv, dV, x, y, z, penal(1:3), ACM_energy_block, C_0, V_channel, u_bulk, tol, weight_trapez, y_lower, y_upper
     real(kind=rk) :: dxyz(1:3), iwmoment(1:n_insects, 1:3,1:5)
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
     ! Color defines which objects belong together, default values are:
@@ -318,6 +318,28 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 enddo
             enddo
 
+			if (params_acm%use_channel_forcing) then
+				do iy = y1, y2 ! g+1, Bs(2)+g
+					y = x0(2) + dble(iy-(g+1)) * dx(2)
+					tol = 1.0e-12_rk
+					y_lower = params_acm%h_channel
+					y_upper = params_acm%domain_size(2) - params_acm%h_channel
+
+					if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
+
+						if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
+							weight_trapez = 0.5_rk
+						else
+							weight_trapez = 1.0_rk
+						endif
+
+						meanflow_channel_block(1) = meanflow_channel_block(1) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
+						meanflow_channel_block(2) = meanflow_channel_block(2) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
+						meanflow_channel_block(3) = meanflow_channel_block(3) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
+					endif
+				enddo
+			endif
+
             ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
             ! sense to keep track of this. however, note that with Neumann BC, that makes no
             ! sense (zero flux is imposed and the solution for the scalar inside the solid is arbitrary)
@@ -384,6 +406,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! mean flow but only in fluid domain
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%meanflow_channel, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
+			! analytically compute the volume of our channel (no numerical integration required, simple multiplication)
             V_channel = params_acm%domain_size(1)*params_acm%domain_size(3)*(params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)
             params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
         endif

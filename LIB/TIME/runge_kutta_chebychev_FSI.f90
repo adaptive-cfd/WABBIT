@@ -185,7 +185,7 @@ subroutine RungeKuttaChebychev_FSI(time, dt, iteration, params, hvy_block, hvy_w
     state_vector_write = 0.0_rk
     state_vector_write(1) = time + dt
     do i_insect = 1, n_insects
-        state_vector_write( (i_insect-1)*26 + 2 : i_insect*26 + 1) = (/ Insects(i_insect)%STATE, insects(i_insect)%force_g(i_insect), insects(i_insect)%moment_g(i_insect) /)
+        state_vector_write( (i_insect-1)*26 + 2 : i_insect*26 + 1) = (/ Insects(i_insect)%STATE, insects(i_insect)%force_g, insects(i_insect)%moment_g /)
     enddo
     call append_t_file( 'insect_state_vector.t', state_vector_write )
 

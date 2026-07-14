@@ -70,17 +70,22 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
-            if ( abs(mask_max - mask_min)>1.0e-7_rk ) then
+            if ( abs(mask_max - mask_min) > 1.0e-7_rk ) then
+                ! max and min value are different - the mask is not all constant on this block.
+                ! set block status to REFINE.
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
 
-            ! check globally if a geometry is contained within a block
-            ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
+            ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
+            ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
+            ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
             call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
             if (ref_status == +1) then
-                ! block has to stay if geometry_indicator says so AND the whole mask is 0 - then we can assume that the mask did not yet hit the geometry
+                ! The origin of the object (geometry) is in fact inside this block.
+                ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
+                ! the rare exception did occur and we accidentally did not create the mask. 
                 if (mask_max < 1.0e-9_rk) then
-                    lgt_block(lgt_ID, IDX_REFINE_STS) = ref_status
+                    lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
                 endif
             endif
         enddo
@@ -107,21 +112,23 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            ! sometimes, no point of the mask is contained in the block, so we check for the actual geometries as well - this is a task for the physics modules, as they know about the geometries
-            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "refinement")
+            ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
+            ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
+            ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
+            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
             if (ref_status == +1) then
-                ! block contains geometry, for this refinement indicator we always refine it, cause we contain boundary + interior parts
-                lgt_block(lgt_id, IDX_REFINE_STS) = +1
-                cycle
+                ! The origin of the object (geometry) is in fact inside this block.
+                ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
+                ! the rare exception did occur and we accidentally did not create the mask. 
+                if (mask_max < 1.0e-9_rk) then
+                    lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+                endif
             endif
 
             ! merge selects 2D or 3D bounds depending on params%dim
             if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
-            ! if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 6, hvy_id) > 0.0_rk)) then
-            !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
-            ! endif
         enddo
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.

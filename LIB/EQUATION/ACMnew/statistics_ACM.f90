@@ -52,7 +52,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
     real(kind=rk), save :: umag, umax, dx_min, scalar_removal_block, dissipation, u_RMS
     ! Color defines which objects belong together, default values are:
     ! Color         Description
-    !   1-n         full geometries
+    !   1-n         full geometries (= for example a fractal tree, or an entire insect composed of up to 5 individual colors)
     !   n+1-n+5     parts of insect1 (body, left wing, right wing, left wing2, right wing2)
     !   n+6-n+10    parts of insect2 (body, left wing, right wing, left wing2, right wing2)
     !   ...
@@ -496,18 +496,21 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             call append_t_file( 'div.t', (/time, params_acm%div_max, params_acm%div_min/) )
             if (params_acm%penalization .or. params_acm%use_sponge) then
-                ! total force (excluding insect parts, they are considered by the full geometry, otherwise we count them twice)
+                ! total forces (excluding colors for individual insect parts: 1:params_acm%n_geometries). 
+                ! For each insect (which is composed of up to 5 colors), we have the total 
+                ! force stored in the color i_geometry. Hence, we cannot sum here over _all_ colors, as this would mean suming, for an insect,
+                ! the total PLUS the individual parts, so twice the value.
                 call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,1:params_acm%n_geometries)), &
                 sum(params_acm%force_color(2,1:params_acm%n_geometries)), sum(params_acm%force_color(3,1:params_acm%n_geometries)) /) )
 
-                ! forces/moment for individual colors all in one file
+                ! forces/moment for individual colors all in one file.
                 ! This is what we should have done in the first place. For the insects below,
-                ! some colors are (also) stored to different names. That's unfortunate but not a big deal.
+                ! some colors are (also) stored to different filenames. That's unfortunate but not a big deal.
                 ! Reshape flattens the array, so that we'd have for a(2,2): (/a(1,1), a(2,1), a(1,2), a(2,2)/)
-                call append_t_file( "forces_color.t", (/time, reshape(params_acm%force_color(:,:), (/ 3*ncolors/))/) )
+                call append_t_file( "forces_color.t", (/time, reshape(params_acm%force_color(:,:), (/3*ncolors/) ) /) )
 
                 ! save moment for each color in one file
-                call append_t_file( "moments_color.t", (/time, reshape(params_acm%moment_color(:,:), (/ 3*ncolors/))/) )
+                call append_t_file( "moments_color.t", (/time, reshape(params_acm%moment_color(:,:), (/3*ncolors/) ) /) )
 
                 if (is_insect) then
                     call append_t_file( 'aero_power.t', (/time, apowtotal(:), ipowtotal(:)/) )

@@ -151,7 +151,7 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
             endif
 
         case ('none')
-            ! nothin happens, resetting is done before
+            ! nothing happens, not even setting mask to zero: this is done before.
 
         case default
             call abort(120001,"ERROR: geometry for 3d VPM is unknown: "//params_acm%geometries(i_geom))

@@ -387,8 +387,8 @@ subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_I
 
         ! check if any interface point is within the block
         ! merge selects 2D or 3D bounds depending on params%dim
-        if (any(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 1.0e-9_rk .and. &
-                hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) < 1.0_rk-1.0e-9_rk)) then
+        if (any(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 1.0e-12_rk .and. &
+                hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) < 1.0_rk-1.0e-12_rk)) then
             refinement_status_mask = 0_ik
         endif
         mask_max = maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
@@ -396,7 +396,7 @@ subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_I
 
         ! maybe the resolution is so coarse no point on the smoothing layer exists
         ! in that case if both 1 and 0 are in a mask it also has to contain an interface
-        if ((mask_max-mask_min)>1.0e-6) refinement_status_mask = 0_ik
+        if ((mask_max-mask_min)>1.0e-12_rk) refinement_status_mask = 0_ik
 
         ! max acts as an or-operator: only if both checks have -1 then the block can coarsen (and keeps -1), elsewise it stays (and gets 0)
         refinement_status = max(refinement_status, refinement_status_mask)
@@ -407,7 +407,7 @@ subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_I
         call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, refinement_status_geometry, "coarsening")
         if (max(refinement_status, refinement_status_geometry) >= 0) then
             ! block has to stay if geometry_indicator says so AND the whole mask is 0 - then we can assume that the mask did not yet hit the geometry
-            if (mask_max < 1.0e-9_rk) then
+            if (mask_max < 1.0e-12_rk) then
                 lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
             endif
         endif

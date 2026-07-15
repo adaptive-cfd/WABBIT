@@ -1,5 +1,5 @@
-! \brief Delete blocks of tree where all point values are 0, usefull for mask
-subroutine prune_tree( params, hvy_block, tree_ID)
+! \brief Delete blocks of tree where all point values are prune_val (defaults to 0), usefull for mask
+subroutine prune_tree( params, hvy_block, tree_ID, prune_val)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -8,47 +8,39 @@ subroutine prune_tree( params, hvy_block, tree_ID)
     type (type_params), intent(in)    :: params   !< params structure
     integer(kind=ik), intent(in)      :: tree_ID
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    real(kind=rk), intent(in), optional  :: prune_val !< value that is checked
 
     integer(kind=ik) :: k, lgt_id, hvy_id, rank, N, g ,Bs(3)
+    real(kind=rk) :: prune_val_now, prune_eps
 
     rank = params%rank
     N = params%number_blocks
     g = params%g
     Bs = params%Bs
 
+    prune_val_now = 0.0_rk
+    prune_eps = 1.0e-12_rk
+    if (present(prune_val)) prune_val_now = prune_val
 
-    if (rank==0) write(*,'("Tree-pruning, before Nb=",i7)') lgt_n(tree_ID)
+    if (rank==0) write(*,'("Tree-pruning for value ",es10.2,", before Nb=",i7)') prune_val_now, lgt_n(tree_ID)
 
-    if (params%dim == 3) then
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, rank, N )
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, rank, N )
 
-            ! pruning condition: all entries of the block are zero (or below)
-            if (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk) ) then
-                ! pruning: delete the block from the tree
-                lgt_block(lgt_id, :) = -1_ik
-            endif
-        end do
-    else
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, rank, N )
-
-            ! pruning condition: all entries of the block are zero (or below)
-            if ( .not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk) ) then
-                ! pruning: delete the block from the tree
-                lgt_block(lgt_id, :) = -1_ik
-            endif
-        end do
-    endif
+        ! pruning condition: all entries of the block are close to prune_val_now
+        if (all(abs(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, g+1, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 1, hvy_id) - prune_val_now) < prune_eps) ) then
+            ! pruning: delete the block from the tree
+            lgt_block(lgt_id, :) = -1_ik
+        endif
+    end do
 
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     call createActiveSortedLists_forest(params)
     ! do not call updateNeighbors_tree on the pruned tree..
 
-    if (rank==0) write(*,'("Tree-pruning, pruned to Nb=",i7)') lgt_n(tree_ID)
+    if (rank==0) write(*,'("Tree-pruning for value ",es10.2,", pruned to Nb=",i7)') prune_val_now, lgt_n(tree_ID)
 end subroutine
 
 !---------------------------------------------------------------------------------

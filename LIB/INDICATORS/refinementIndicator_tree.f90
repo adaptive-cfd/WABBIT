@@ -49,6 +49,9 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
         ! (useful only if this is the mask function), checks the details and tags the block
         ! for refinement if the details are significant.
 
+        ! we check from g+1 until BS+g+1, so the first ghost layer is included, in order to check the bounds around all possible new points
+        ! if not, the point at position BS+g+1/2 might be on the ghost layer but we would not detect that, even though it should be refined.
+
         ! reset refinement status to "stay"
         do k = 1, lgt_n(tree_ID)
            lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = 0
@@ -65,12 +68,16 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
                 params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
 
-            mask_max = maxval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
-            mask_min = minval(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id))
+            if (any(hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id) > 1.0e-12_rk .and. &
+                hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id) < 1.0_rk-1.0e-12_rk)) then
+                lgt_block(lgt_id, IDX_REFINE_STS) = +1
+            endif
+            mask_max = maxval(hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id))
+            mask_min = minval(hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id))
 
             ! exclude blocks which are all zero or all one from refinement.
             ! they are boring.
-            if ( abs(mask_max - mask_min) > 1.0e-7_rk ) then
+            if ( abs(mask_max - mask_min) > 1.0e-12_rk ) then
                 ! max and min value are different - the mask is not all constant on this block.
                 ! set block status to REFINE.
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
@@ -84,7 +91,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
                 ! The origin of the object (geometry) is in fact inside this block.
                 ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
                 ! the rare exception did occur and we accidentally did not create the mask. 
-                if (mask_max < 1.0e-9_rk) then
+                if (mask_max < 1.0e-12_rk) then
                     lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
                 endif
             endif
@@ -99,6 +106,9 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
         !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))
         ! this criterion tags any block which has a value greater 0.0 in the first
         ! component to be refined.
+
+        ! we check from g+1 until BS+g+1, so the first ghost layer is included, in order to check the bounds around all possible new points
+        ! if not, the point at position BS+g+1/2 might be on the ghost layer but we would not detect that, even though it should be refined.
 
         ! reset refinement status to "stay"
         do k = 1, lgt_n(tree_ID)
@@ -126,7 +136,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             endif
 
             ! merge selects 2D or 3D bounds depending on params%dim
-            if (any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
+            if (any(hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
         enddo

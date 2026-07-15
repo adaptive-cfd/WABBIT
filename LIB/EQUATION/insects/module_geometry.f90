@@ -91,11 +91,11 @@ subroutine draw_sphere(mask, color, x0, dx, g, center, radius, color_set, smooth
     ! bounding box check
     if (present(bounding_box)) then
         ! use pre-computed bounding box for sphere (can be faster if many spheres are to be drawn)
-        bound_min = int((bounding_box(1:3)-x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((bounding_box(4:6)-x0)/dx)) + Nsafety + g+1
+        bound_min = int((bounding_box(1:3)-x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((bounding_box(4:6)-x0)/dx)) + Nsafety + x0_offset
     else
-        bound_min = int((center - radius - x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((center + radius - x0)/dx)) + Nsafety + g+1
+        bound_min = int((center - radius - x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((center + radius - x0)/dx)) + Nsafety + x0_offset
     endif
 
     do iz = max(bound_min(3),lbounds(3)), min(bound_max(3),ubounds(3))
@@ -183,11 +183,11 @@ subroutine draw_cylinder(mask, color, x0, dx, g, endpoint_1, endpoint_2, radius,
     ! for angle=0 (parallel to x-axis) for example, e_r = (1,0,0) and e_t = (0,1,1)
     if (present(bounding_box)) then
         ! use pre-computed bounding box for sphere (can be faster if many spheres are to be drawn)
-        bound_min = int((bounding_box(1:3)-x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((bounding_box(4:6)-x0)/dx)) + Nsafety + g+1
+        bound_min = int((bounding_box(1:3)-x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((bounding_box(4:6)-x0)/dx)) + Nsafety + x0_offset
     else
-        bound_min = int((min(endpoint_1, endpoint_2)-radius*et - x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((max(endpoint_1, endpoint_2)+radius*et - x0)/dx)) + Nsafety + g+1
+        bound_min = int((min(endpoint_1, endpoint_2)-radius*et - x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((max(endpoint_1, endpoint_2)+radius*et - x0)/dx)) + Nsafety + x0_offset
     endif
 
     do iz = max(bound_min(3),lbounds(3)), min(bound_max(3),ubounds(3))
@@ -272,11 +272,11 @@ subroutine draw_cylinder_rounded(mask, color, x0, dx, g, endpoint_1, endpoint_2,
     ! for cylinder-rounded, we can go at most radius away from the endpoints.
     if (present(bounding_box)) then
         ! use pre-computed bounding box for sphere (can be faster if many spheres are to be drawn)
-        bound_min = int((bounding_box(1:3)-x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((bounding_box(4:6)-x0)/dx)) + Nsafety + g+1
+        bound_min = int((bounding_box(1:3)-x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((bounding_box(4:6)-x0)/dx)) + Nsafety + x0_offset
     else
-        bound_min = int((min(endpoint_1, endpoint_2)-radius - x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((max(endpoint_1, endpoint_2)+radius - x0)/dx)) + Nsafety + g+1
+        bound_min = int((min(endpoint_1, endpoint_2)-radius - x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((max(endpoint_1, endpoint_2)+radius - x0)/dx)) + Nsafety + x0_offset
     endif
 
     do iz = max(bound_min(3),lbounds(3)), min(bound_max(3),ubounds(3))
@@ -357,11 +357,11 @@ subroutine draw_circle(mask, color, x0, dx, g, center, radius, color_set, smooth
     ! bounding box check
     if (present(bounding_box)) then
         ! use pre-computed bounding box for sphere (can be faster if many spheres are to be drawn)
-        bound_min = int((bounding_box(1:2)-x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((bounding_box(3:4)-x0)/dx)) + Nsafety + g+1
+        bound_min = int((bounding_box(1:2)-x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((bounding_box(3:4)-x0)/dx)) + Nsafety + x0_offset
     else
-        bound_min = int((center - radius - x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((center + radius - x0)/dx)) + Nsafety + g+1
+        bound_min = int((center - radius - x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((center + radius - x0)/dx)) + Nsafety + x0_offset
     endif
 
     do iy = max(bound_min(2),lbounds(2)), min(bound_max(2),ubounds(2))
@@ -444,11 +444,11 @@ subroutine draw_rectangle(mask, color, x0, dx, g, center, half_size, angle, colo
 
     if (present(bounding_box)) then
         ! use pre-computed bounding box for rectangle (can be faster if many rectangles are to be drawn)
-        bound_min = int((bounding_box(1:2)-x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((bounding_box(3:4)-x0)/dx)) + Nsafety + g+1
+        bound_min = int((bounding_box(1:2)-x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((bounding_box(3:4)-x0)/dx)) + Nsafety + x0_offset
     else
-        bound_min = int((center - abs(half_size*cos_a) - abs(half_size(2:1:-1) * sin_a) - x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((center + abs(half_size*cos_a) + abs(half_size(2:1:-1) * sin_a) - x0)/dx)) + Nsafety + g+1
+        bound_min = int((center - abs(half_size*cos_a) - abs(half_size(2:1:-1) * sin_a) - x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((center + abs(half_size*cos_a) + abs(half_size(2:1:-1) * sin_a) - x0)/dx)) + Nsafety + x0_offset
     endif
 
     do iy = max(bound_min(2),lbounds(2)), min(bound_max(2),ubounds(2))
@@ -525,11 +525,11 @@ subroutine draw_triangle(mask, color, x0, dx, g, vertex1, vertex2, vertex3, colo
 
     if (present(bounding_box)) then
         ! use pre-computed bounding box for rectangle (can be faster if many rectangles are to be drawn)
-        bound_min = int((bounding_box(1:2)-x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((bounding_box(3:4)-x0)/dx)) + Nsafety + g+1
+        bound_min = int((bounding_box(1:2)-x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((bounding_box(3:4)-x0)/dx)) + Nsafety + x0_offset
     else
-        bound_min = int((min(min(vertex1, vertex2), vertex3) - x0)/dx) - Nsafety + g+1
-        bound_max = int(ceiling((max(max(vertex1, vertex2), vertex3) - x0)/dx)) + Nsafety + g+1
+        bound_min = int((min(min(vertex1, vertex2), vertex3) - x0)/dx) - Nsafety + x0_offset
+        bound_max = int(ceiling((max(max(vertex1, vertex2), vertex3) - x0)/dx)) + Nsafety + x0_offset
     endif
 
     do iy = max(bound_min(2),lbounds(2)), min(bound_max(2),ubounds(2))

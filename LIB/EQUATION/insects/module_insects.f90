@@ -14,7 +14,7 @@ module module_insects
 
    ! functions
    PUBLIC :: Draw_Insect, draw_insect_body, draw_insect_wings, insect_geometry_indicator, Update_All_Insects, insects_array_init, insect_init, &
-      insect_clean, draw_active_grid_winglets, init_insect_data, write_insect_data, &
+      insects_clean, insect_clean, draw_active_grid_winglets, init_insect_data, write_insect_data, &
       aero_power, inert_power, read_insect_STATE_from_file, rigid_solid_init, rigid_solid_rhs, &
       BodyMotion, FlappingMotionWrap, StrokePlane, mask_from_pointcloud, &
       body_rotation_matrix, wing_rotation_matrix
@@ -603,56 +603,56 @@ contains
 
       do i=1,n_insects
          do_init = .true.
-         ! check previous insects if this kinematics file was already initialized, if yes, skip initialization
-         do i_check = 1, i-1
-            if (Insects(i)%kinematics_file == Insects(i_check)%kinematics_file) do_init = .false.
-         enddo
-         if (.not. do_init) cycle
+         if (insects(i)%kinematics_file /= Insects(1)%kinematics_file) then
+            write(*,'("ERROR! insects have different kinematics files: ",a," and ",a, " . We will use the first one only")') &
+            Insects(i)%kinematics_file, Insects(1)%kinematics_file
+         endif
 
-         write(header(1+(i-1)*43), '(A, i0.2, A)') "insect", i, ":xc_body_g_x"
-         write(header(2+(i-1)*43), '(A, i0.2, A)') "insect", i, ":xc_body_g_y"
-         write(header(3+(i-1)*43), '(A, i0.2, A)') "insect", i, ":xc_body_g_z"
-         write(header(4+(i-1)*43), '(A, i0.2, A)') "insect", i, ":psi (rad)"
-         write(header(5+(i-1)*43), '(A, i0.2, A)') "insect", i, ":beta (rad)"
-         write(header(6+(i-1)*43), '(A, i0.2, A)') "insect", i, ":gamma (rad)"
-         write(header(7+(i-1)*43), '(A, i0.2, A)') "insect", i, ":eta (rad)"
-         write(header(8+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_l (rad)"
-         write(header(9+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_l (rad)"
-         write(header(10+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_l (rad)"
-         write(header(11+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_r (rad)"
-         write(header(12+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_r (rad)"
-         write(header(13+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_r (rad)"
-         write(header(14+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l_w_x"
-         write(header(15+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l_w_y"
-         write(header(16+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l_w_z"
-         write(header(17+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r_w_x"
-         write(header(18+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r_w_y"
-         write(header(19+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r_w_z"
-         write(header(20+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l_w_x"
-         write(header(21+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l_w_y"
-         write(header(22+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l_w_z"
-         write(header(23+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r_w_x"
-         write(header(24+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r_w_y"
-         write(header(25+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r_w_z"
-         write(header(26+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_l2 (rad)"
-         write(header(27+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_l2 (rad)"
-         write(header(28+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_l2 (rad)"
-         write(header(29+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_r2 (rad)"
-         write(header(30+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_r2 (rad)"
-         write(header(31+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_r2 (rad)"
-         write(header(32+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l2_w_x"
-         write(header(33+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l2_w_y"
-         write(header(34+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l2_w_z"
-         write(header(35+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r2_w_x"
-         write(header(36+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r2_w_y"
-         write(header(37+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r2_w_z"
-         write(header(38+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l2_w_x"
-         write(header(39+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l2_w_y"
-         write(header(40+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l2_w_z"
-         write(header(41+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_x"
-         write(header(42+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_y"
-         write(header(43+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_z"
+         write(header(2+(i-1)*43), '(A, i0.2, A)') "insect", i, ":xc_body_g_x"
+         write(header(3+(i-1)*43), '(A, i0.2, A)') "insect", i, ":xc_body_g_y"
+         write(header(4+(i-1)*43), '(A, i0.2, A)') "insect", i, ":xc_body_g_z"
+         write(header(5+(i-1)*43), '(A, i0.2, A)') "insect", i, ":psi (rad)"
+         write(header(6+(i-1)*43), '(A, i0.2, A)') "insect", i, ":beta (rad)"
+         write(header(7+(i-1)*43), '(A, i0.2, A)') "insect", i, ":gamma (rad)"
+         write(header(8+(i-1)*43), '(A, i0.2, A)') "insect", i, ":eta (rad)"
+         write(header(9+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_l (rad)"
+         write(header(10+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_l (rad)"
+         write(header(11+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_l (rad)"
+         write(header(12+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_r (rad)"
+         write(header(13+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_r (rad)"
+         write(header(14+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_r (rad)"
+         write(header(15+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l_w_x"
+         write(header(16+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l_w_y"
+         write(header(17+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l_w_z"
+         write(header(18+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r_w_x"
+         write(header(19+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r_w_y"
+         write(header(20+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r_w_z"
+         write(header(21+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l_w_x"
+         write(header(22+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l_w_y"
+         write(header(23+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l_w_z"
+         write(header(24+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r_w_x"
+         write(header(25+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r_w_y"
+         write(header(26+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r_w_z"
+         write(header(27+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_l2 (rad)"
+         write(header(28+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_l2 (rad)"
+         write(header(29+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_l2 (rad)"
+         write(header(30+(i-1)*43), '(A, i0.2, A)') "insect", i, ":alpha_r2 (rad)"
+         write(header(31+(i-1)*43), '(A, i0.2, A)') "insect", i, ":phi_r2 (rad)"
+         write(header(32+(i-1)*43), '(A, i0.2, A)') "insect", i, ":theta_r2 (rad)"
+         write(header(33+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l2_w_x"
+         write(header(34+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l2_w_y"
+         write(header(35+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_l2_w_z"
+         write(header(36+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r2_w_x"
+         write(header(37+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r2_w_y"
+         write(header(38+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_rel_r2_w_z"
+         write(header(39+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l2_w_x"
+         write(header(40+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l2_w_y"
+         write(header(41+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_l2_w_z"
+         write(header(42+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_x"
+         write(header(43+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_y"
+         write(header(44+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_z"
       enddo
+      call init_t_file( Insects(1)%kinematics_file, overwrite, header=header(1:43*n_insects+1))
    end subroutine Init_insect_data
 
    !-------------------------------------------------------------------------------
@@ -672,11 +672,6 @@ contains
       if (.not. allocated(buffer_local)) allocate(buffer_local(1:n_entries*n_insects))
 
       do i=1,n_insects
-         if (insects(i)%kinematics_file /= Insects(1)%kinematics_file) then
-            write(*,'("ERROR! insects have different kinematics files: ",a," and ",a, " . We will use the first one.")') &
-            Insects(i)%kinematics_file, Insects(1)%kinematics_file
-         endif
-
          if (Insects(i)%second_wing_pair) then
             buffer_local((i-1)*n_entries+1:i*n_entries) = (/Insects(i)%xc_body_g, Insects(i)%psi, Insects(i)%beta, &
                Insects(i)%gamma, Insects(i)%eta_stroke, Insects(i)%alpha_l, Insects(i)%phi_l, &
@@ -1296,6 +1291,9 @@ contains
          rot_dt_wing_g = (Insect2%rot_rel_wing_r2_g - Insect%rot_rel_wing_r2_g) / dt
          Insect%rot_dt_wing_r2_w = matmul(M_b2w_r2,matmul(M_g2b, rot_dt_wing_g))
       endif
+
+      ! just to be sure, we deallocate insect2 here
+      call insect_clean(insect2)
 
    end subroutine wing_angular_accel
 

@@ -23,8 +23,8 @@ subroutine post_dry_run(params)
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)               :: filename, fname, grid_list, headers(1:100)
-    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz
+    character(len=cshort)               :: filename, fname, grid_list, headers(1:100), dummy
+    integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz, color
     real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect
     type(inifile) :: FILE
@@ -42,45 +42,45 @@ subroutine post_dry_run(params)
     call get_cmd_arg( "-h", help2, default=.false. )
 
     if ((help1 .or. help2) .and. (params%rank==0)) then
-        write(*,*) "--------------------------------------------------------------"
-        write(*,*) " Dry run"
-        write(*,*) "--------------------------------------------------------------"
-        write(*,*) " Just like a normal simulation, this postprocessing routine reads"
-        write(*,*) " the parameters from an INI file, but it just generates the mask"
-        write(*,*) " function at time intervals specified in the INI file. No fluid "
-        write(*,*) " or other eqns are solved."
-        write(*,*) "--------------------------------------------------------------"
-        write(*,*) " This routine is mostly used for ACM and insects"
-        write(*,*) "--------------------------------------------------------------"
-        write(*,*) " Two modes are available: "
-        write(*,*) "    1/ create mask on minimum grid, which may be different from fluid grid"
-        write(*,*) "    2/ create mask on a list of given grids, then identical to fluid grid"
-        write(*,*) "--------------------------------------------------------------"
-        write(*,*) " Call:"
-        write(*,*) " ./wabbit-post --dry-run PARAMS.ini --memory=20.0GB --Jmin=1 --grid-list=none --pruned"
-        write(*,*) ""
-        write(*,*) " Other parameters:"
-        write(*,*) ""
-        write(*,*) " --pruned=1 (or simply --pruned) Uses tree-pruning, i.e. removes"
-        write(*,*) "    blocks which do not contain the mask function. This option can"
-        write(*,*) "    speed up visualization, but the data are incomplete: you cannot"
-        write(*,*) "    read those fields into wabbit."
-        write(*,*) ""
-        write(*,*) " --Jmin The minimum tree level, default is taken from INI file."
-        write(*,*) ""
-        write(*,*) " --save-us Save, in addition to mask_*.h5, also the solid velocity field us (a vector field)"
-        write(*,*) " --save-color Save, in addition to mask_*.h5, also the color field (a scalar field)"
-        write(*,*) " --save-sponge Save, in addition to mask_*.h5, also the sponge field (a scalar field)"
-        write(*,*) ""
-        write(*,*) " --tstart: Start mask generation at this time."
-        write(*,*) " --tfinal: End mask generation at this time, overwriting that from INI file"
-        write(*,*) " --include-tfinal: Usually, we skip the last time step (as for periodic data this is redundant), but optionally may want to include it"
-        write(*,*) ""
-        write(*,*) " --grid-list=list.txt"
-        write(*,*) "   If given, we read in the specified h5 files and create the mask"
-        write(*,*) "   on the same grid. Output is stored in mask_XXXXXXXXXXXX.h5 as usual, "
-        write(*,*) "   but the time stamp is taken from the file(s)."
-        write(*,*) ""
+        write(*,'(A)') "--------------------------------------------------------------"
+        write(*,'(A)') " Dry run"
+        write(*,'(A)') "--------------------------------------------------------------"
+        write(*,'(A)') " Just like a normal simulation, this postprocessing routine reads"
+        write(*,'(A)') " the parameters from an INI file, but it just generates the mask"
+        write(*,'(A)') " function at time intervals specified in the INI file. No fluid "
+        write(*,'(A)') " or other eqns are solved."
+        write(*,'(A)') "--------------------------------------------------------------"
+        write(*,'(A)') " This routine is mostly used for ACM and insects"
+        write(*,'(A)') "--------------------------------------------------------------"
+        write(*,'(A)') " Two modes are available: "
+        write(*,'(A)') "    1/ create mask on minimum grid, which may be different from fluid grid"
+        write(*,'(A)') "    2/ create mask on a list of given grids, then identical to fluid grid"
+        write(*,'(A)') "--------------------------------------------------------------"
+        write(*,'(A)') " Call:"
+        write(*,'(A)') " ./wabbit-post --dry-run PARAMS.ini --memory=20.0GB --Jmin=1 --grid-list=none --pruned"
+        write(*,'(A)') ""
+        write(*,'(A)') " Other parameters:"
+        write(*,'(A)') ""
+        write(*,'(A)') " --pruned=1 (or simply --pruned) Uses tree-pruning, i.e. removes"
+        write(*,'(A)') "    blocks which do not contain the mask function. This option can"
+        write(*,'(A)') "    speed up visualization, but the data are incomplete: you cannot"
+        write(*,'(A)') "    read those fields into wabbit."
+        write(*,'(A)') ""
+        write(*,'(A)') " --Jmin The minimum tree level, default is taken from INI file."
+        write(*,'(A)') ""
+        write(*,'(A)') " --save-us Save, in addition to mask_*.h5, also the solid velocity field us (a vector field)"
+        write(*,'(A)') " --save-color Save, in addition to mask_*.h5, also the color field (a scalar field)"
+        write(*,'(A)') " --save-sponge Save, in addition to mask_*.h5, also the sponge field (a scalar field)"
+        write(*,'(A)') ""
+        write(*,'(A)') " --tstart: Start mask generation at this time."
+        write(*,'(A)') " --tfinal: End mask generation at this time, overwriting that from INI file"
+        write(*,'(A)') " --include-tfinal: Usually, we skip the last time step (as for periodic data this is redundant), but optionally may want to include it"
+        write(*,'(A)') ""
+        write(*,'(A)') " --grid-list=list.txt"
+        write(*,'(A)') "   If given, we read in the specified h5 files and create the mask"
+        write(*,'(A)') "   on the same grid. Output is stored in mask_XXXXXXXXXXXX.h5 as usual, "
+        write(*,'(A)') "   but the time stamp is taken from the file(s)."
+        write(*,'(A)') ""
     endif
 
 
@@ -125,11 +125,13 @@ subroutine post_dry_run(params)
     deallocate(params%threshold_state_vector_component)
     allocate(params%threshold_state_vector_component(1:params%n_eqn))
     params%threshold_state_vector_component = 0
-    params%threshold_state_vector_component(1) = 1  ! old: threshold after mask
+    ! params%threshold_state_vector_component(1) = 1  ! old: threshold after mask
 
     deallocate(params%symmetry_vector_component)
     allocate(params%symmetry_vector_component(1:params%n_eqn))
     params%symmetry_vector_component = "0"
+    
+    flush_frequency = 1
 
     ! it is generally desired to create the mask on Jmax, which is the finest
     ! level used in the simulation. This is where the RHS is computed. If the dealiasing
@@ -176,7 +178,7 @@ subroutine post_dry_run(params)
     ! init t-file for mask volume - we assume 20 values
     headers(1) = "time"
     do k=1,20
-        write(headers(k+2),"(A,i0.3,A)") "color", k, ":mask_volume"
+        write(headers(k+1),"(A,i0.3,A)") "color", k, ":mask_volume"
     end do
     if (save_sponge) then
         headers(22) = "sponge_volume"
@@ -184,6 +186,7 @@ subroutine post_dry_run(params)
     else
         call init_t_file( 'mask_volume.t', overwrite=.true., header=headers(1:21) )
     endif
+    call init_t_file('eps_norm.t', overwrite=.true.)
 
     is_insect = .false.
     if (any(params_acm%geometries(:) == "Insect").or.any(params_acm%geometries(:)=="active_grid") &
@@ -236,7 +239,8 @@ subroutine post_dry_run(params)
                 Nmask = lgt_n(tree_ID_flow)
 
                 ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
-                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
+                ! why do we use hvy_tmp here for the mask? Because hvy_mask will be decomposed and we will backup everything in hvy_tmp during adapt_tree
+                call adapt_tree( time, params, hvy_mask, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_tmp )
                 lgt_n_new = lgt_n(tree_ID_flow)
 
                 ! on new grid, create the mask again
@@ -288,7 +292,11 @@ subroutine post_dry_run(params)
                     do iy = g+1, Bs(2)+g
                         do ix = g+1, Bs(1)+g
                             ! add volume of this point to the correct color
-                            mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) = mask_volume(int(hvy_mask(ix,iy,iz,5,hvy_id))) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
+                            color = int(hvy_mask(ix,iy,iz,5,hvy_id))
+                            if (color == 0 .or. color > size(mask_volume)) then
+                                call abort(071120251, "Error: Dry run generated a mask with color outside of range.")
+                            endif
+                            mask_volume(color) = mask_volume(color) + hvy_mask(ix,iy,iz,1,hvy_id) * product(dx(1:params%dim))
                         enddo
                     enddo
                 enddo
@@ -312,9 +320,10 @@ subroutine post_dry_run(params)
             call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
             if (pruned) then
-                if (params%rank==0) write(*,*) "now pruning!"
+                if (params%rank==0) write(*,'(A)') "now pruning!"
 
-                call prune_tree( params, hvy_mask, tree_ID=tree_ID_flow)
+                call prune_tree( params, hvy_mask, tree_ID=tree_ID_flow, prune_val=0.0_rk )
+                call prune_tree( params, hvy_mask, tree_ID=tree_ID_flow, prune_val=1.0_rk )
             endif
 
             !***********************************************************************

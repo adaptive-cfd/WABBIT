@@ -91,8 +91,8 @@ subroutine init_probes_file(params, overwrite)
             ! write entries for every variable as "probeID:varname", right aligned in 15 characters
             do ip = 1, params%n_probes
                 do iv = 1, params%N_probe_variables
-                    write(column_format, '(A,I0,A)') '(i0.', digits, ',A,A)'
-                    write(column_name, column_format) ip, ':', trim(adjustl(params%probe_variables(iv)))
+                    write(column_format, '(A,I0,A)') '(A, i0.', digits, ',A,A)'
+                    write(column_name, column_format) 'Point', ip, ':', trim(adjustl(params%probe_variables(iv)))
                     write(iu, '(A,A)', advance='no') tfile_separator, trim(adjustl(column_name))
                 enddo
             enddo
@@ -100,8 +100,8 @@ subroutine init_probes_file(params, overwrite)
             do il = 1, params%n_probe_lines
                 do ip = 1, params%probe_line_npoints(il)
                     do iv = 1, params%N_probe_variables
-                        write(column_format, '(A,I0,A,I0,A)') '(i0.', digits_lines, ',A,i0.', digits_line_points, ',A,A)'
-                        write(column_name, column_format) il, ':', ip, ':', trim(adjustl(params%probe_variables(iv)))
+                        write(column_format, '(A,I0,A,I0,A)') '(A, i0.', digits_lines, ',A,i0.', digits_line_points, ',A,A)'
+                        write(column_name, column_format) 'Line', il, ':Point', ip, ':', trim(adjustl(params%probe_variables(iv)))
                         write(iu, '(A,A)', advance='no') tfile_separator, trim(adjustl(column_name))
                     enddo
                 enddo

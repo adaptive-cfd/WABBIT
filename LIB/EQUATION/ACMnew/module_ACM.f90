@@ -964,7 +964,7 @@ contains
             call init_insect_data(overwrite)
         endif
         do i_color = 1, ncolors
-            write(headers(i_color+1),"(A,i0.3,A)") "c", i_color, ":mask_volume"
+            write(headers(i_color+1),"(A,i0.3,A)") "color", i_color, ":mask_volume"
         enddo
         headers(ncolors+2) = "sponge_volume"
         call init_t_file('mask_volume.t', overwrite, headers(1:ncolors+2) )

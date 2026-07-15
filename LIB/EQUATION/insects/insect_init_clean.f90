@@ -476,38 +476,79 @@ Insects(Insect_ID)%initialized = .true.
 end subroutine insect_init
 
 
-
-
-subroutine insect_clean()
+! -------------------------------------------------------------------------------
+! \brief Clean up insect data structure for all insects or one specific one
+subroutine insects_clean(insect_i)
     implicit none
 
-    integer(kind=ik) :: Insects_i
+    integer(kind=ik), intent(in), optional :: insect_i  ! which insect to clean?
+    integer(kind=ik) :: Insects_i, insect_start, insect_end
 
-    if (root) then
+    ! if we clean up all insects, then this mass extinction will be announced to the user
+    if (root .and. .not. present(insect_i)) then
         write(*,'(80("<"))')
         write(*,*) "Finalizing insect module!"
         write(*,'(80("<"))')
     endif
 
-    do Insects_i = 1, n_insects
-        if (allocated(Insects(Insects_i)%data_kineloader)) deallocate(Insects(Insects_i)%data_kineloader)
-        if (allocated(Insects(Insects_i)%RHS)) deallocate(Insects(Insects_i)%RHS)
-        if (allocated(Insects(Insects_i)%ai_wings)) deallocate(Insects(Insects_i)%ai_wings)
-        if (allocated(Insects(Insects_i)%bi_wings)) deallocate(Insects(Insects_i)%bi_wings)
-        if (allocated(Insects(Insects_i)%R0_table)) deallocate(Insects(Insects_i)%R0_table)
-        if (allocated(Insects(Insects_i)%theta_i)) deallocate(Insects(Insects_i)%theta_i)
-        if (allocated(Insects(Insects_i)%R_i)) deallocate(Insects(Insects_i)%R_i)
-        if (allocated(Insects(Insects_i)%bristles_coords)) deallocate(Insects(Insects_i)%bristles_coords)
-        if (allocated(Insects(Insects_i)%particle_points)) deallocate ( Insects(Insects_i)%particle_points )
-        if (allocated(Insects(Insects_i)%wing_thickness_profile)) deallocate ( Insects(Insects_i)%wing_thickness_profile )
-        if (allocated(Insects(Insects_i)%corrugation_profile)) deallocate ( Insects(Insects_i)%corrugation_profile )
-        if (allocated(Insects(Insects_i)%mask_wing_complete)) deallocate ( Insects(Insects_i)%mask_wing_complete )
-        if (allocated(Insects(Insects_i)%damage_mask)) deallocate(Insects(Insects_i)%damage_mask)
-        if (allocated(Insects(Insects_i)%mask_wing_complete)) deallocate ( Insects(Insects_i)%mask_wing_complete )
-        if (allocated(Insects(Insects_i)%body_superSTL_b)) deallocate ( Insects(Insects_i)%body_superSTL_b )
-        if (allocated(Insects(Insects_i)%body_superSTL_g)) deallocate ( Insects(Insects_i)%body_superSTL_g )
+    if (present(insect_i)) then
+        insect_start = insect_i
+        insect_end   = insect_i
+    else
+        insect_start = 1
+        insect_end   = n_insects
+    endif
+
+    do Insects_i = insect_start, insect_end
+        call insect_clean(Insects(Insects_i))
     enddo
 
     if (allocated(Insects)) deallocate(Insects)
    
+end subroutine insects_clean
+
+! -------------------------------------------------------------------------------
+! \brief Clean up insect data structure of one insect
+subroutine insect_clean(insect)
+    implicit none
+
+    type(diptera), intent(inout) :: insect
+
+    call wingkinematics_clean(insect%kine_wing_l)
+    call wingkinematics_clean(insect%kine_wing_r)
+    call wingkinematics_clean(insect%kine_wing_l2)
+    call wingkinematics_clean(insect%kine_wing_r2)
+
+    if (allocated(insect%data_kineloader)) deallocate(insect%data_kineloader)
+    if (allocated(insect%RHS)) deallocate(insect%RHS)
+    if (allocated(insect%ai_wings)) deallocate(insect%ai_wings)
+    if (allocated(insect%bi_wings)) deallocate(insect%bi_wings)
+    if (allocated(insect%R0_table)) deallocate(insect%R0_table)
+    if (allocated(insect%theta_i)) deallocate(insect%theta_i)
+    if (allocated(insect%R_i)) deallocate(insect%R_i)
+    if (allocated(insect%bristles_coords)) deallocate(insect%bristles_coords)
+    if (allocated(insect%particle_points)) deallocate ( insect%particle_points )
+    if (allocated(insect%wing_thickness_profile)) deallocate ( insect%wing_thickness_profile )
+    if (allocated(insect%corrugation_profile)) deallocate ( insect%corrugation_profile )
+    if (allocated(insect%damage_mask)) deallocate ( insect%damage_mask )
+    if (allocated(insect%deformations)) deallocate ( insect%deformations )
+    if (allocated(insect%deformation_profile)) deallocate ( insect%deformation_profile )
+    if (allocated(insect%mask_wing_complete)) deallocate ( insect%mask_wing_complete )
+    if (allocated(insect%body_superSTL_b)) deallocate ( insect%body_superSTL_b )
+    if (allocated(insect%body_superSTL_g)) deallocate ( insect%body_superSTL_g )
+
 end subroutine insect_clean
+
+subroutine wingkinematics_clean(wing_kinematics)
+    implicit none
+
+    type(wingkinematics), intent(inout) :: wing_kinematics
+
+    if (allocated(wing_kinematics%ai_phi)) deallocate(wing_kinematics%ai_phi)
+    if (allocated(wing_kinematics%bi_phi)) deallocate(wing_kinematics%bi_phi)
+    if (allocated(wing_kinematics%ai_theta)) deallocate(wing_kinematics%ai_theta)
+    if (allocated(wing_kinematics%bi_theta)) deallocate(wing_kinematics%bi_theta)
+    if (allocated(wing_kinematics%ai_alpha)) deallocate(wing_kinematics%ai_alpha)
+    if (allocated(wing_kinematics%bi_alpha)) deallocate(wing_kinematics%bi_alpha)
+
+end subroutine wingkinematics_clean

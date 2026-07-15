@@ -318,27 +318,27 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 enddo
             enddo
 
-			if (params_acm%use_channel_forcing) then
-				do iy = y1, y2 ! g+1, Bs(2)+g
-					y = x0(2) + dble(iy-(g+1)) * dx(2)
-					tol = 1.0e-12_rk
-					y_lower = params_acm%h_channel
-					y_upper = params_acm%domain_size(2) - params_acm%h_channel
+            if (params_acm%use_channel_forcing) then
+                do iy = y1, y2 ! g+1, Bs(2)+g
+                    y = x0(2) + dble(iy-(g+1)) * dx(2)
+                    tol = 1.0e-12_rk
+                    y_lower = params_acm%h_channel
+                    y_upper = params_acm%domain_size(2) - params_acm%h_channel
 
-					if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
+                    if ((y >= y_lower - tol) .and. (y <= y_upper + tol)) then
 
-						if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
-							weight_trapez = 0.5_rk
-						else
-							weight_trapez = 1.0_rk
-						endif
+                        if (abs(y - y_lower) <= tol .or. abs(y - y_upper) <= tol) then
+                            weight_trapez = 0.5_rk
+                        else
+                            weight_trapez = 1.0_rk
+                        endif
 
-						meanflow_channel_block(1) = meanflow_channel_block(1) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
-						meanflow_channel_block(2) = meanflow_channel_block(2) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
-						meanflow_channel_block(3) = meanflow_channel_block(3) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
-					endif
-				enddo
-			endif
+                        meanflow_channel_block(1) = meanflow_channel_block(1) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 1))
+                        meanflow_channel_block(2) = meanflow_channel_block(2) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 2))
+                        meanflow_channel_block(3) = meanflow_channel_block(3) + weight_trapez * sum(u(g+1:Bs(1)+g, iy, g+1:Bs(3)+g, 3))
+                    endif
+                enddo
+            endif
 
             ! if the scalar BC is Dirichlet, then the solid absorbs some scalar, and it makes
             ! sense to keep track of this. however, note that with Neumann BC, that makes no

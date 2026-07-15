@@ -1,5 +1,5 @@
-! \brief Delete blocks of tree where all point values are 0, usefull for mask
-subroutine prune_tree( params, hvy_block, tree_ID)
+! \brief Delete blocks of tree where all point values are prune_val (defaults to 0), usefull for mask
+subroutine prune_tree( params, hvy_block, tree_ID, prune_val)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -8,47 +8,39 @@ subroutine prune_tree( params, hvy_block, tree_ID)
     type (type_params), intent(in)    :: params   !< params structure
     integer(kind=ik), intent(in)      :: tree_ID
     real(kind=rk), intent(inout)      :: hvy_block(:, :, :, :, :) !< heavy data array - block data
+    real(kind=rk), intent(in), optional  :: prune_val !< value that is checked
 
     integer(kind=ik) :: k, lgt_id, hvy_id, rank, N, g ,Bs(3)
+    real(kind=rk) :: prune_val_now, prune_eps
 
     rank = params%rank
     N = params%number_blocks
     g = params%g
     Bs = params%Bs
 
+    prune_val_now = 0.0_rk
+    prune_eps = 1.0e-12_rk
+    if (present(prune_val)) prune_val_now = prune_val
 
-    if (rank==0) write(*,'("Tree-pruning, before Nb=",i7)') lgt_n(tree_ID)
+    if (rank==0) write(*,'("Tree-pruning for value ",es10.2,", before Nb=",i7)') prune_val_now, lgt_n(tree_ID)
 
-    if (params%dim == 3) then
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, rank, N )
+    do k = 1, hvy_n(tree_ID)
+        hvy_id = hvy_active(k, tree_ID)
+        call hvy2lgt( lgt_id, hvy_id, rank, N )
 
-            ! pruning condition: all entries of the block are zero (or below)
-            if (.not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, g+1:Bs(3)+g, 1, hvy_id) > 0.0_rk) ) then
-                ! pruning: delete the block from the tree
-                lgt_block(lgt_id, :) = -1_ik
-            endif
-        end do
-    else
-        do k = 1, hvy_n(tree_ID)
-            hvy_id = hvy_active(k, tree_ID)
-            call hvy2lgt( lgt_id, hvy_id, rank, N )
-
-            ! pruning condition: all entries of the block are zero (or below)
-            if ( .not. any(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, 1, 1, hvy_id) > 0.0_rk) ) then
-                ! pruning: delete the block from the tree
-                lgt_block(lgt_id, :) = -1_ik
-            endif
-        end do
-    endif
+        ! pruning condition: all entries of the block are close to prune_val_now
+        if (all(abs(hvy_block(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, g+1, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 1, hvy_id) - prune_val_now) < prune_eps) ) then
+            ! pruning: delete the block from the tree
+            lgt_block(lgt_id, :) = -1_ik
+        endif
+    end do
 
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
     call createActiveSortedLists_forest(params)
     ! do not call updateNeighbors_tree on the pruned tree..
 
-    if (rank==0) write(*,'("Tree-pruning, pruned to Nb=",i7)') lgt_n(tree_ID)
+    if (rank==0) write(*,'("Tree-pruning for value ",es10.2,", pruned to Nb=",i7)') prune_val_now, lgt_n(tree_ID)
 end subroutine
 
 !---------------------------------------------------------------------------------
@@ -810,7 +802,7 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
     logical, intent(in),optional      :: verbosity
     !-----------------------------------------------------------------
     integer(kind=ik)    :: rank, level1, level2, Jmax, lgt_id1, lgt_id2, fsize, tree_loop, tree_search
-    integer(kind=ik)    :: k1, k2, Nblocks_2refine(1:2), level_min, loop_i, mpierr
+    integer(kind=ik)    :: k1, k2, Nblocks_2refine(1:2), level_min, loop_i, loop_max, mpierr
     integer(kind=tsize) :: treecode1, treecode2
     logical :: verbose = .false.
     logical :: error_oom, exists
@@ -818,6 +810,7 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
 
     Jmax = params%Jmax ! max treelevel
     fsize= params%forest_size   ! maximal number of trees in forest
+    loop_max = 20
 
     if (present(verbosity)) verbose=verbosity
     if ( params%rank == 0 .and. verbose ) write(*,'("Refining trees to same level: ",i9,",",i9)') tree_ID1, tree_ID2
@@ -867,7 +860,7 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
         ! sort sorted arrays only after treeid-treecode - needs to be repeated after refinement
         ! Why? Because for the following checks, we do not need the blocks to be on the same lvl and therefore need way less array searches
         call createActiveSortedLists_forest(params, sort_only_treecode=.true.)
-        ! loop over tree1
+        ! loop over tree with less blocks
         do k1 = 1, lgt_n(tree_loop)
             lgt_id1 = lgt_active(k1, tree_loop)
             level1  = lgt_block(lgt_id1, IDX_MESH_LVL)
@@ -897,22 +890,25 @@ subroutine refine_trees2same_lvl(params, hvy_block, hvy_tmp, tree_ID1, tree_ID2,
         if (Nblocks_2refine(1) == 0 .and. Nblocks_2refine(2) == 0) then
             exit   ! EXIT the (while true) loop when nothing has to be refined anymore
         else
-            if (params%rank == 0 .and. verbose) write(*,'("Loop ",i9," Number of blocks marked for refinement: ",i9, 1x, i9)') loop_i, Nblocks_2refine(1), Nblocks_2refine(2)
+            if (params%rank == 0 .and. verbose) write(*,'("Loop ",i9," Number of blocks marked for refinement: ",i9, 1x, i9, " Blocks: ",i9, 1x, i9)') loop_i, Nblocks_2refine(1), Nblocks_2refine(2), lgt_n(tree_loop), lgt_n(tree_search)
 
             !----------------------------
             ! refine the tagged blocks
+            ! attention: first entry is for tree with less blocks, second entry is for tree with more blocks
             !----------------------------
             if (Nblocks_2refine(1) > 0) then
-                call refine_tree( params, hvy_block, indicator='nothing (external)', tree_id=tree_ID1, check_full_tree=.false., error_OOM=error_OOM)
-                call sync_ghosts_tree( params, hvy_block, tree_ID1)
+                call refine_tree( params, hvy_block, indicator='nothing (external)', tree_id=tree_loop, check_full_tree=.false., error_OOM=error_OOM)
+                call sync_ghosts_tree( params, hvy_block, tree_loop)
             endif
             if (Nblocks_2refine(2) > 0) then
-                call refine_tree( params, hvy_block, indicator='nothing (external)', tree_id=tree_ID2, check_full_tree=.false., error_OOM=error_OOM)
-                call sync_ghosts_tree( params, hvy_block, tree_ID2)
+                call refine_tree( params, hvy_block, indicator='nothing (external)', tree_id=tree_search, check_full_tree=.false., error_OOM=error_OOM)
+                call sync_ghosts_tree( params, hvy_block, tree_search)
             endif
         endif
 
         loop_i = loop_i + 1
+
+        if (loop_i > loop_max) call abort(260714, "Something went wrong: refine_trees2same_lvl did not converge")
     end do
 
     ! restore sorted arrays

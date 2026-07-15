@@ -319,7 +319,7 @@ end subroutine saveHDF5_tree
 ! test is made if that is true: if the grids are different, garbage will be read.
 !
 !-------------------------------------------------------------------------------
-subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity, synchronize_ghosts, read_refinement_status)
+subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration, verbosity, synchronize_ghosts, update_metadata, read_refinement_status)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -331,7 +331,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     real(kind=rk), intent(inout)   :: hvy_block(:, :, :, :, :) !< heavy data array - data are stored herein
 
     logical, intent(in), optional  :: verbosity       !< if verbosity==True generates log output
-    logical, intent(in), optional  :: synchronize_ghosts
+    logical, intent(in), optional  :: synchronize_ghosts, update_metadata  !< if true, we synchronize the ghost nodes and update the metadata (default: true)
     logical, intent(in), optional  :: read_refinement_status  !< if true, we read the refinement status as well, defaults to false
     real(kind=rk), intent(out), optional   :: time
     integer(kind=ik), intent(out), optional   :: iteration
@@ -705,7 +705,11 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
 
     ! it is good practice that this routine returns a working forest, i.e., all meta
     ! data is updated.
-    call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    if (present(update_metadata)) then
+        if (update_metadata) call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    else
+        call updateMetadata_tree(params, tree_ID, search_overlapping=.false.)
+    endif
 
     if (present(synchronize_ghosts)) then
         if (synchronize_ghosts) call sync_ghosts_tree(params, hvy_block, tree_ID )

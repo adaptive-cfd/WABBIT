@@ -29,11 +29,11 @@ subroutine post_prune_tree(params)
     ! does the user need help?
     if (fname_ini=='--help' .or. fname_ini=='--h' .or. fname_ini=='-h') then
         if (params%rank==0) then
-            write(*,*) "------------------------------------------------------------------"
-            write(*,*) "./wabbit-post --prune-tree input_002.h5 output.h5"
-            write(*,*) "------------------------------------------------------------------"
-            write(*,*) " Removes all zero blocks from a tree (useful only for the mask function)"
-            write(*,*) "------------------------------------------------------------------"
+            write(*,'(A)') "------------------------------------------------------------------"
+            write(*,'(A)') "./wabbit-post --prune-tree input_002.h5 output.h5"
+            write(*,'(A)') "------------------------------------------------------------------"
+            write(*,'(A)') " Removes all zero blocks from a tree (useful only for the mask function)"
+            write(*,'(A)') "------------------------------------------------------------------"
         end if
         return
     endif
@@ -75,7 +75,8 @@ subroutine post_prune_tree(params)
 
     call createActiveSortedLists_forest(params)
 
-    call prune_tree( params, hvy_block, tree_ID=1)
+    call prune_tree( params, hvy_block, tree_ID=1, prune_val=0.0_rk )
+    call prune_tree( params, hvy_block, tree_ID=1, prune_val=1.0_rk )
 
     call createActiveSortedLists_forest(params)
 

@@ -31,27 +31,27 @@ subroutine post_meta_analyse(params)
     ! does the user need help?
     if (file=='--help' .or. file=='--h') then
         if (params%rank==0) then
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Wabbit postprocessing: meta analysis tools"
-            write(*,*) "-----------------------------------------------------------"
-            write(*,*) " Read in a data field (2D or 3D) and performs various"
-            write(*,*) " meta-analyses on the grid structure."
-            write(*,*) " "
-            write(*,*) " Available operators:"
-            write(*,*) " "
-            write(*,*) " --analyse-sisters"
-            write(*,*) "   Checks if all sister blocks exist for every block."
-            write(*,*) "   This is done by checking hvy_family for each block."
-            write(*,*) "   If any sister is missing (entry -1), the block gets"
-            write(*,*) "   status 1. If all sisters exist, the block gets status -1."
-            write(*,*) " "
-            write(*,*) " --analyse-levels"
-            write(*,*) "   Counts the number of blocks on each refinement level"
-            write(*,*) "   and prints a histogram of the block distribution."
-            write(*,*) " "
-            write(*,*) " Usage: "
-            write(*,*) " ./wabbit-post --analyse-sisters file.h5"
-            write(*,*) " ./wabbit-post --analyse-levels file.h5"
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " Wabbit postprocessing: meta analysis tools"
+            write(*,'(A)') "-----------------------------------------------------------"
+            write(*,'(A)') " Read in a data field (2D or 3D) and performs various"
+            write(*,'(A)') " meta-analyses on the grid structure."
+            write(*,'(A)') " "
+            write(*,'(A)') " Available operators:"
+            write(*,'(A)') " "
+            write(*,'(A)') " --analyse-sisters"
+            write(*,'(A)') "   Checks if all sister blocks exist for every block."
+            write(*,'(A)') "   This is done by checking hvy_family for each block."
+            write(*,'(A)') "   If any sister is missing (entry -1), the block gets"
+            write(*,'(A)') "   status 1. If all sisters exist, the block gets status -1."
+            write(*,'(A)') " "
+            write(*,'(A)') " --analyse-levels"
+            write(*,'(A)') "   Counts the number of blocks on each refinement level"
+            write(*,'(A)') "   and prints a histogram of the block distribution."
+            write(*,'(A)') " "
+            write(*,'(A)') " Usage: "
+            write(*,'(A)') " ./wabbit-post --analyse-sisters file.h5"
+            write(*,'(A)') " ./wabbit-post --analyse-levels file.h5"
         end if
         return
     endif
@@ -87,16 +87,18 @@ subroutine post_meta_analyse(params)
     call allocate_forest(params, hvy_block, hvy_tmp=hvy_tmp)
 
     ! read mesh and field
-    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID, synchronize_ghosts=.false.)
+    call readHDF5vct_tree((/file/), params, hvy_block, tree_ID, synchronize_ghosts=.false., update_metadata=.false.)
 
-    ! create lists of active blocks (light and heavy data)
-    ! update list of sorted numerical treecodes, used for finding blocks
-    call updateMetadata_tree( params, tree_ID )
+    call updateMetadata_tree( params, tree_id=tree_ID, update_lists=.true., update_neighbors=.false., update_family=.false. )
 
     ! ------------------------------------------------
     ! Perform the requested analysis
     ! ------------------------------------------------
     if (operator == "--analyse-sisters") then
+        ! create lists of active blocks (light and heavy data)
+        ! update list of sorted numerical treecodes, used for finding blocks
+        call updateMetadata_tree( params, tree_id=tree_ID )
+
         ! ------------------------------------------------
         ! Check for sister completeness
         ! ------------------------------------------------
@@ -134,15 +136,15 @@ subroutine post_meta_analyse(params)
 
         ! Output results
         if (params%rank == 0) then
-            write(*,*) "============================================"
-            write(*,*) " Sister Completeness Check Results"
-            write(*,*) "============================================"
+            write(*,'(A)') "============================================"
+            write(*,'(A)') " Sister Completeness Check Results"
+            write(*,'(A)') "============================================"
             write(*,'(A,I0)') " Total blocks: ", blocks_with_all_sisters + blocks_with_incomplete_sisters
             write(*,'(A,I0)') " Blocks with all sisters: ", blocks_with_all_sisters
             write(*,'(A,I0)') " Blocks without all sisters: ", blocks_with_incomplete_sisters
             write(*,'(A,F7.2,A)') " Percentage with all sisters: ", &
                 100.0_rk * dble(blocks_with_all_sisters) / dble(blocks_with_all_sisters + blocks_with_incomplete_sisters), "%"
-            write(*,*) "============================================"
+            write(*,'(A)') "============================================"
         endif
 
     elseif (operator == "--analyse-levels") then
@@ -162,21 +164,21 @@ subroutine post_meta_analyse(params)
 
         ! Output results
         if (params%rank == 0) then
-            write(*,*) "============================================"
-            write(*,*) " Block Distribution by Refinement Level"
-            write(*,*) "============================================"
+            write(*,'(A)') "============================================"
+            write(*,'(A)') " Block Distribution by Refinement Level"
+            write(*,'(A)') "============================================"
             write(*,'(A,I0)') " Total blocks: ", lgt_n(tree_ID)
             write(*,'(A,I0)') " Maximum level (Jmax): ", Jmax
-            write(*,*) "--------------------------------------------"
+            write(*,'(A)') "--------------------------------------------"
             write(*,'(A)') " Level  |  Number of Blocks  |  Percentage"
-            write(*,*) "--------------------------------------------"
+            write(*,'(A)') "--------------------------------------------"
             do level = 0, Jmax
                 if (blocks_per_level(level) > 0) then
                     write(*,'(I5,A,I12,A,F10.2,A)') level, "   |   ", blocks_per_level(level), &
                         "     |  ", 100.0_rk * dble(blocks_per_level(level)) / dble(lgt_n(tree_ID)), "%"
                 endif
             enddo
-            write(*,*) "============================================"
+            write(*,'(A)') "============================================"
         endif
 
         deallocate(blocks_per_level)

@@ -288,31 +288,33 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! forces acting on this color
                         force_block(1:params_acm%dim, color) = force_block(1:params_acm%dim, color) - penal(1:params_acm%dim)
 
-                        ! moment with color-dependent lever
-                        x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
+                        if (params_acm%dim == 3) then
+                            ! moment with color-dependent lever
+                            x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
 
-                        ! is the obstacle is near the boundary, parts of it may cross the periodic
-                        ! boundary. therefore, ensure that xlev is periodized:
-                        ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
-                        
-                        ! moment acting on this color
-                        moment_block(1:3,color) = moment_block(1:3,color) - cross(x_lev, penal)
+                            ! is the obstacle is near the boundary, parts of it may cross the periodic
+                            ! boundary. therefore, ensure that xlev is periodized:
+                            ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
+                            
+                            ! moment acting on this color
+                            moment_block(1:3,color) = moment_block(1:3,color) - cross(x_lev, penal)
 
 
-                        ! moments. For insects, we compute the total moment wrt to the body center, and
-                        ! the wing moments wrt to the hinge points. The latter two are used to compute the
-                        ! aerodynamic power. Makes sense only in 3D.
-                        if (is_insect .and. params_acm%dim == 3) then
-                            do i_insect = 1, n_insects
-                                if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
-                                    ! in the geometry color of the insect, we compute the total mask volume, force and moment for the whole
-                                    ! insect wrt the center point (body+wings)
-                                    mask_volume(insects(i_insect)%color_geometry) = mask_volume(insects(i_insect)%color_geometry) + mask(ix,iy,iz,1)
-                                    force_block(1:params_acm%dim, insects(i_insect)%color_geometry) = force_block(1:params_acm%dim, insects(i_insect)%color_geometry) - penal(1:params_acm%dim)
-                                    x_lev(1:3) = (/x, y, z/) - Insects(1)%xc_body_g(1:3)
-                                    moment_block(:,insects(i_insect)%color_geometry)  = moment_block(:,insects(i_insect)%color_geometry) - cross(x_lev, penal)
-                                endif
-                            enddo
+                            ! moments. For insects, we compute the total moment wrt to the body center, and
+                            ! the wing moments wrt to the hinge points. The latter two are used to compute the
+                            ! aerodynamic power. Makes sense only in 3D.
+                            if (is_insect) then
+                                do i_insect = 1, n_insects
+                                    if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
+                                        ! in the geometry color of the insect, we compute the total mask volume, force and moment for the whole
+                                        ! insect wrt the center point (body+wings)
+                                        mask_volume(insects(i_insect)%color_geometry) = mask_volume(insects(i_insect)%color_geometry) + mask(ix,iy,iz,1)
+                                        force_block(1:params_acm%dim, insects(i_insect)%color_geometry) = force_block(1:params_acm%dim, insects(i_insect)%color_geometry) - penal(1:params_acm%dim)
+                                        x_lev(1:3) = (/x, y, z/) - Insects(1)%xc_body_g(1:3)
+                                        moment_block(:,insects(i_insect)%color_geometry)  = moment_block(:,insects(i_insect)%color_geometry) - cross(x_lev, penal)
+                                    endif
+                                enddo
+                            endif
                         endif
                     enddo
                 enddo
@@ -525,6 +527,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! the total PLUS the individual parts, so twice the value.
                 call append_t_file( 'forces.t', (/time, sum(params_acm%force_color(1,1:params_acm%n_geometries)), &
                 sum(params_acm%force_color(2,1:params_acm%n_geometries)), sum(params_acm%force_color(3,1:params_acm%n_geometries)) /) )
+                call append_t_file( 'moments.t', (/time, sum(params_acm%moment_color(1,1:params_acm%n_geometries)), &
+                sum(params_acm%moment_color(2,1:params_acm%n_geometries)), sum(params_acm%moment_color(3,1:params_acm%n_geometries)) /) )
 
                 ! forces/moment for individual colors all in one file.
                 ! This is what we should have done in the first place. For the insects below,

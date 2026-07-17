@@ -161,7 +161,10 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
         ! hvy_mask
         if ( present(hvy_mask) .and. params%N_mask_components>0 ) then
-            mem_per_block = mem_per_block + real(params%N_mask_components) * real(product(Bs(1:dim)+2*g))
+            ! only in penalization case, mask is fully used, otherwise it has only one block
+            if (params%penalization) then
+                mem_per_block = mem_per_block + real(params%N_mask_components) * real(product(Bs(1:dim)+2*g))
+            endif
         endif
 
         ! hvy_tmp
@@ -257,7 +260,15 @@ subroutine allocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask, neqn_
 
     if ( present(hvy_mask) .and. params%N_mask_components > 0 ) then
         if (allocated(hvy_mask)) deallocate(hvy_mask)
-        allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
+        ! without penalization, mask gets only one block
+        if (params%penalization) then
+            allocate( hvy_mask( nx, ny, nz, params%N_mask_components, params%number_blocks )  )
+        else
+            allocate( hvy_mask(nx, ny, nz, params%N_mask_components, 1)  )
+            ! preset to 0 and color to 1
+            hvy_mask(:,:,:,:,:) = 0.0_rk
+            if (params%N_mask_components >= 5) hvy_mask(:,:,:,5,:) = 1.0_rk
+        endif
         memory_this = product(real(shape(hvy_mask)))*8.0e-9
         memory_total = memory_total + memory_this
         if (rank==0) then

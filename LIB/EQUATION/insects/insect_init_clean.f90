@@ -339,7 +339,7 @@ subroutine insect_init(time, fname_ini, Insect_ID, resume_backup, fname_backup, 
     ! Insect%smoothing_thickness=="global" : smoothing_layer = c_sm * 2**-Jmax * L/(BS-1)
     ! NOTE: for FLUSI, this has no impact! Here, the grid is constant and equidistant.
     ! NOTE: 05/2020 Thomas, I changed the default back to local.
-    call read_param_mpi(PARAMS,insect_name_str,"smoothing_thickness",Insects(Insect_ID)%smoothing_thickness,"local")
+    call read_param_mpi(PARAMS,insect_name_str,"smoothing_thickness",Insects(Insect_ID)%smoothing_thickness,"global")
     call read_param_mpi(PARAMS,insect_name_str,"C_smooth",Insects(Insect_ID)%C_smooth,1.0_rk)
     call read_param_mpi(PARAMS,insect_name_str,"BodySuperSTLfile",Insects(Insect_ID)%BodySuperSTLfile,"none.superstl")
     ! when using CT data, code computes the mask function in a shell around fluid-solid interface.

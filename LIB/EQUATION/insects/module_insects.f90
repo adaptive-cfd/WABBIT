@@ -251,7 +251,7 @@ module module_insects
       real(kind=rk), ALLOCATABLE :: bristles_coords(:,:,:)
       ! used for rectangular part of bristled model wings (Kleemeier)
       real(kind=rk) :: B_membrane(1:4), L_membrane(1:4)
-      logical :: damaged(1:4)
+      logical :: damaged(1:4) = .false.
 
       !--------------------------------------------------------------
       ! Wing kinematics

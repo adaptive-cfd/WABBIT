@@ -87,14 +87,26 @@ tests = [
         {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":3},
         {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":3},
         {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":3},
-
         {"test_name":"blob_equi_avg", "wavelet":"CDF40", "dim":2},
 
         f"---{group_names[6]}---",  # group identifier
         {"test_name":"acm", "wavelet":"CDF40", "dim":2},
         {"test_name":"acm", "wavelet":"CDF44", "dim":2},
         {"test_name":"acm_norm", "wavelet":"CDF44", "dim":2},
-        {"test_name":"acm_significant", "wavelet":"CDF44", "dim":2},
+        {"test_name":"acm_significant", "wavelet":"CDF44", "dim":2},        
+        {"test_name":"3vorticesEquiFD2", "wavelet":"CDF20", "dim":2},
+        {"test_name":"3vorticesEquiFD4", "wavelet":"CDF40", "dim":2},
+        {"test_name":"3vorticesEquiFD6", "wavelet":"CDF60", "dim":2},
+        {"test_name":"3vorticesAdaptFD2", "wavelet":"CDF20", "dim":2},
+        {"test_name":"3vorticesAdaptFD2", "wavelet":"CDF22", "dim":2},
+        {"test_name":"3vorticesAdaptFD4", "wavelet":"CDF40", "dim":2},
+        {"test_name":"3vorticesAdaptFD4", "wavelet":"CDF42", "dim":2},
+        {"test_name":"3vorticesAdaptFD6", "wavelet":"CDF60", "dim":2},  
+        {"test_name":"3vorticesAdaptFD6", "wavelet":"CDF62", "dim":2},
+        {"test_name":"taylorGreenEqui_FD2", "wavelet":"CDF20", "dim":3},
+        {"test_name":"taylorGreenEqui_FD4", "wavelet":"CDF40", "dim":3},
+        {"test_name":"taylorGreenEqui_FD6", "wavelet":"CDF60", "dim":3},
+        {"test_name":"bumblebeeFlowEquiFD4", "wavelet":"CDF40", "dim":3},
 
         f"---{group_names[7]}---",  # group identifier
         {"test_name":"dry_fractal_tree", "wavelet":"CDF22", "dim":3},
@@ -168,7 +180,7 @@ class WabbitTest:
     valid = True  # check if something in initialization went wrong
 
     # init the class itself
-    def __init__(self, ini=None, test_name=None, wavelet=None, dim=None, mpi_command="nice mpirun -n 4", memory="8.0GB", run_dir=None):
+    def __init__(self, ini=None, test_name=None, wavelet=None, dim=None, mpi_command="nice mpirun -n 8", memory="8.0GB", run_dir=None):
         if run_dir == None: self.run_dir = os.getcwd()  # this should be the run directory
         else: self.run_dir = os.path.abspath(run_dir)
         self.ini = ini
@@ -186,6 +198,12 @@ class WabbitTest:
         elif self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg"]:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
         elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"{self.test_name}_{self.wavelet}")
+        elif "3vortices" in self.test_name:
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", "3vortices", f"{self.test_name}_{self.wavelet}")
+        elif "taylorGreen" in self.test_name:
+            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", "taylorGreen", f"{self.test_name}_{self.wavelet}")
+        elif "bumblebeeFlowEquiFD4" in  self.test_name:
             self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"{self.test_name}_{self.wavelet}")
         elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", 
                                 "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete",
@@ -261,7 +279,6 @@ class WabbitTest:
             # change back to test_dir
             os.chdir(self.test_dir)
             return result2
-        
         elif "denoise" in self.test_name:
             # change to directory to tmp
             tmp_dir = f"{self.test_dir}/tmp"
@@ -340,18 +357,35 @@ class WabbitTest:
             return result1
         
         # this part is meant for any tests which simply call an ini file, just provide the ini-file in the beginning and the rest is handled automatically
-        elif self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg", "acm", "acm_norm", "acm_significant"]:
+        elif self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg", "acm", "acm_norm", "acm_significant", "bumblebeeFlowEquiFD4"] or "3vortices" in self.test_name or "taylorGreen" in self.test_name:
             # lets say where the ini-file is
             if self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg"]:
                 ini_file = os.path.join("..", "blob-convection.ini")  # relative to tmp_dir
             elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
                 ini_file = os.path.join("..", "acm_cyl.ini")  # relative to tmp_dir
+            elif "3vortices" in self.test_name:
+                ini_file = os.path.join("..", "PARAMS_3vortices.ini")  # relative to tmp_dir
+            elif "taylorGreen" in self.test_name:
+                ini_file = os.path.join("..", "PARAMS_taylor_green.ini")  # relative to tmp_dir
+            elif "bumblebeeFlowEqui" in self.test_name:
+                ini_file = os.path.join("..", "PARAMS.ini")  # relative to tmp_dir
 
             # change to directory to tmp
             tmp_dir = f"{self.test_dir}/tmp"
-            if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
+            if not os.path.isdir(tmp_dir): 
+                os.mkdir(tmp_dir)
+            else:
+                os.system( "rm -rf %s" % (tmp_dir) )
+                os.mkdir(tmp_dir)
             os.chdir(tmp_dir)
 
+            if "3vortices" in self.test_name:
+                os.system("cp ../ux_000010000000.h5 .")
+                os.system("cp ../uy_000010000000.h5 .")
+                os.system("cp ../p_000010000000.h5 .")
+            if "bumblebeeFlowEqui" in self.test_name:
+                os.system("cp ../bumblebee_new_kinematics.ini .")
+            
             # run simmulation
             command1 = f"{self.mpi_command} {self.run_dir}/wabbit {ini_file} --memory={self.memory}"
             result1 = run_command(command1, self.logger)

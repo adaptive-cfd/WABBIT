@@ -57,7 +57,7 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
     real(kind=rk), allocatable, save :: vor(:,:,:,:)
     integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_apply(1:ncolors), x, y, z, f_block(1:3)
+    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), C_eta_apply_inv(0:ncolors), x, y, z, f_block(1:3)
     integer(kind=2) :: color
     integer(kind=ik) :: i_insect
     character(len=clong) :: discretization
@@ -92,12 +92,13 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
             ! constant value of C_eta after the startup phase
             params_nspp%C_eta_temp = params_nspp%C_eta
         endif
-        C_eta_apply = params_nspp%C_eta
-        C_eta_apply(params_nspp%penalization_startup_colors:) = params_nspp%C_eta_temp
+        C_eta_apply_inv = 1.0_rk/params_nspp%C_eta
+        C_eta_apply_inv(params_nspp%penalization_startup_colors:) = 1.0_rk/params_nspp%C_eta_temp
     else
         ! constant value of C_eta
-        C_eta_apply = params_nspp%C_eta
+        C_eta_apply_inv = 1.0_rk/params_nspp%C_eta
     endif
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     select case(stage)
     case ("init_stage")
@@ -200,7 +201,7 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
                             ! only include parts of the insect
                             if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
                                 ! penalization term
-                                penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) / C_eta_apply(color)
+                                penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_apply_inv(color)
 
                                 f_block(1:params_nspp%dim) = f_block(1:params_nspp%dim) - penal(1:params_nspp%dim)
 
@@ -352,7 +353,7 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
     
     ! Local variables for derivatives and velocities
     integer(kind=ik) :: ix, iy, iz, dim, color
-    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, C_eta_apply(1:ncolors)
+    real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, C_eta_apply_inv(0:ncolors), C_eta_sponge_inv
     real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, &
                      w_dx, w_dy, w_dz, w_dxdx, w_dydy, w_dzdz, &
@@ -407,9 +408,10 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
     dx2_inv = 1.0_rk / (dx(1)**2)
     dy2_inv = 1.0_rk / (dx(2)**2)
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
-    C_eta_apply = params_nspp%C_eta
-    C_eta_apply(params_nspp%penalization_startup_colors:) = params_nspp%C_eta_temp
-    
+    C_eta_apply_inv = 1.0_rk / params_nspp%C_eta
+    C_eta_apply_inv(params_nspp%penalization_startup_colors:) = 1.0_rk / params_nspp%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
+
     if (dim == 3) then
         dz_inv = 1.0_rk / dx(3)
         dz2_inv = 1.0_rk / (dx(3)**2)
@@ -457,8 +459,8 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
 
                 ! Penalization: -\chi/C_eta * (U - U_target)
                 color = int(mask(ix,iy,1,5), kind=2)
-                penalx = -mask(ix,iy,1,1) / C_eta_apply( color ) * (ux - mask(ix,iy,1,2))
-                penaly = -mask(ix,iy,1,1) / C_eta_apply( color ) * (uy - mask(ix,iy,1,3))
+                penalx = -mask(ix,iy,1,1) * C_eta_apply_inv( color ) * (ux - mask(ix,iy,1,2))
+                penaly = -mask(ix,iy,1,1) * C_eta_apply_inv( color ) * (uy - mask(ix,iy,1,3))
 
                 ! Assemble RHS: -1/2 (div(U\otimes U) + U\cdot grad(U)) + \nu \Delta U + penalization
                 rhs(ix,iy,1,1) = -0.5_rk*(uu_dx + uv_dy + ux*u_dx + uy*u_dy) + params_nspp%nu*(u_dxdx + u_dydy) + penalx
@@ -519,9 +521,9 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
 
                     ! Penalization: -\chi/C_eta * (U - U_target)
                     color = int(mask(ix,iy,iz,5), kind=2)
-                    penalx = -mask(ix,iy,iz,1) / C_eta_apply(color) * (ux - mask(ix,iy,iz,2))
-                    penaly = -mask(ix,iy,iz,1) / C_eta_apply(color) * (uy - mask(ix,iy,iz,3))
-                    penalz = -mask(ix,iy,iz,1) / C_eta_apply(color) * (uz - mask(ix,iy,iz,4))
+                    penalx = -mask(ix,iy,iz,1) * C_eta_apply_inv(color) * (ux - mask(ix,iy,iz,2))
+                    penaly = -mask(ix,iy,iz,1) * C_eta_apply_inv(color) * (uy - mask(ix,iy,iz,3))
+                    penalz = -mask(ix,iy,iz,1) * C_eta_apply_inv(color) * (uz - mask(ix,iy,iz,4))
 
                     ! Assemble RHS: -1/2 (div(U\otimes U) + U\cdot grad(U)) + \nu \Delta U + penalization
                     rhs(ix,iy,iz,1) = -0.5_rk * (uu_dx + uv_dy + uw_dz + ux*u_dx + uy*u_dy + uz*u_dz) &
@@ -551,6 +553,7 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
     if (params_nspp%use_sponge) then
         ! Check for Lamballais special treatment (2D only)
         if (dim == 2 .and. (any(params_nspp%geometries(:) == "lamballais") .or. any(params_nspp%geometries(:) == "lamballais-local"))) then
+            C_eta_sponge_inv = 1.0_rk / params_nspp%C_eta_ring
             ! Special treatment for Lamballais: use C_eta_ring for the outer ring penalization
             ! Note: C_eta_ring can differ from C_eta in local variation cases
             ! The ring (stored in sponge mask array) penalizes velocity towards target values            
@@ -558,19 +561,20 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
                 do ix = g+1, Bs(1)+g
                     ! Sponge mask (component 6) contains ring mask
                     ! Components 2,3 contain target velocities in the ring
-                    rhs(ix,iy,1,1) = rhs(ix,iy,1,1) - mask(ix,iy,1,6)*(phi(ix,iy,1,1) - mask(ix,iy,1,2))/ params_nspp%C_eta_ring
-                    rhs(ix,iy,1,2) = rhs(ix,iy,1,2) - mask(ix,iy,1,6)*(phi(ix,iy,1,2) - mask(ix,iy,1,3))/ params_nspp%C_eta_ring
+                    rhs(ix,iy,1,1) = rhs(ix,iy,1,1) - mask(ix,iy,1,6)*(phi(ix,iy,1,1) - mask(ix,iy,1,2)) * C_eta_sponge_inv
+                    rhs(ix,iy,1,2) = rhs(ix,iy,1,2) - mask(ix,iy,1,6)*(phi(ix,iy,1,2) - mask(ix,iy,1,3)) * C_eta_sponge_inv
                     ! Note: Pressure component (if present) would be handled separately in pressure equation
                 enddo
             enddo
         else
+            C_eta_sponge_inv = 1.0_rk / params_nspp%C_sponge
             ! Standard sponge treatment            
             if (dim == 2) then
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
                         ! Sponge mask is stored in component 6 of mask array
-                        spo = mask(ix,iy,1,6) / params_nspp%C_sponge
-                        
+                        spo = mask(ix,iy,1,6) * C_eta_sponge_inv
+
                         rhs(ix,iy,1,1) = rhs(ix,iy,1,1) - (phi(ix,iy,1,1) - params_nspp%u_mean_set(1)) * spo
                         rhs(ix,iy,1,2) = rhs(ix,iy,1,2) - (phi(ix,iy,1,2) - params_nspp%u_mean_set(2)) * spo
                     enddo
@@ -580,7 +584,7 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
                     do iy = g+1, Bs(2)+g
                         do ix = g+1, Bs(1)+g
                             ! Sponge mask is stored in component 6 of mask array
-                            spo = mask(ix,iy,iz,6) / params_nspp%C_sponge
+                            spo = mask(ix,iy,iz,6) * C_eta_sponge_inv
                             
                             rhs(ix,iy,iz,1) = rhs(ix,iy,iz,1) - (phi(ix,iy,iz,1) - params_nspp%u_mean_set(1)) * spo
                             rhs(ix,iy,iz,2) = rhs(ix,iy,iz,2) - (phi(ix,iy,iz,2) - params_nspp%u_mean_set(2)) * spo
@@ -668,7 +672,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
-    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply(1:ncolors)
+    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply_inv(0:ncolors)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
     real(kind=rk) :: ux, uy, uz,&
     usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
@@ -690,8 +694,9 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     nu = params_nspp%nu
 
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
-    C_eta_apply = params_nspp%C_eta
-    C_eta_apply(params_nspp%penalization_startup_colors:) = params_nspp%C_eta_temp
+    C_eta_apply_inv = 1.0_rk / params_nspp%C_eta
+    C_eta_apply_inv(params_nspp%penalization_startup_colors:) = 1.0_rk / params_nspp%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     !-----------------------------------------------------------------------
     ! passive scalar equations: loop over all scalars and compute RHS
@@ -729,7 +734,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
                             ! source(ix,iy,iz) = -1.0d0*(phi(ix,iy,iz,j)-masksource-) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
-                            source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
+                            source(ix,iy,iz) = (masksource - phi(ix,iy,iz,j)) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) )
                             ! source(ix,iy,iz) = -masksource*(phi(ix,iy,iz,j)-1.d0) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
                         endif
                     end do
@@ -749,7 +754,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         if ( R <= R0sq ) then
                             ! for the source term, we use the usual dirichlet C_eta
                             ! to force scalar to 1
-                            source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) )
+                            source(ix,iy,iz) = -(phi(ix,iy,iz,j)-1.d0) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) )
                         endif
                     end do
                 end do
@@ -762,7 +767,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         x = x0(1) + dble(ix-(g+1))*dx(1)
                         if ( x <= params_nspp%widthsource(iscalar) ) then
                             ! INFLOW
-                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
+                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
                         endif
                     end do
                 end do
@@ -775,11 +780,11 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         x = x0(1) + dble(ix-(g+1))*dx(1)
                         if ( x <= params_nspp%widthsource(iscalar) ) then
                             ! INFLOW
-                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
+                            source(ix,iy,iz) = (1.0_rk - phi(ix,iy,iz,j)) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
                         endif
                         if ( x >= params_nspp%domain_size(1)-params_nspp%widthsource(iscalar) ) then
                             ! OUTFLOW
-                            source(ix,iy,iz) = (0.0_rk - phi(ix,iy,iz,j)) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
+                            source(ix,iy,iz) = (0.0_rk - phi(ix,iy,iz,j)) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
                         endif
                     end do
                 end do
@@ -888,7 +893,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                         ! easy RHS for dirichlet BC
                         rhs(ix,iy,iz,j) = -ux*phi_dx -uy*phi_dy -uz*phi_dz &
                         + kappa*(phi_dxdx + phi_dydy + phi_dzdz) &
-                        - chi*(phi(ix,iy,iz,j) - 0.0_rk) / C_eta_apply( int(mask(ix,iy,iz,5), kind=2) ) & ! Dirichlet penalization for obstacle mask (instead of Neumann penalization)
+                        - chi*(phi(ix,iy,iz,j) - 0.0_rk) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) ) & ! Dirichlet penalization for obstacle mask (instead of Neumann penalization)
                         + source(ix, iy, iz) ! source term is actually a dirichlet penalization term as well
                     enddo
                 enddo
@@ -941,7 +946,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     integer(kind=ik) :: ix, iy, iscalar, j
 
-    real(kind=rk) :: kappa, x, y, masksource, nu, R, C_eta_apply(1:ncolors)
+    real(kind=rk) :: kappa, x, y, masksource, nu, R, C_eta_apply_inv(0:ncolors)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv
     real(kind=rk) :: ux, uy, usx, usy, wx, wy, gx, gy, D, chi, chidx, chidy, D_dx, D_dy, gxx, gyy
     real(kind=rk) :: phi_dx, phi_dy, phi_dxdx, phi_dydy
@@ -966,8 +971,9 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     nu = params_nspp%nu
 
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
-    C_eta_apply = params_nspp%C_eta
-    C_eta_apply(params_nspp%penalization_startup_colors:) = params_nspp%C_eta_temp
+    C_eta_apply_inv = 1.0_rk / params_nspp%C_eta
+    C_eta_apply_inv(params_nspp%penalization_startup_colors:) = 1.0_rk / params_nspp%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     !-----------------------------------------------------------------------
     ! passive scalar equations: loop over all scalars and compute RHS
@@ -999,8 +1005,8 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     if (masksource > 1.0d-6) then
                         ! for the source term, we use the usual dirichlet C_eta
                         ! to force scalar to 1
-                        source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
-                        ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
+                        source(ix,iy,1) = (masksource - phi(ix,iy,1,j)) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) )
+                        ! source(ix,iy,1) = -masksource*(phi(ix,iy,1,j)-1.d0) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) )
                     endif
                 end do
             end do
@@ -1012,11 +1018,11 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     x = x0(1) + dble(ix-(g+1))*dx(1)
                     if ( x <= params_nspp%widthsource(iscalar) ) then
                         ! INFLOW
-                        source(ix,iy,1) = (1.0_rk - phi(ix,iy,1,j)) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
+                        source(ix,iy,1) = (1.0_rk - phi(ix,iy,1,j)) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) ) ! for the source term, we use the usual dirichlet C_eta
 
                     elseif ( x >= params_nspp%domain_size(1)-params_nspp%widthsource(iscalar) ) then
                         ! OUTFLOW
-                        source(ix,iy,1) = (0.0_rk - phi(ix,iy,1,j)) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
+                        source(ix,iy,1) = (0.0_rk - phi(ix,iy,1,j)) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) )
                     endif
                 end do
             end do
@@ -1025,7 +1031,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
             do iy = g+1, Bs(2)+g
                  do ix = g+1, Bs(1)+g
                      if ( abs(mask(ix,iy,1,5) - params_nspp%widthsource(iscalar)) <=1.0e-8 ) then
-                        source(ix,iy,1) = -mask(ix,iy,1,5)*(phi(ix,iy,1,j)-1.d0) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
+                        source(ix,iy,1) = -mask(ix,iy,1,5)*(phi(ix,iy,1,j)-1.d0) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) )
                      endif
                  end do
              end do
@@ -1045,7 +1051,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                 do ix = g+1, Bs(1)+g
                     ! for the source term, we use the usual dirichlet C_eta
                     ! to force scalar to 0
-                    source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) )
+                    source(ix,iy,1) = source(ix,iy,1) - mask(ix,iy,1,6)*phi(ix,iy,1,j) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) )
                 end do
             end do
         endif
@@ -1116,7 +1122,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
                     ! easy RHS for dirichlet BC
                     rhs(ix,iy,1,j) = -ux*phi_dx -uy*phi_dy &
                                    + kappa*(phi_dxdx + phi_dydy) &
-                                   - chi*(phi(ix,iy,1,j) - 0.0_rk) / C_eta_apply( int(mask(ix,iy,1,5), kind=2) ) & ! Dirichlet penalization for obstacle mask
+                                   - chi*(phi(ix,iy,1,j) - 0.0_rk) * C_eta_apply_inv( int(mask(ix,iy,1,5), kind=2) ) & ! Dirichlet penalization for obstacle mask
                                    + source(ix, iy, 1) ! source term is actually a dirichlet penalization term as well
                 end do
             end do

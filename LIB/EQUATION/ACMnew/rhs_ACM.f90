@@ -53,7 +53,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     real(kind=rk), allocatable, save :: vor(:,:,:,:)
     integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), x, y, z, f_block(1:3), C_eta_apply_inv(1:ncolors)
+    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), x, y, z, f_block(1:3), C_eta_apply_inv(0:ncolors)
     integer(kind=2) :: color
     integer(kind=ik) :: i_insect
 
@@ -90,6 +90,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         ! constant value of C_eta
         C_eta_apply_inv = 1.0_rk / params_acm%C_eta
     endif
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     select case(stage)
     case ("init_stage")
@@ -322,7 +323,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !> forcing term
     real(kind=rk), dimension(3) :: forcing
     !>
-    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta_apply_inv(1:ncolors), C_sponge_inv, gamma
+    real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv, c_0, nu, C_eta_apply_inv(0:ncolors), C_sponge_inv, gamma
     real(kind=rk) :: div_U, u_dx, u_dy, u_dxdx, u_dydy, u_dxdy, v_dx, v_dy, v_dxdx, v_dxdy, &
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, nu_bulk, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
@@ -362,6 +363,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
     C_eta_apply_inv = 1.0_rk / params_acm%C_eta
     C_eta_apply_inv(params_acm%penalization_startup_colors:) = 1.0_rk / params_acm%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     if (size(phi,1)/=Bs(1)+2*g .or. size(phi,2)/=Bs(2)+2*g .or. size(phi,3)<params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics) then
         write(write_statement, '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)') "phi size: ", size(phi,1), " x ", size(phi,2), " x ", size(phi,3), " expected: ", Bs(1)+2*g, " x ", Bs(2)+2*g, " x ", params_acm%dim+1+params_acm%N_scalars+params_acm%N_time_statistics
@@ -959,7 +961,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
-                     nu, C_eta_apply_inv(1:ncolors), C_sponge_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
+                     nu, C_eta_apply_inv(0:ncolors), C_sponge_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
     !> derivatives
     real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, u_dxdy, u_dxdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, v_dxdy, v_dydz, &
@@ -1007,6 +1009,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
     C_eta_apply_inv = 1.0_rk/params_acm%C_eta
     C_eta_apply_inv(params_acm%penalization_startup_colors:) = 1.0_rk/params_acm%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     select case(order_discretization)
     case("FD_2nd_central")
@@ -1815,7 +1818,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
-    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply_inv(1:ncolors)
+    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply_inv(0:ncolors)
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
     real(kind=rk) :: ux, uy, uz,&
     usx,usy,usz,wx,wy,wz,gx,gy,gz,D,chi,chidx,chidz,chidy,D_dx,D_dy,D_dz,gxx,gyy,gzz
@@ -1839,6 +1842,7 @@ subroutine RHS_3D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
     C_eta_apply_inv = 1.0_rk / params_acm%C_eta
     C_eta_apply_inv(params_acm%penalization_startup_colors:) = 1.0_rk / params_acm%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     !-----------------------------------------------------------------------
     ! passive scalar equations: loop over all scalars and compute RHS
@@ -2088,7 +2092,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
 
     integer(kind=ik) :: ix, iy, iscalar, j
 
-    real(kind=rk) :: kappa, x, y, masksource, nu, R, C_eta_apply_inv(1:ncolors)
+    real(kind=rk) :: kappa, x, y, masksource, nu, R, C_eta_apply_inv(0:ncolors)
     real(kind=rk) :: dx_inv, dy_inv, dx2_inv, dy2_inv
     real(kind=rk) :: ux, uy, usx, usy, wx, wy, gx, gy, D, chi, chidx, chidy, D_dx, D_dy, gxx, gyy
     real(kind=rk) :: phi_dx, phi_dy, phi_dxdx, phi_dydy
@@ -2115,6 +2119,7 @@ subroutine RHS_2D_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, ma
     ! for now - c_eta can only vary if the geometry is faded in or not. Later, this can be changed for full flexibility for each color
     C_eta_apply_inv = 1.0_rk / params_acm%C_eta
     C_eta_apply_inv(params_acm%penalization_startup_colors:) = 1.0_rk / params_acm%C_eta_temp
+    C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
 
     !-----------------------------------------------------------------------
     ! passive scalar equations: loop over all scalars and compute RHS

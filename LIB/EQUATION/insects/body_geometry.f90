@@ -82,8 +82,8 @@ subroutine draw_insect_body( time, xx0, ddx, mask, mask_color, us, Insect, delet
     case ("jerry")
         call draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
 
-    case ("hawkmoth")
-        call draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
+    ! case ("hawkmoth")
+    !     call draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
 
     case ("platicle")
         call draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
@@ -339,49 +339,92 @@ subroutine draw_body_bumblebee( xx0, ddx, mask, mask_color, us, Insect)
     ! ----------------------------------------------------------------------------
     ! legs (composed of 3 cylinders)
     ! ----------------------------------------------------------------------------
+    ! do j = 1,  4
+    !     ! transform coordinates to global system. they are defined in the body system
+    !     xa = matmul( transpose(M_g2b), (/xl1(j)  ,yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
+    !     xb = matmul( transpose(M_g2b), (/xl1(j+1),yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
+    !     ! note input to draw_cylinder_new is in global coordinates
+    !     call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl1(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    !     xa = matmul( transpose(M_g2b), (/xl2(j)  ,yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
+    !     xb = matmul( transpose(M_g2b), (/xl2(j+1),yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
+    !     call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl2(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    !     xa = matmul( transpose(M_g2b), (/xl3(j)  ,yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
+    !     xb = matmul( transpose(M_g2b), (/xl3(j+1),yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
+    !     call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl3(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    !     ! right side of body (flip the sign of y)
+    !     xa = matmul( transpose(M_g2b), (/xl1(j)  ,-yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
+    !     xb = matmul( transpose(M_g2b), (/xl1(j+1),-yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
+    !     call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl1(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    !     xa = matmul( transpose(M_g2b), (/xl2(j)  ,-yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
+    !     xb = matmul( transpose(M_g2b), (/xl2(j+1),-yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
+    !     call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl2(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    !     xa = matmul( transpose(M_g2b), (/xl3(j)  ,-yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
+    !     xb = matmul( transpose(M_g2b), (/xl3(j+1),-yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
+    !     call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl3(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+    ! enddo
+
+    ! ! antenna (left)
+    ! xa = matmul( transpose(M_g2b), (/xan(1),yan(1),zan(1)/) ) + Insect%xc_body_g
+    ! xb = matmul( transpose(M_g2b), (/xan(2),yan(2),zan(2)/) ) + Insect%xc_body_g
+    ! call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, ran, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    ! ! antenna (right)
+    ! xa = matmul( transpose(M_g2b), (/xan(1),-yan(1),zan(1)/) ) + Insect%xc_body_g
+    ! xb = matmul( transpose(M_g2b), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
+    ! call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, ran, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+
+    ! ! proboscis (to drink)
+    ! xa = matmul( transpose(M_g2b), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
+    ! xb = matmul( transpose(M_g2b), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
+    ! call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rf, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
     do j = 1,  4
         ! transform coordinates to global system. they are defined in the body system
         xa = matmul( transpose(M_g2b), (/xl1(j)  ,yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
         xb = matmul( transpose(M_g2b), (/xl1(j+1),yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
         ! note input to draw_cylinder_new is in global coordinates
-        call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl1(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+        call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
         xa = matmul( transpose(M_g2b), (/xl2(j)  ,yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
         xb = matmul( transpose(M_g2b), (/xl2(j+1),yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
-        call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl2(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+        call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
         xa = matmul( transpose(M_g2b), (/xl3(j)  ,yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
         xb = matmul( transpose(M_g2b), (/xl3(j+1),yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
-        call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl3(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+        call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
         ! right side of body (flip the sign of y)
         xa = matmul( transpose(M_g2b), (/xl1(j)  ,-yl1(j)  ,zl1(j)/)  ) + Insect%xc_body_g
         xb = matmul( transpose(M_g2b), (/xl1(j+1),-yl1(j+1),zl1(j+1)/)) + Insect%xc_body_g
-        call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl1(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+        call draw_cylinder_new( xa, xb, rl1(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
         xa = matmul( transpose(M_g2b), (/xl2(j)  ,-yl2(j)  ,zl2(j)/)  ) + Insect%xc_body_g
         xb = matmul( transpose(M_g2b), (/xl2(j+1),-yl2(j+1),zl2(j+1)/)) + Insect%xc_body_g
-        call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl2(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+        call draw_cylinder_new( xa, xb, rl2(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
 
         xa = matmul( transpose(M_g2b), (/xl3(j)  ,-yl3(j)  ,zl3(j)/)  ) + Insect%xc_body_g
         xb = matmul( transpose(M_g2b), (/xl3(j+1),-yl3(j+1),zl3(j+1)/)) + Insect%xc_body_g
-        call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rl3(j), color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+        call draw_cylinder_new( xa, xb, rl3(j), xx0, ddx, mask, mask_color, us, Insect, color_body)
     enddo
 
     ! antenna (left)
     xa = matmul( transpose(M_g2b), (/xan(1),yan(1),zan(1)/) ) + Insect%xc_body_g
     xb = matmul( transpose(M_g2b), (/xan(2),yan(2),zan(2)/) ) + Insect%xc_body_g
-    call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, ran, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+    call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
     ! antenna (right)
     xa = matmul( transpose(M_g2b), (/xan(1),-yan(1),zan(1)/) ) + Insect%xc_body_g
     xb = matmul( transpose(M_g2b), (/xan(2),-yan(2),zan(2)/) ) + Insect%xc_body_g
-    call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, ran, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+    call draw_cylinder_new( xa, xb, ran, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
     ! proboscis (to drink)
     xa = matmul( transpose(M_g2b), (/xf(1),yf(1),zf(1)/) ) + Insect%xc_body_g
     xb = matmul( transpose(M_g2b), (/xf(2),yf(2),zf(2)/) ) + Insect%xc_body_g
-    call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, xa, xb, rf, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
+    call draw_cylinder_new( xa, xb, rf, xx0, ddx, mask, mask_color, us, Insect, color_body)
 
 end subroutine draw_body_bumblebee
 
@@ -943,6 +986,8 @@ subroutine draw_body_platicle( xx0, ddx, mask, mask_color, us, Insect)
     B = 1.0_rk
     H = 0.05_rk
 
+    ! TODO TE replace by primitive
+
     do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
@@ -1003,6 +1048,8 @@ subroutine draw_body_coin( xx0, ddx, mask, mask_color, us, Insect)
     color_body = Insect%color_body
     M_g2b     = Insect%M_g2b
 
+    ! TODO TE replace by tiny cylinder
+
     do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
@@ -1060,6 +1107,8 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
     R0 = ( 0.5_rk*Insect%WingThickness + Insect%Safety )**2
     RR0 = 0.5_rk*Insect%WingThickness
 
+    ! TODO TE replace by primitive
+
     do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
         x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
         do iy = g, size(mask,2)-1-g
@@ -1089,101 +1138,6 @@ subroutine draw_suzuki_thin_rod( xx0, ddx, mask, mask_color, us, Insect)
 
 end subroutine draw_suzuki_thin_rod
 
-!-------------------------------------------------------------------------------
-subroutine draw_body_hawkmoth( xx0, ddx, mask, mask_color, us, Insect)
-    implicit none
-
-    type(diptera),intent(inout) :: Insect
-    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
-    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
-    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
-    real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
-
-
-    real(kind=rk) :: R0,R,a_body
-    real(kind=rk) :: x_body(1:3), x_glob(1:3), x_head(1:3), x_eye(1:3), x_eye_r(1:3), x_eye_l(1:3)
-    real(kind=rk), dimension(1:3) :: x1,x2
-    real(kind=rk)   :: M_g2b(1:3,1:3)
-    integer(kind=2) :: color_body
-    integer :: ix,iy,iz
-
-    color_body = Insect%color_body
-    M_g2b     = Insect%M_g2b
-
-    Insect%R_head = 0.125_rk
-    Insect%R_eye = 0.0625_rk
-    ! Insect%x_pivot_r_b =(/ 0.05_rk, -0.2165_rk, 0.0_rk /)
-    ! Insect%x_pivot_l_b =(/ 0.05_rk, +0.2165_rk, 0.0_rk /)
-    Insect%b_body = 0.15_rk
-    Insect%L_body = 1.0_rk
-    Insect%x_head = (/0.5_rk*Insect%L_body,0.0_rk,0.0_rk /)
-    Insect%x_eye_r = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head&
-    *0.8_rk*(/1._rk,+1._rk,1._rk/)
-    Insect%x_eye_l = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head&
-    *0.8_rk*(/1._rk,-1._rk,1._rk/)
-
-    a_body = Insect%L_body / 2.0_rk
-    !-----------------------------------------------------------------------------
-    ! The body is an ellipsoid
-    !-----------------------------------------------------------------------------
-    do iz = g, size(mask,3)-1-g ! note zero-based indexing in this module, which may appear odd in WABBIT (usually 1-based)
-        x_glob(3) = xx0(3) + dble(iz)*ddx(3) - Insect%xc_body_g(3)
-        do iy = g, size(mask,2)-1-g
-            x_glob(2) = xx0(2) + dble(iy)*ddx(2) - Insect%xc_body_g(2)
-            do ix = g, size(mask,1)-1-g
-                x_glob(1) = xx0(1) + dble(ix)*ddx(1) - Insect%xc_body_g(1)
-                ! disabled (see comment in init_insect)
-                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
-
-                ! x_body is in the body coordinate system, which is centered at Insect%xc_body_g
-                x_body = matmul( M_g2b, x_glob)
-                ! check if inside the surrounding box (save comput. time)
-                if ( dabs(x_body(2)) <= Insect%b_body + Insect%safety ) then
-                    if ( dabs(x_body(3)) <= Insect%b_body + Insect%safety ) then
-                        ! check for length inside ellipsoid:
-                        if ( dabs(x_body(1) ) < Insect%L_body/2 + Insect%safety ) then
-                            R  = dsqrt ( x_body(2)**2 + x_body(3)**2 )
-                            ! this gives the R(x) shape
-                            if ( (x_body(1)/a_body)**2 <= 1._rk) then
-                                R0 = dsqrt( Insect%b_body**2 *(1._rk- (x_body(1)/a_body)**2 ) )
-
-                                if ( R < R0 + Insect%safety ) then
-                                    mask(ix,iy,iz)= max(step(R,R0, Insect%smooth, Insect%safety, Insect%smoothing_type_int),mask(ix,iy,iz))
-                                    mask_color(ix,iy,iz) = color_body
-                                endif
-                            endif
-                        endif
-                    endif
-                endif
-            enddo
-        enddo
-    enddo
-
-    !-----------------------------------------------------------------------------
-    ! Head is a sphere, we add antennae, which are cylinders
-    !-----------------------------------------------------------------------------
-    x_head = Insect%xc_body_g + matmul(transpose(M_g2b),Insect%x_head)
-    call draw_sphere(mask, mask_color, xx0, ddx, g, x_head,Insect%R_head, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
-
-    ! these guys are in the body system:
-    x_eye_r = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head*0.8_rk*(/1._rk,+1._rk,1._rk/)
-    x_eye_l = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head*1.8_rk*(/1._rk,+1._rk,1._rk/)
-    ! back to global system
-    x1 = Insect%xc_body_g + matmul(transpose(M_g2b),x_eye_l)
-    x2 = Insect%xc_body_g + matmul(transpose(M_g2b),x_eye_r)
-    ! draw the cylinder (with spheres at the ends)
-    call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, x1, x2, 0.015_rk*1.3_rk, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
-
-
-    ! these guys are in the body system:
-    x_eye_r = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head*0.8_rk*(/1._rk,-1._rk,1._rk/)
-    x_eye_l = Insect%x_head+dsin(45._rk*pi/180.0_rk)*Insect%R_head*1.8_rk*(/1._rk,-1._rk,1._rk/)
-    ! back to global system
-    x1 = Insect%xc_body_g + matmul(transpose(M_g2b),x_eye_l)
-    x2 = Insect%xc_body_g + matmul(transpose(M_g2b),x_eye_r)
-    ! draw the cylinder (with spheres at the ends)
-    call draw_cylinder_rounded(mask, mask_color, xx0, ddx, g, x1, x2, 0.015_rk*1.3_rk, color_set=int(color_body, kind=ik), smoothing_type_int=Insect%smoothing_type_int, smoothing_width=Insect%smooth, smoothing_safety=Insect%safety, x0_indices=(/1,1,1/))
-end subroutine draw_body_hawkmoth
 
 
 
@@ -1576,3 +1530,254 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         enddo
     enddo
 end subroutine
+
+
+
+
+!-------------------------------------------------------------------------------
+! draw a cylinder defined by GLOBALS points (x1,y1,z1), (x2,y2,z2) and radius R0
+! At the start/end point, we add a sphere.
+! The solid velocity field us is not touched -- we consider this routine for bodies
+! therefore the solid velocity field (which is a solid body rotation around
+! insect%xc) is added in the main insect drawing routine.
+! The color of the new cylinder will be what you pass in color_val
+!-------------------------------------------------------------------------------
+subroutine draw_cylinder_new( x1, x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val, bounding_box)
+    implicit none
+
+    real(kind=rk),dimension(1:3),intent(inout )::x1,x2
+    real(kind=rk),intent(in)::R0
+    type(diptera),intent(inout)::Insect
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
+    integer(kind=2),intent(in) :: color_val
+    ! (/xmin,ymin,zmin,xmax,ymax,zmax/) of cylinder (in global coordinates)
+    real(kind=rk),optional,intent(in) :: bounding_box(1:6)
+
+    real(kind=rk),dimension(1:3) :: cb, rb, ab, u, vp, p1, p2
+    real(kind=rk),dimension(1:3) :: x_glob, e_x, e_r, e_3
+    real(kind=rk),dimension(1:3,1:3) :: M_phi
+    real(kind=rk):: R, RR0, clength, safety, t, phi
+    integer :: ix,iy,iz, Nphi
+
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer :: xmin,xmax,ymin,ymax,zmin,zmax
+    integer :: Nsafety, i
+
+    safety = 1.5*Insect%safety
+    Nsafety = ceiling(safety / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g ! note zero based indexing
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g -1 ! note zero based indexing
+
+    if (present(bounding_box)) then
+        ! use pre-computed bounding box for cylinder (can be faster if many cylinder are to be drawn: fractal tree)
+        xmin = nint( (bounding_box(1)-xx0(1))/ddx(1) ) - Nsafety
+        ymin = nint( (bounding_box(2)-xx0(2))/ddx(2) ) - Nsafety
+        zmin = nint( (bounding_box(3)-xx0(3))/ddx(3) ) - Nsafety
+
+        xmax = nint( (bounding_box(4)-xx0(1))/ddx(1) ) + Nsafety
+        ymax = nint( (bounding_box(5)-xx0(2))/ddx(2) ) + Nsafety
+        zmax = nint( (bounding_box(6)-xx0(3))/ddx(3) ) + Nsafety
+
+    else
+
+        ! unit vector in cylinder axis direction and cylinder length
+        e_x = x2 - x1
+        clength = norm2(e_x)
+        e_x = e_x / clength
+
+        ! radial unit vector
+        ! use a vector perpendicular to e_x, since it is a azimuthal symmetry
+        ! it does not really matter which one. however, we must be sure that the vector
+        ! we use and the e_x vector are not colinear -- their cross product is the zero vector, if that is the case
+        e_r = (/0.0_rk,0.0_rk,0.0_rk/)
+        do while ( norm2(e_r) <= 1.0d-12 )
+            e_r = cross( (/rand_nbr(),rand_nbr(),rand_nbr()/), e_x)
+        enddo
+        e_r = e_r / norm2(e_r)
+
+        ! third (also radial) unit vector, simply the cross product of the others
+        e_3 = cross(e_x,e_r)
+        e_3 = e_3 / norm2(e_3)
+        RR0 = R0 + safety
+
+        ! bounding box of the vicinity of the cylinder.
+        ! Note: this bounding box maybe in inaccurate if the cylinder is very well resolved
+        ! (D/dx large). Computing the actual bounding box is complicated and expensive, hence
+        ! we do it in preprocessing and only once per cylinder
+        t = minval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmin = nint( (t-xx0(1)) / ddx(1) ) - Nsafety
+
+        t = maxval( (/x1(1)+RR0*e_r(1), x1(1)-RR0*e_r(1), x1(1)+RR0*e_3(1), x1(1)-RR0*e_3(1), &
+                      x2(1)+RR0*e_r(1), x2(1)-RR0*e_r(1), x2(1)+RR0*e_3(1), x2(1)-RR0*e_3(1) /) )
+        xmax = nint( (t-xx0(1)) / ddx(1) ) + Nsafety
+
+        t = minval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymin = nint( (t-xx0(2)) / ddx(2) ) - Nsafety
+
+        t = maxval( (/x1(2)+RR0*e_r(2), x1(2)-RR0*e_r(2), x1(2)+RR0*e_3(2), x1(2)-RR0*e_3(2), &
+                      x2(2)+RR0*e_r(2), x2(2)-RR0*e_r(2), x2(2)+RR0*e_3(2), x2(2)-RR0*e_3(2) /) )
+        ymax = nint( (t-xx0(2)) / ddx(2) ) + Nsafety
+
+        t = minval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmin = nint( (t-xx0(3)) / ddx(3) ) - Nsafety
+
+        t = maxval( (/x1(3)+RR0*e_r(3), x1(3)-RR0*e_r(3), x1(3)+RR0*e_3(3), x1(3)-RR0*e_3(3), &
+                      x2(3)+RR0*e_r(3), x2(3)-RR0*e_r(3), x2(3)+RR0*e_3(3), x2(3)-RR0*e_3(3) /) )
+        zmax = nint( (t-xx0(3)) / ddx(3) ) + Nsafety
+    endif
+
+
+
+    ! first we draw the cylinder, then the endpoint spheres
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
+        x_glob(3) = xx0(3) + dble(iz)*ddx(3)
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
+            x_glob(2) = xx0(2) + dble(iy)*ddx(2)
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
+                x_glob(1) = xx0(1) + dble(ix)*ddx(1)
+
+                ! if (periodic_insect) x_glob = periodize_coordinate(x_glob, (/xl,yl,zl/))
+
+                ! cb is the distance to the cylinder mid-point
+                cb = 0.5_rk*(x1+x2) - x_glob
+                ! rb is the length of the clinder
+                rb = x1 - x2
+
+                ! this is a spherical bounding box, centered around the mid-point
+                if ( sum(cb**2) <= 0.25*sum(rb**2) ) then ! the 0.25 is from the 0.5 squared
+                    ab = x_glob - x1
+                    u = x2 - x1
+
+                    vp = cross(ab, u)
+                    R = sqrt( sum(vp**2) / sum(u**2) )
+
+                    if (R <= R0+safety) then
+                        t = steps(R, R0, Insect%smooth)
+                        if (t >= mask(ix,iy,iz)) then
+                            mask(ix,iy,iz) = t
+                            mask_color(ix,iy,iz) = real(color_val, kind=rk)
+                        endif
+                    endif
+                endif
+            enddo
+        enddo
+    enddo
+
+    !---------------------------------------------------------------------------
+    ! endpoint spheres
+    !---------------------------------------------------------------------------
+    call drawsphere( x1, R0, xx0, ddx, mask, mask_color, us, Insect, color_val )
+    call drawsphere( x2, R0, xx0, ddx, mask, mask_color, us, Insect, color_val )
+end subroutine draw_cylinder_new
+
+
+
+
+!-------------------------------------------------------------------------------
+! draw a sphere with radius R0 centered at the point xc (GLOBAL SYSTEM)
+! This routine's intended use is for drawing the insect's body, for example
+! the head and eyes of Jerry. The velocity field inside the body is added
+! later, thus, the field us is untouched in this routines.
+!-------------------------------------------------------------------------------
+subroutine drawsphere( xc, R0, xx0, ddx, mask, mask_color, us, Insect, icolor )
+    implicit none
+
+    real(kind=rk),intent(inout)::xc(1:3)
+    real(kind=rk),intent(in)::R0
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
+    integer(kind=2),intent(in) :: icolor
+    type(diptera),intent(inout) :: Insect
+
+    integer :: ix,iy,iz
+    real(kind=rk)::x(1:3),R,tmp
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer :: xmin,xmax,ymin,ymax,zmin,zmax
+    integer :: Nsafety
+
+    ! periodization: if the center point is out of the domain, then correct that
+    ! if (periodic_insect) then
+    !     if (xc(1)<0.0) xc(1)=xc(1)+xl
+    !     if (xc(2)<0.0) xc(2)=xc(2)+yl
+    !     if (xc(3)<0.0) xc(3)=xc(3)+zl
+
+    !     if (xc(1)>=xl) xc(1)=xc(1)-xl
+    !     if (xc(2)>=yl) xc(2)=xc(2)-yl
+    !     if (xc(3)>=zl) xc(3)=xc(3)-zl
+    ! endif
+
+    Nsafety = nint( (R0+Insect%safety) / minval(ddx))
+
+    ! bounds of the current patch of data
+    lbounds = g
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) - 1 - g
+
+    ! bounding box of the vicinity of the sphere.
+    xmin = nint( (xc(1)-xx0(1)) / ddx(1) ) - (Nsafety)
+    xmax = nint( (xc(1)-xx0(1)) / ddx(1) ) + (Nsafety)
+    ymin = nint( (xc(2)-xx0(2)) / ddx(2) ) - (Nsafety)
+    ymax = nint( (xc(2)-xx0(2)) / ddx(2) ) + (Nsafety)
+    zmin = nint( (xc(3)-xx0(3)) / ddx(3) ) - (Nsafety)
+    zmax = nint( (xc(3)-xx0(3)) / ddx(3) ) + (Nsafety)
+
+
+    do iz = max(zmin,lbounds(3)), min(zmax,ubounds(3))
+        x(3) = xx0(3) + dble(iz)*ddx(3) - xc(3)
+
+        do iy = max(ymin,lbounds(2)), min(ymax,ubounds(2))
+            x(2) = xx0(2) + dble(iy)*ddx(2) - xc(2)
+
+            do ix = max(xmin,lbounds(1)), min(xmax,ubounds(1))
+                x(1) = xx0(1) + dble(ix)*ddx(1) - xc(1)
+
+                ! the bounding box check is incorporated in the loop bounds - no if clause!
+                ! compute radius
+                R = dsqrt( x(1)*x(1)+x(2)*x(2)+x(3)*x(3) )
+                if ( R <= R0+Insect%safety ) then
+                    tmp = steps(R, R0, Insect%smooth)
+                    if (tmp>=mask(ix,iy,iz)) then
+                        ! set new value
+                        mask(ix,iy,iz) = tmp
+                        mask_color(ix,iy,iz) = real(icolor, kind=rk)
+                    endif
+                endif
+            enddo
+        enddo
+    enddo
+
+end subroutine
+
+
+
+   !-------------------------------------------------------
+   ! short for the smooth step function.
+   ! the smooting is defined in Insect%smooth, here we need only x, and the
+   ! thickness (i.e., in the limit, steps=1 if x<t and steps=0 if x>t
+   !-------------------------------------------------------
+   real(kind=rk) function steps(x, t, h)
+      implicit none
+      real(kind=rk) :: x, t, h
+      ! f is 1 if x<=t-h
+      ! f is 0 if x>t+h
+      ! f is variable (smooth) in between
+      if (x<=t-h) then
+         steps = 1.0_rk
+      elseif (((t-h)<x).and.(x<(t+h))) then
+         steps = 0.5_rk*(1.0_rk+dcos((x-t+h)*pi/(2.0_rk*h)) )
+      else
+         steps = 0.0_rk
+      endif
+
+   end function

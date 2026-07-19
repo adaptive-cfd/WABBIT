@@ -78,6 +78,9 @@ module module_acm
     real(kind=rk) :: HIT_energy = 1.0_rk
     real(kind=rk) :: HIT_gain = 100.0_rk
 
+    logical :: use_energy_limiter = .false.
+    real(kind=rk) :: energy_start = -1.0_rk
+
     ! channel flow
     logical :: use_channel_forcing = .false.
     real(kind=rk) :: mask_volume=0.0_rk, meanflow_channel(1:3) = 0.0_rk
@@ -261,6 +264,7 @@ end subroutine
     call read_param_mpi(FILE, 'ACM-new', 'HIT_gain', params_acm%HIT_gain, 100.0_rk )
     call read_param_mpi(FILE, 'ACM-new', 'p_eqn_model', params_acm%p_eqn_model, "acm" )
     call read_param_mpi(FILE, 'ACM-new', 'skew_symmetry', params_acm%skew_symmetry, .false. )
+    call read_param_mpi(FILE, 'ACM-new', 'use_energy_limiter', params_acm%use_energy_limiter, .false. )
 
     ! channel flow
     call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )

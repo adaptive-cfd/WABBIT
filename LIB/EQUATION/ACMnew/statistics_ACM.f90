@@ -138,7 +138,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! called for each block.
 
         do k = 1, size(u,4)
-            if (maxval(abs(u(:,:,:,k))) > 1.0e12_rk) then
+            if (maxval(abs(u(:,:,:,k))) > 1.0e3_rk) then
                 write(*,'("Statistics: maxval in u(:,:,:,",i2,") = ", es10.4, ", Block with origin", 3(1x,es9.2), " and dx", 3(1x,es8.2))') k, maxval(abs(u(:,:,:,k))), x0, dx
 
                 call dump_block_fancy(u(:,:,:,k:k), "block_ACM_diverged_statistics.txt", Bs, g)
@@ -148,7 +148,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 open (77, file='ACM_diverged', status='replace')
                 close(77)
 
-                call abort(0409201934,"ACM fail: very very large values in state vector.")
+                call abort_save(0409201934,"ACM fail: very very large values in state vector.")
             endif
         enddo
 
@@ -456,6 +456,18 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%ACM_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+        ! energy limiter (used for testing operator instability). If active, kills the simulation
+        ! if current energy exceeds 2.1 times the initial one.
+        if ( params_acm%use_energy_limiter) then
+            if (time<=1.0e-6_rk) then
+                params_acm%energy_start = params_acm%ACM_energy
+            elseif ((time>1.0e-4_rk).and.(params_acm%ACM_energy>0.0_rk)) then
+                if (params_acm%ACM_energy > 2.1_rk * params_acm%energy_start ) then
+                    call abort_save(888888, "Energy is doubled, leaving.")
+                endif
+            endif
+        endif
 
         !-------------------------------------------------------------------------
         ! divergence

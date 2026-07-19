@@ -1091,6 +1091,10 @@ contains
             if (params%wavelet(1:3) /= "CDF") then
                 call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
             endif
+
+            allocate( params%MGR(0:1) )
+            ! params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+            params%MGR = (/0.5_rk, 0.5_rk/)
             
             ! The HR filter is always defined by the first number of the CDFXY filter
             ! The HD filter changes depending on both numbers
@@ -1104,32 +1108,30 @@ contains
                     allocate( params%HD(0:0) )
                     params%HD = (/1.0_rk/)
                     ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
                 elseif (params%wavelet(5:5) == "2") then
                     allocate( params%HD(-2:2) )
                     params%HD = (/-1.0_rk, +2.0_rk, +6.0_rk, +2.0_rk, -1.0_rk/) / 8.0_rk
-                    allocate( params%MGR(-2:2) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-2:2) )
+                    ! params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "4") then
                     allocate( params%HD(-4:4) )
                     ! from Daubechies - Ten lectures on wavelets, Table 8.2
                     params%HD = (/3.0_rk, -6.0_rk, -16.0_rk, 38.0_rk, 90.0_rk, 38.0_rk, -16.0_rk, -6.0_rk, 3.0_rk/) / 128.0_rk
-                    allocate( params%MGR(-4:4) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-4:4) )
+                    ! params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "6") then
                     allocate( params%HD(-6:6) )
                     ! from Daubechies - Ten lectures on wavelets, Table 8.2
                     params%HD = (/-5.0_rk, 10.0_rk, 34.0_rk, -78.0_rk, -123.0_rk, 324.0_rk, 700.0_rk, 324.0_rk, -123.0_rk, -78.0_rk, 34.0_rk, 10.0_rk, -5.0_rk/) / 1024.0_rk
-                    allocate( params%MGR(-6:6) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-6:6) )
+                    ! params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "8") then
                     allocate( params%HD(-8:8) )
                     ! from Daubechies - Ten lectures on wavelets, Table 8.2
                     params%HD = (/35.0_rk, -70.0_rk, -300.0_rk, 670.0_rk, 1228.0_rk, -3126.0_rk, -3796.0_rk, 10718.0_rk, 22050.0_rk, &
                         10718.0_rk, -3796.0_rk, -3126.0_rk, 1228.0_rk, 670.0_rk, -300.0_rk, -70.0_rk, 35.0_rk/) / 32768.0_rk
-                    allocate( params%MGR(-8:8) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-8:8) )
+                    ! params%MGR(:) = params%HD(:)
                 else
                     call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )
                 endif
@@ -1144,8 +1146,8 @@ contains
                     allocate( params%HD(0:0) )
                     params%HD = (/1.0_rk/)
                     ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+                    ! allocate( params%MGR(-1:1) )
+                    ! params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
 
                     ! hack - second order cell average
                     ! allocate( params%MGR(0:1) )
@@ -1171,8 +1173,8 @@ contains
                            23.0_rk*2.0_rk**(-5.0_rk), 2.0_rk**(-2.0_rk), &
                                   -2.0_rk**(-3.0_rk), 0.0_rk, &
                                    2.0_rk**(-6.0_rk) /)
-                    allocate( params%MGR(-4:4) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-4:4) )
+                    ! params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "4") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=4
@@ -1184,8 +1186,8 @@ contains
                            -63.0_rk*2.0_rk**(-9.0_rk),        -2.0_rk**(-5.0_rk), &
                              9.0_rk*2.0_rk**(-8.0_rk),         0.0_rk, &
                                    -2.0_rk**(-9.0_rk)/)
-                    allocate( params%MGR(-6:6) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-6:6) )
+                    ! params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "6") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 2 for N_tilde=6
@@ -1199,8 +1201,8 @@ contains
                                  189.0_rk*2.0_rk**(-12.0_rk),   9.0_rk*2.0_rk**(-10.0_rk), &
                                  -35.0_rk*2.0_rk**(-12.0_rk),          0.0_rk, &
                                    9.0_rk*2.0_rk**(-14.0_rk) /)  
-                    allocate( params%MGR(-8:8) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-8:8) )
+                    ! params%MGR(:) = params%HD(:)
                 else
                     call abort( 3006221, "Unkown bi-orthogonal wavelet specified. Set course for adventure! params%wavelet="//trim(adjustl(params%wavelet)) )      
                 endif
@@ -1214,8 +1216,8 @@ contains
                     allocate( params%HD(0:0) )
                     params%HD = (/1.0_rk/)
                     ! multigrid restriction - second order central average for lowpass filtering                  
-                    allocate( params%MGR(-1:1) )
-                    params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
+                    ! allocate( params%MGR(-1:1) )
+                    ! params%MGR = (/1.0_rk/4.0_rk, 1.0_rk/2.0_rk, 1.0_rk/4.0_rk/)
                 elseif (params%wavelet(5:5) == "2") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=2
@@ -1227,8 +1229,8 @@ contains
                                  -125.0_rk*2.0_rk**(-10.0_rk), 0.0_rk, &
                                    11.0_rk*2.0_rk**( -9.0_rk), 0.0_rk, &
                                    -3.0_rk*2.0_rk**(-10.0_rk)/)
-                    allocate( params%MGR(-6:6) )
-                    params%MGR(:) = params%HD(:)
+                    ! allocate( params%MGR(-6:6) )
+                    ! params%MGR(:) = params%HD(:)
                 elseif (params%wavelet(5:5) == "4") then
                     ! Sweldens paper, "The Lifting Scheme: A Custom-Design
                     ! Construction of Biorthogonal Wavelets" table 3 for N_tilde=4

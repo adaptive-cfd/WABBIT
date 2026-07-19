@@ -163,7 +163,8 @@ subroutine sync_ghosts_RHS_tree(params, hvy_block, tree_ID, g_minus, g_plus, syn
     if (present(g_plus))   gplus = g_plus
 
     ! set level to -1 to enable synching between all, set stati to send to all levels
-    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", spaghetti_form=.false., ignore_Filter=.true., sync_debug_name=sync_debug_name)
+    call sync_ghosts_generic(params, hvy_block, tree_ID, g_minus=gminus, g_plus=gplus, sync_case="full_leaf", spaghetti_form=.false., &
+     ignore_Filter=.false., sync_debug_name=sync_debug_name, filter_ID='HD')
 
 end subroutine
 
@@ -173,7 +174,7 @@ end subroutine
 !! In order to avoid confusion wrapper functions should be used everywhere in order to implement
 !! specific versions. This also means that parameter changes only have to be changed in the wrappers
 subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti_form, &
-    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter, sync_debug_name)
+    g_minus, g_plus, s_val, hvy_tmp, verbose_check, ignore_Filter, sync_debug_name, filter_ID)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
     
@@ -194,12 +195,13 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
     logical, intent(in), optional  :: ignore_Filter                 !< If set, coarsening will be done only with loose downsampling, not applying HD filter even in the case of lifted wavelets
     integer(kind=ik), optional, intent(in) :: g_minus, g_plus       !< Synch only so many ghost points
     character(len=*), optional, intent(in) :: sync_debug_name       !< name to be used in debug output files
+    character(len=*), optional, intent(in) :: filter_ID
 
     integer(kind=ik) :: count_send_total, Nstages, istage, gminus, gplus, k, hvy_id, lgt_id, i_dim, ierr
     real(kind=rk) :: t0, t1, t2, x0(1:3), dx(1:3), tolerance
     character(len=clong) :: toc_statement
     integer(kind=2) :: n_domain(1:3)
-    character(len=clong) :: format_string, string_prepare
+    character(len=clong) :: format_string, string_prepare, filter_ID2
     integer(kind=ik)                    :: points_synched
     integer(kind=ik), allocatable, save :: points_synched_list(:)
 
@@ -224,6 +226,9 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
     ! if we sync a different number of ghost nodes
     if (present(g_minus)) gminus = g_minus
     if (present(g_plus))   gplus = g_plus
+
+    filter_ID2 = 'HD'
+    if (present(filter_ID)) filter_ID2 = filter_ID
 
     !-----------------------------------------------------------------------
     ! set up constant arrays
@@ -268,14 +273,14 @@ subroutine sync_ghosts_generic( params, hvy_block, tree_ID, sync_case, spaghetti
         t2 = MPI_wtime()
         if (.not. present(hvy_tmp)) then
             call xfer_block_data(params, hvy_block, tree_ID, count_send_total, ignore_Filter=ignore_Filter, &
-            verbose_check=verbose_check)
+            verbose_check=verbose_check, filter_ID=filter_ID2)
         else
             if (index(sync_case, "ref") > 0) then
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                REF_FLAG=s_val, ignore_Filter=ignore_Filter, verbose_check=verbose_check)
+                REF_FLAG=s_val, ignore_Filter=ignore_Filter, verbose_check=verbose_check, filter_ID=filter_ID2)
             else
                 call xfer_block_data(params, hvy_block, tree_ID, count_send_total, hvy_tmp=hvy_tmp, &
-                ignore_Filter=ignore_Filter, verbose_check=verbose_check)
+                ignore_Filter=ignore_Filter, verbose_check=verbose_check, filter_ID=filter_ID2)
             endif
         endif
         call toc( "sync ghosts (xfer_block_data)", 82, MPI_wtime()-t2 )

@@ -252,8 +252,10 @@ program main
         write(*,*) ""
     endif
 
+    ! this global variable is used to abort the execution but still write a backup - for example if the solution diverges
+    ABORT_TIMESTEPPING = .false.
     keep_running = .true.
-    do while ( time<params%time_max .and. iteration<params%nt .and. keep_running)
+    do while ( time<params%time_max .and. iteration<params%nt .and. keep_running .and. .not. ABORT_TIMESTEPPING)
         t2 = MPI_wtime()
 
         !***********************************************************************
@@ -478,7 +480,10 @@ program main
         ! it can rarely happen that not all proc arrive at the same time at the above condition, then some decide to
         ! stop and others not. this is a rare but severe problem, to solve it, synchronize:
         call MPI_BCAST( keep_running, 1, MPI_LOGICAL, 0, WABBIT_COMM, mpicode )
+        ! this global variable is used to abort the execution but still write a backup - for example if the solution diverges
+        call MPI_ALLREDUCE(MPI_IN_PLACE, ABORT_TIMESTEPPING, 1, MPI_LOGICAL, MPI_LOR, WABBIT_COMM, mpicode)
 
+        
         !***********************************************************************
         ! runtime control
         !***********************************************************************

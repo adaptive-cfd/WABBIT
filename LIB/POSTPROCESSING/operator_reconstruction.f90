@@ -90,6 +90,7 @@ subroutine operator_reconstruction(params)
         g3 = 3
     endif
     params%g = max(max(g1,g2), g3)
+    params%g_rhs = params%g
 
     select case(params%order_discretization)
     case("FD_6th_central")
@@ -259,8 +260,12 @@ subroutine operator_reconstruction(params)
 
             if (refine) then
                 call store_ref_meshes( lgt_block_ref, lgt_active_ref, lgt_n_ref, tree_ID1=1, tree_ID2=1)
-
-                call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM )
+!
+!
+! Attention! To study the influence of coarse extension on OP instability on static grid, the following line needs to be commented
+!
+!
+                ! call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM )
 
                 call sync_ghosts_tree(params, hvy_block, tree_ID)
             endif
@@ -281,8 +286,8 @@ subroutine operator_reconstruction(params)
                         do ix2 = g+1, Bs(1)+g
                             u_dx   = sum( stencil1*hvy_block(ix2+a1:ix2+b1, iy2, iz, 1, hvy_id) )*dx_inv
                             u_dxdx = sum( stencil2*hvy_block(ix2+a2:ix2+b2, iy2, iz, 1, hvy_id) )*dx_inv**2
-                            hvy_block(ix2,iy2,iz,2,hvy_id) = sign*u_dx + nu*u_dxdx &
-                            + 24.0_rk*(-1.0_rk/16.0_rk)* sum( (/1.0_rk, -4.0_rk, 6.0_rk, -4.0_rk, 1.0_rk/)*hvy_block(ix2-2:ix2+2, iy2, iz, 1, hvy_id) )
+                            hvy_block(ix2,iy2,iz,2,hvy_id) = sign*u_dx + nu*u_dxdx !&
+                            ! + 24.0_rk*(-1.0_rk/16.0_rk)* sum( (/1.0_rk, -4.0_rk, 6.0_rk, -4.0_rk, 1.0_rk/)*hvy_block(ix2-2:ix2+2, iy2, iz, 1, hvy_id) )
                             !  + 24.0_rk*(1.0_rk/64.0_rk)* sum( (/1.0_rk, -6.0_rk, 15.0_rk, -20.0_rk, 15.0_rk, -6.0_rk, 1.0_rk/)*hvy_block(ix2-3:ix2+3, iy2, iz, 1, hvy_id) )
                         end do
                     end do
@@ -312,7 +317,9 @@ subroutine operator_reconstruction(params)
 
             if (refine) then
                 ! call adapt_tree( time, params, hvy_block, tree_ID, "everywhere", hvy_tmp )
-
+!
+! This next line does perform the coarse extension (even though the grid is not changing!)
+!
                 ! as both ref meshes are the same, doesnt matter if *ref(:,1) or (:,2)
                 call coarse_tree_2_reference_mesh(params, lgt_block_ref, lgt_active_ref(:,2), lgt_n_ref(2), &
                 hvy_block, hvy_tmp, tree_ID=1, verbosity=.true.)

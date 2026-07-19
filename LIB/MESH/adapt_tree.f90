@@ -180,7 +180,8 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! coarseningIndicator_tree works on all blocks (for wavelet cases).
         ! blocks that are significant now have status 0, others have -1
 
-        if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" .and. indicator/='nothing (external)' .and.indicator/='undo_refinement') then
+        if (params%useSecurityZone .and. indicator/="everywhere" .and. indicator/="random" &
+        .and. indicator/='nothing (external)' .and.indicator/='undo_refinement' .and. indicator/='lower-corner') then
             ! if we want to add a security zone, we check for every significant block if a neighbor wants to coarsen
             ! if this is the case, we check if any significant WC would be deleted (basically checking the thresholding for this patch)
             ! in that case we set the neighbouring block to be important as well (with a temporary flag)

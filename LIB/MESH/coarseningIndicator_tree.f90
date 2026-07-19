@@ -203,6 +203,7 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
         do k_b = 1, hvy_n(tree_ID)
             hvy_ID = hvy_active(k_b, tree_ID)
             call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+
             if (get_tc(lgt_block( lgt_ID, IDX_TC_1:IDX_TC_2 )) == 0 .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == params%Jmax) then
                 ! instead of setting the refinement status, let's set a hack that set's the WC to 0 for Thomas
                 hvy_block(params%g+2:params%g+params%BS(1):2,:,:,:,hvy_ID) = 0.0_rk
@@ -210,6 +211,43 @@ subroutine coarseningIndicator_tree( time, params, hvy_block, hvy_tmp, &
                 if (params%dim == 3) then
                     hvy_block(:,:,params%g+2:params%g+params%BS(3):2,:,hvy_ID) = 0.0_rk
                 endif
+            else
+                lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            endif
+        enddo
+    case ("delete-all")
+        ! set only one block at the origin to coarsen
+        ! Used for development only.
+
+        do k_b = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k_b, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+            
+            ! if (get_tc(lgt_block( lgt_ID, IDX_TC_1:IDX_TC_2 )) == 0 .and. lgt_block( lgt_ID, IDX_MESH_LVL ) == params%Jmax) then
+                ! instead of setting the refinement status, let's set a hack that set's the WC to 0 for Thomas
+                hvy_block(params%g+2:params%g+params%BS(1):2,:,:,:,hvy_ID) = 0.0_rk
+                hvy_block(:,params%g+2:params%g+params%BS(2):2,:,:,hvy_ID) = 0.0_rk
+                if (params%dim == 3) then
+                    hvy_block(:,:,params%g+2:params%g+params%BS(3):2,:,hvy_ID) = 0.0_rk
+                endif
+            ! else
+            !     lgt_block(lgt_ID, IDX_REFINE_STS) = 0
+            ! endif
+        enddo
+
+    case ("lower-corner")
+        do k_b = 1, hvy_n(tree_ID)
+            hvy_ID = hvy_active(k_b, tree_ID)
+            call hvy2lgt(lgt_ID, hvy_ID, params%rank, params%number_blocks)
+
+            ! leaf-blocks only are being set
+            if (.not. block_is_leaf(params, hvy_ID)) cycle
+
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
+
+            ! flag for coarsening
+            if ( x0(1)<0.45*params%domain_size(1).and.x0(2)<0.45*params%domain_size(2)) then
+                lgt_block(lgt_ID, IDX_REFINE_STS) = -1
             else
                 lgt_block(lgt_ID, IDX_REFINE_STS) = 0
             endif

@@ -19,6 +19,8 @@ module module_globals
     integer, parameter, public  :: IDX_TC_2            = IDX_TC_1+1 ! second part of TC number
     integer, parameter, public  :: EXTRA_LGT_FIELDS    = 5 ! number of data fields additionaly to treecode
     integer, parameter, public  :: tree_ID_flow = 1, tree_ID_mask = 2, tree_ID_mask_coarser = 3
+    ! this global variable is used to abort the execution but still write a backup - for example if the solution diverges
+    logical, save, public :: ABORT_TIMESTEPPING = .false.
 
     ! this refinement flag tells us a block exists, but it is not filled with meaningful entries. Syncing with these blocks is ignored.
     ! it is global as it may be used at different positions
@@ -160,6 +162,20 @@ module module_globals
             call MPI_ABORT( WABBIT_COMM, 666, mpierr)
         end subroutine
 
+        subroutine abort_save(code,msg)
+	    ! abort execution but save a backup first (not an MPI_ABORT variant)
+            implicit none
+            character(len=*), intent(in) :: msg
+            integer(kind=ik), intent(in) :: code
+
+            ! as above, all ranks (that encounter the error - may be a subset of total CPU)
+            ! display the message
+            write(*,'(i9, A)') code, msg
+            
+            ! global variable interupts main time loop in main.f90
+            ! useful in simulations only (not in postprocessing)
+            ABORT_TIMESTEPPING = .true.
+        end subroutine
 
         !-----------------------------------------------------------------------------
         ! convert degree to radiant

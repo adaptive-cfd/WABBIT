@@ -253,6 +253,12 @@ module module_insects
       real(kind=rk) :: B_membrane(1:4), L_membrane(1:4)
       logical :: damaged(1:4) = .false.
 
+	   ! polygon wing geometry
+      ! polygon_wings(:,1) = x_w coordinates
+      ! polygon_wings(:,2) = y_w coordinates
+      real(kind=rk), allocatable :: polygon_wings(:,:)
+      integer(kind=ik) :: n_polygon_points = 0
+
       !--------------------------------------------------------------
       ! Wing kinematics
       !--------------------------------------------------------------

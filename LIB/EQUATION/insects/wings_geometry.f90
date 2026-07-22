@@ -210,6 +210,10 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID,
           ! membrane is bad for the fourier series.
           call draw_wing_kleemeier(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, &
           x_pivot_b,rot_rel_wing_w)
+      case ("polygon")
+          ! polygon can be an arbitrily shaped wing with coordinates given in the ini-file
+          call draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, &
+          x_pivot_b,rot_rel_wing_w)
 
       case default
           call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%wing_file_type(wingID))))
@@ -1495,6 +1499,449 @@ subroutine draw_wing_bristled(xx0, ddx, mask, mask_color, us,Insect,color_wing,w
 end subroutine draw_wing_bristled
 
 
+!-------------------------------------------------------------------------------
+subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, x_pivot_b,rot_rel_wing_w)
+    implicit none 
+
+    type(diptera), intent(inout) :: Insect
+    real(kind=rk), intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk), intent(inout) :: mask(0:,0:,0:), mask_color(0:,0:,0:)
+    real(kind=rk), intent(inout) :: us(0:,0:,0:,1:)
+    integer(kind=2), intent(in) :: color_wing, wingID
+    real(kind=rk), intent(in) :: M_g2b(1:3,1:3), M_b2w(1:3,1:3), x_pivot_b(1:3), rot_rel_wing_w(1:3)
+
+    integer(kind=ik) :: i, j, k, ix, iy, iz
+    integer(kind=ik) :: n, iseg, idx_p1, idx_p2
+    integer(kind=ik) :: Bs(1:3)
+    integer(kind=ik) :: xmin, xmax, ymin, ymax, zmin, zmax
+    integer(kind=ik) :: xmin_seg, xmax_seg, ymin_seg, ymax_seg, zmin_seg, zmax_seg
+    real(kind=rk) :: x, y, z
+    real(kind=rk) :: x_g(1:3), x_b(1:3), x_w(1:3)
+    real(kind=rk) :: corner_w(1:3), corner_b(1:3), corner_g(1:3)
+    real(kind=rk) :: M_w2b(1:3,1:3), M_b2g(1:3,1:3)
+    real(kind=rk) :: band_width
+    real(kind=rk) :: wingbox_w(1:6), x_wingbox_w(1:2), y_wingbox_w(1:2), z_wingbox_w(1:2)
+    real(kind=rk) :: segmentbox_w(1:6), x_segmentbox_w(1:2), y_segmentbox_w(1:2), z_segmentbox_w(1:2)
+    real(kind=rk) :: wingbox_g_min(1:3), wingbox_g_max(1:3), segmentbox_g_min(1:3), segmentbox_g_max(1:3)
+    real(kind=rk) :: p1(1:2), p2(1:2)
+
+    real(kind=rk), allocatable, save :: tmp_dist_xy(:,:,:)
+    logical, allocatable, save       :: tmp_active(:,:,:)
+    real(kind=rk) :: d_seg, zmin_wing, zmax_wing
+    real(kind=rk) :: phi_xy, phi_z, phi, mask_value
+    logical :: inside_polygon
+
+
+    if ((Insect%wing_file_type(wingID)) /= "polygon") call abort(01072601,"draw_wing_polygon called with non-polygon wing...")
+    if (.not. allocated(Insect%polygon_wings)) call abort(01072602, "draw_wing_polygon: polygon_wings is not allocated")
+    if (Insect%damaged(wingID)) call abort(21072601, "draw_wing_polygon can currently only be used with non-damaged wings")
+    if (Insect%corrugated(wingID)) call abort(21072602, "draw_wing_polygon can currently only be used with non-corrugated wings")
+    if ( Insect%wing_thickness_distribution(wingID)=="variable") call abort(21072603, "draw_wing_polygon can currently only be used with a constant wing thickness")
+
+
+    Bs(1) = size(mask,1) - 2*g
+    Bs(2) = size(mask,2) - 2*g
+    Bs(3) = size(mask,3) - 2*g
+
+    n = Insect%n_polygon_points
+    band_width = Insect%safety
+
+   
+    ! Local wing bounding box in wing coordinates extended by safety zone
+    ! a bit redundant but used for readability
+    wingbox_w(1) = Insect%wing_bounding_box(1,wingID) - band_width
+    wingbox_w(2) = Insect%wing_bounding_box(2,wingID) + band_width
+    wingbox_w(3) = Insect%wing_bounding_box(3,wingID) - band_width
+    wingbox_w(4) = Insect%wing_bounding_box(4,wingID) + band_width
+    wingbox_w(5) = Insect%wing_bounding_box(5,wingID) - band_width
+    wingbox_w(6) = Insect%wing_bounding_box(6,wingID) + band_width
+
+    ! Reverse transformations:
+    ! usual point transform: global -> body -> wing
+    ! here we need:          wing -> body -> global
+    M_w2b = transpose(M_b2w)
+    M_b2g = transpose(M_g2b)
+    
+    ! we need the 6 values to decribe the 8 corners of the bounding box
+    x_wingbox_w = (/wingbox_w(1), wingbox_w(2)/)
+    y_wingbox_w = (/wingbox_w(3), wingbox_w(4)/)
+    z_wingbox_w = (/wingbox_w(5), wingbox_w(6)/)
+
+    ! we are saving global coordinates of the bounding box 
+    ! with each values wingbox_g_min(3) - x,y,z
+    wingbox_g_min = 999.d9
+    wingbox_g_max = -999.d9
+
+    ! Loop over the 8 corners of the local WING bounding box
+    do k = 1, 2
+        do j = 1, 2
+            do i = 1, 2
+                ! corner
+                corner_w = (/x_wingbox_w(i), y_wingbox_w(j), z_wingbox_w(k)/)
+                ! wing -> body
+                corner_b = x_pivot_b + matmul(M_w2b, corner_w)
+                ! body -> global
+                corner_g = Insect%xc_body_g + matmul(M_b2g, corner_b)
+
+                ! Global axis-aligned box around the tilted wing box
+                wingbox_g_min = min(wingbox_g_min, corner_g)
+                wingbox_g_max = max(wingbox_g_max, corner_g)            
+            enddo
+        enddo
+    enddo
+
+    ! Convert global wing box to index range on the current block.
+    xmin = floor( (wingbox_g_min(1) - xx0(1)) / ddx(1) )
+    xmax = ceiling( (wingbox_g_max(1) - xx0(1)) / ddx(1) )
+    ymin = floor( (wingbox_g_min(2) - xx0(2)) / ddx(2) )
+    ymax = ceiling( (wingbox_g_max(2) - xx0(2)) / ddx(2) )
+    zmin = floor( (wingbox_g_min(3) - xx0(3)) / ddx(3) )
+    zmax = ceiling( (wingbox_g_max(3) - xx0(3)) / ddx(3) )
+
+    ! Clip to non-ghost points of the current block (like in draw_body_superSTL)
+    ! (g) and not (g+1) because of zero indexing
+    xmin = max(xmin, g)
+    ymin = max(ymin, g)
+    zmin = max(zmin, g)
+
+    xmax = min(xmax, size(mask,1)-1-g)
+    ymax = min(ymax, size(mask,2)-1-g)
+    zmax = min(zmax, size(mask,3)-1-g)
+
+    ! If the clipped range is empty, the current block is not affected by this wing.
+    if (xmax-xmin+1 <= 0) return
+    if (ymax-ymin+1 <= 0) return
+    if (zmax-zmin+1 <= 0) return
+    
+    if (.not. allocated(tmp_dist_xy)) then
+        allocate(tmp_dist_xy(g:Bs(1)+g-1, &
+                            g:Bs(2)+g-1, &
+                            g:Bs(3)+g-1))
+    endif
+    if (.not. allocated(tmp_active)) then
+        allocate(tmp_active(g:Bs(1)+g-1, &
+                            g:Bs(2)+g-1, &
+                            g:Bs(3)+g-1))
+    endif
+
+    tmp_dist_xy = band_width
+    tmp_active  = .false.
+
+    !-----------------------------------------------------------------------------
+    ! Loop over all polygon segments!
+    ! Each segment gets its own local 3D segment box. This box is transformed to 
+    ! the global bounding box and converted to an index range.
+    !-----------------------------------------------------------------------------
+    do iseg = 1, n
+
+        idx_p1 = iseg
+        if (iseg < n) then
+            idx_p2 = iseg + 1
+        else
+            idx_p2 = 1
+        endif
+
+        p1 = Insect%polygon_wings(idx_p1,1:2)
+        p2 = Insect%polygon_wings(idx_p2,1:2)
+
+        ! cheap geometry check, building a second local bounding box around segment 
+        ! to check wether or not the segment is important for the specific block
+        segmentbox_w(1) = min(p1(1), p2(1)) - band_width
+        segmentbox_w(2) = max(p1(1), p2(1)) + band_width
+        segmentbox_w(3) = min(p1(2), p2(2)) - band_width
+        segmentbox_w(4) = max(p1(2), p2(2)) + band_width
+        segmentbox_w(5) = Insect%wing_bounding_box(5,wingID) - band_width
+        segmentbox_w(6) = Insect%wing_bounding_box(6,wingID) + band_width
+
+        x_segmentbox_w = (/segmentbox_w(1), segmentbox_w(2)/)
+        y_segmentbox_w = (/segmentbox_w(3), segmentbox_w(4)/)
+        z_segmentbox_w = (/segmentbox_w(5), segmentbox_w(6)/)
+
+        ! we are saving global coordinates of the bounding box with each values wingbox_g_min(3) - x,y,z
+        segmentbox_g_min = 999.d9
+        segmentbox_g_max = -999.d9
+
+        ! Loop over the 8 corners of the local SEGMENT bounding box
+        do k = 1, 2
+            do j = 1, 2
+                do i = 1, 2
+                    ! corner
+                    corner_w = (/x_segmentbox_w(i), y_segmentbox_w(j), z_segmentbox_w(k)/)
+                    ! wing -> body
+                    corner_b = x_pivot_b + matmul(M_w2b, corner_w)
+                    ! body -> global
+                    corner_g = Insect%xc_body_g + matmul(M_b2g, corner_b)
+
+                    ! Global axis-aligned box around the transformed wing box.
+                    segmentbox_g_min = min(segmentbox_g_min, corner_g)
+                    segmentbox_g_max = max(segmentbox_g_max, corner_g)            
+                enddo
+            enddo
+        enddo
+
+        ! index range on the current block
+        xmin_seg = floor( (segmentbox_g_min(1) - xx0(1)) / ddx(1) )
+        xmax_seg = ceiling( (segmentbox_g_max(1) - xx0(1)) / ddx(1) )
+        ymin_seg = floor( (segmentbox_g_min(2) - xx0(2)) / ddx(2) )
+        ymax_seg = ceiling( (segmentbox_g_max(2) - xx0(2)) / ddx(2) )
+        zmin_seg = floor( (segmentbox_g_min(3) - xx0(3)) / ddx(3) )
+        zmax_seg = ceiling( (segmentbox_g_max(3) - xx0(3)) / ddx(3) )
+
+        ! again clip index range if not on block
+        xmin_seg = max(xmin_seg, xmin)
+        ymin_seg = max(ymin_seg, ymin)
+        zmin_seg = max(zmin_seg, zmin)
+
+        xmax_seg = min(xmax_seg, xmax)
+        ymax_seg = min(ymax_seg, ymax)
+        zmax_seg = min(zmax_seg, zmax)
+
+        ! contniue if segment is not on block
+        if (xmin_seg > xmax_seg) cycle
+        if (ymin_seg > ymax_seg) cycle
+        if (zmin_seg > zmax_seg) cycle
+
+        ! -> now we have evaluated for each point if it is important for the current 
+        ! block and extracted the indizies in close range to the line segment
+
+
+        !-------------------------------------------------------------------------
+        ! Now only points in this small segment box are considered.
+        ! For each point:
+        !     global -> body -> wing
+        !     optional local segment-box check
+        !     compute 2D distance to current polygon segment
+        !-------------------------------------------------------------------------
+
+        do iz = zmin_seg, zmax_seg
+            z = xx0(3) + dble(iz)*ddx(3)
+            do iy = ymin_seg, ymax_seg
+                y = xx0(2) + dble(iy)*ddx(2)
+                do ix = xmin_seg, xmax_seg
+                    x = xx0(1) + dble(ix)*ddx(1)
+
+                    ! global coordinates
+                    x_g = (/x,y,z/)
+
+                    ! global -> body
+                    x_b = matmul(M_g2b, x_g - Insect%xc_body_g)
+
+                    ! body -> wing
+                    x_w = matmul(M_b2w, x_b - x_pivot_b)
+
+                    ! Extra local check.
+                    ! The global bounding box is only a coarse box around a rotated box.
+                    ! This check removes points that are inside the global box
+                    ! but outside the actual local segment box
+                    if (x_w(1) < segmentbox_w(1)) cycle
+                    if (x_w(1) > segmentbox_w(2)) cycle
+                    if (x_w(2) < segmentbox_w(3)) cycle
+                    if (x_w(2) > segmentbox_w(4)) cycle
+                    if (x_w(3) < segmentbox_w(5)) cycle
+                    if (x_w(3) > segmentbox_w(6)) cycle
+
+                    ! 2D distance in the wing plane.
+                    ! Only x_w/y_w are used here.
+                    d_seg = point_segment_distance_2D(x_w(1:2), p1, p2)
+                    if (d_seg <= band_width) then
+                        if (d_seg < tmp_dist_xy(ix,iy,iz)) then
+                            tmp_dist_xy(ix,iy,iz) = d_seg
+                            tmp_active(ix,iy,iz)  = .true.
+                        endif
+                    endif
+                enddo
+            enddo
+        enddo
+    enddo  ! loop over polygon segments
+
+    !-----------------------------------------------------------------------------
+    ! Final SDF evaluation.
+    ! - determine inside/outside in the 2D polygon
+    ! - assign the sign of phi_xy
+    ! - compute phi_z from the wing thickness
+    ! - combine both to the 3D signed distance of the extruded polygon
+    ! - convert phi to mask value
+    !-----------------------------------------------------------------------------
+    zmin_wing = Insect%wing_bounding_box(5,wingID)
+    zmax_wing = Insect%wing_bounding_box(6,wingID)
+
+    do iz = zmin, zmax
+        z = xx0(3) + dble(iz)*ddx(3)
+        do iy = ymin, ymax
+            y = xx0(2) + dble(iy)*ddx(2)
+            do ix = xmin, xmax
+                x = xx0(1) + dble(ix)*ddx(1)
+
+                ! global coordinates
+                x_g = (/x,y,z/)
+                ! global -> body
+                x_b = matmul(M_g2b, x_g - Insect%xc_body_g)
+                ! body -> wing
+                x_w = matmul(M_b2w, x_b - x_pivot_b)
+
+                ! inside the global box but outside the true local wing box.
+                if (x_w(1) < wingbox_w(1)) cycle
+                if (x_w(1) > wingbox_w(2)) cycle
+                if (x_w(2) < wingbox_w(3)) cycle
+                if (x_w(2) > wingbox_w(4)) cycle
+                if (x_w(3) < wingbox_w(5)) cycle
+                if (x_w(3) > wingbox_w(6)) cycle
+
+                ! Check whether the point is inside the 2D polygon in the wing plane
+                inside_polygon = point_in_polygon_2D(x_w(1:2), Insect%polygon_wings, n)
+
+                ! Case 1:
+                ! tmp_active = true
+                ! -> point was close enough to at least one polygon segment
+                ! -> use computed distance
+                !
+                ! Case 2:
+                ! tmp_active = false and point is inside polygon
+                ! -> point is deep inside the polygon, away from all edges
+                ! -> exact distance is not needed for truncated SDF
+                ! -> use phi_xy = -band_width
+                !
+                ! Case 3:
+                ! tmp_active = false and point is outside polygon
+                ! -> point is outside and away from edges
+                ! -> no mask contribution
+
+                if (tmp_active(ix,iy,iz)) then
+
+                    if (inside_polygon) then
+                        phi_xy = -tmp_dist_xy(ix,iy,iz)
+                    else
+                        phi_xy =  tmp_dist_xy(ix,iy,iz)
+                    endif
+
+                else
+
+                    if (inside_polygon) then
+                        phi_xy = -band_width
+                    else
+                        cycle
+                    endif
+
+                endif
+
+                ! assuming constant thickness here - incase its not maybe loop
+                ! phi_z <= 0 inside the thickness interval
+                ! phi_z >  0 outside the thickness interval
+                phi_z = max(zmin_wing - x_w(3), x_w(3) - zmax_wing)
+
+                ! mengenformel um echten Abstand zu bekommen
+                phi = min(max(phi_xy, phi_z), 0.0_rk) + sqrt(max(phi_xy, 0.0_rk)**2 + max(phi_z, 0.0_rk)**2)
+                phi = max(-band_width, min(band_width, phi))
+
+
+                ! Outside the narrow band: no contribution needed
+                if (phi > band_width) cycle
+
+                !----------------------------------------------------------
+                ! call step and update mask, us
+                !----------------------------------------------------------
+
+                mask_color(ix,iy,iz) = color_wing
+                mask_value = step(phi, 0.0_rk, Insect%smooth, Insect%safety,  Insect%smoothing_type_int)
+
+                ! update only if the new mask value is higher than the one before
+                if (mask_value > mask(ix,iy,iz)) then
+                    mask(ix,iy,iz) = mask_value
+                    mask_color(ix,iy,iz) = color_wing
+                endif
+
+            enddo
+        enddo
+    enddo
+
+end subroutine draw_wing_polygon
+
+
+function point_segment_distance_2D(x,p1,p2) result(d)
+
+    ! x   - point in wing system (x_w, y_w)
+    ! p1  - starting point of line segment
+    ! p2  - end point of line segment
+    ! d   - shortest distance from x to line segment p1--p2
+
+    implicit none
+    real(kind=rk), intent(in) :: x(1:2), p1(1:2), p2(1:2)
+    real(kind=rk) :: d
+    real(kind=rk) :: v(1:2), w(1:2), closest(1:2)
+    real(kind=rk) :: vv, t
+
+    ! p1 ---------> p2
+    !       v
+    v = p2 - p1
+    w = x - p1
+
+    vv = v(1)**2+v(2)**2
+
+    ! are our segments far enough apart?
+    if (vv <= 1.0e-14_rk) then
+        d = sqrt(sum((x-p1)*(x-p1)))
+        return
+    endif
+
+    ! Projection, restricted to finite line segment 
+    ! (would be infinite line if t<0 & t>1)
+    ! t = 0: projection on p1
+    ! t = 1: projection on p2
+    ! 0<t<1: projection between p1 and p2
+    t = sum(w*v) / vv
+    t = max(0.0_rk, min(1.0_rk, t))
+
+    ! closest point on line segment
+    closest = p1 + t*v
+
+    ! finally distance
+    d = sqrt(sum((x-closest)*(x-closest)))
+
+end function point_segment_distance_2D
+
+
+function point_in_polygon_2D(x, polygon, n) result(inside)
+    implicit none
+
+    real(kind=rk), intent(in) :: x(1:2), polygon(:,:)
+    integer(kind=ik), intent(in) :: n
+    logical :: inside
+    integer(kind=ik) :: i, j
+    real(kind=rk) :: xi, yi, xj, yj
+    real(kind=rk) :: x_intersect
+
+    inside = .false.
+    j = n
+
+    do i = 1, n
+
+        xi = polygon(i,1)
+        yi = polygon(i,2)
+
+        xj = polygon(j,1)
+        yj = polygon(j,2)
+
+        ! ray-crossing test
+        ! we look in positive x-direction from point x.
+        ! if it crosses the polygon 2 times - outside
+        ! if it crosses the polygon 1 time  - inside        
+        if ( (yi > x(2)) .neqv. (yj > x(2)) ) then
+
+            ! where does my hoizontal line cut the polygon segment?
+            x_intersect = xi + (x(2)-yi) * (xj-xi) / (yj-yi)
+            if (x(1) < x_intersect) then
+                inside = .not. inside
+            endif
+
+        endif
+        j = i
+
+    enddo
+
+end function point_in_polygon_2D
+
+
+
 
 
 !-------------------------------------------------------------------------------
@@ -2073,7 +2520,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
   ! for many cases, it is important that Lspan and Lchord are known, but that is
   ! tedious for Fourier shapes, as the use cannot see it from the coefficients.
   ! Therefore, we compute the max / min of x / y here and store the result
-  call set_wing_bounding_box_fourier( Insect, wingID )
+  call set_wing_bounding_box( Insect, wingID )
 
   ! this is the old default value:
   if (maxval(Insect%corrugation_array_bbox(:,wingID)) == 0.0_rk) then
@@ -2116,6 +2563,10 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     integer(kind=ik) :: a1,b1,c
     !KVN-2025<<<<<
 
+    ! polygon wing geometry
+    real(kind=rk), allocatable :: polygon_wings(:,:)
+    integer(kind=ik) :: n_polygon_points = 0
+
 
     if (root) then
         write(*,'(80("─"))')
@@ -2134,7 +2585,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     ! some wings cannot be read from inifile, so if the type of the wing is some rubbish
     ! then we abort here:
     select case (Insect%wing_file_type(wingID))
-    case ("xy-points", "fourier", "fourierY", "kleemeier", "linear")
+    case ("xy-points", "fourier", "fourierY", "kleemeier", "linear", "polygon")
         ! nothing to do, type is correct, proceed
     case default
         call abort(6652, "ini file for wing does not seem to be correct type...")
@@ -2153,6 +2604,9 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     ! kleemeier:
     !       the wing is a rectangular membrane (possibly with bristles)
     !       T. Engels, D. Kolomenskiy, F.-O. Lehmann, Flight efficiency is key to diverse wing morphologies in small insects, J. R. Soc. Interface 18 20210518, 2021
+    ! polygon:
+    !       the wing contour is described in cartesian coordinates of points P(:,:) given in the wing-system and can be arbitrarily shaped 
+
     select case(Insect%wing_file_type(wingID))
     case ("kleemeier")
         ! the kleemeier wing was used in T. Engels, D. Kolomenskiy, F.-O. Lehmann, Flight efficiency is key to diverse wing morphologies in small insects, J. R. Soc. Interface 18 20210518, 2021
@@ -2270,6 +2724,43 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
             write(*,*) "ai", Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID)
             write(*,*) "bi", Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID)
         endif
+
+    case("polygon")
+        !-----------------------------------------------------------------------------
+        ! Read points P(:,:), we assume: P(1,:) -> P(2,:) -> ... P(n,:) -> P(1,:)
+        !-----------------------------------------------------------------------------
+        ! fetch size of matrix
+        call param_matrix_size_mpi( ifile, "Wing", "polygon_points", a,b)
+        if (a < 3) then
+            call abort(17062601, "think again :) - polygon_points must contain at least three points")
+        endif
+        if (b/=2) then
+            call abort(17062602, "polygon_points must have exactly two columns for coordinates (x,y)")
+        endif
+
+        ! allocate matrix
+        allocate( tmparray(1:a,1:b) )
+        call param_matrix_read_mpi(ifile, "Wing", "polygon_points", tmparray)
+
+        ! for now, I assume the wings are completly symmetric (in the z direction, top/down), 
+        ! later maybe we can add a second variable for e.g. asymmetric wing damage (corrugation)
+        if (.not. allocated(Insect%polygon_wings)) then
+            ! ---- could be relevant in case at some point we call the function 
+            ! multiple times in iteration w. different numbers of points l/r
+            ! if (allocated(Insect%polygon_wings)) then 
+                !deallocate(Insect%polygon_wings)
+            ! endif
+            allocate(Insect%polygon_wings(1:a,1:b))
+        endif
+        Insect%polygon_wings(1:a,1:2) = tmparray(1:a,1:2)
+        Insect%n_polygon_points = a
+        
+        deallocate(tmparray)
+
+        if (root) then
+            write(*,'("Polygon wing shape from ini-file: read ",i0," points from polygon_points")') a
+        endif
+
     end select
 
     !-----------------------------------------------------------------------------
@@ -2406,12 +2897,16 @@ end subroutine Setup_Wing_from_inifile
 ! tedious for Fourier shapes, as the use cannot see it from the cooefficients.
 ! Therefore, we compute the max / min of x / y / z  here and store the result
 ! NOTE: This code is executed only once.
+! 2026/06/30 EG: I added cases to include the polygon shaped wing and changed the name
+! set_wing_bounding_box_fourier( Insect, wingID) -> set_wing_bounding_box( Insect, wingID)
 !-------------------------------------------------------------------------------
-subroutine set_wing_bounding_box_fourier( Insect, wingID )
+subroutine set_wing_bounding_box( Insect, wingID)
+
     implicit none
     type(diptera),intent(inout) :: Insect
     real(kind=rk) :: theta, xmin,xmax, ymin, ymax, R, x, y, theta_prime, tmp
     integer(kind=2), intent(in) :: wingID ! wing id number
+    integer(kind=ik) :: n
 
     theta = 0.0_rk
     xmin = 999.d9
@@ -2419,6 +2914,9 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
     xmax = -999.d9
     ymax = -999.d9
 
+
+    select case(Insect%wing_file_type(wingID))
+    case("fourier")
     ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
     ! note flusi uses an angle between [0, 2*pi)
     do while ( theta < 2.0_rk*pi )
@@ -2451,6 +2949,40 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
     end do
 
     Insect%wing_bounding_box(1:4,wingID) = (/xmin, xmax, ymin, ymax/)
+
+    case("polygon")
+        n = Insect%n_polygon_points
+
+    !         yw
+    !         ^
+    !         |
+    !  ymax   |    +-----------------+
+    !         |    |      P4 o       |
+    !         |    |        / \      |
+    !         |    |       /   o P3  |
+    !         |    |  P5 o     |     |
+    !         |    |     \     |     |
+    !         |    |      \    o P2  |
+    !         |    |       \  /      |
+    !         |    |        o P1     |
+    !  ymin   |    +-----------------+
+    !         |
+    !         o------------------------------> xw
+    !            xmin               xmax     
+
+
+        ! 2D box
+        ! x = chord direction, y = span direction
+        xmin = minval(Insect%polygon_wings(1:n,1))
+        xmax = maxval(Insect%polygon_wings(1:n,1))
+        ymin = minval(Insect%polygon_wings(1:n,2))
+        ymax = maxval(Insect%polygon_wings(1:n,2))
+
+        Insect%wing_bounding_box(1:4,wingID) = (/xmin, xmax, ymin, ymax/)
+
+    case default
+        call abort(300626001, "ini file for wing does not seem to be correct type...")
+    end select
 
     ! the bounding box in z-direction depends on the wing thicnkess (constant or not)
     ! and the corrugation
@@ -2491,7 +3023,7 @@ subroutine set_wing_bounding_box_fourier( Insect, wingID )
         write(*,'("ywmin=",es15.8," ywmax=",es15.8)') Insect%wing_bounding_box(3:4,wingID)
         write(*,'("zwmin=",es15.8," zwmax=",es15.8)') Insect%wing_bounding_box(5:6,wingID)
     endif
-end subroutine set_wing_bounding_box_fourier
+end subroutine set_wing_bounding_box
 
 
 

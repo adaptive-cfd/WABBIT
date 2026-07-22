@@ -1692,7 +1692,6 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
         ymin_seg = max(ymin_seg, ymin)
         zmin_seg = max(zmin_seg, zmin)
 
-                !
         xmax_seg = min(xmax_seg, xmax)
         ymax_seg = min(ymax_seg, ymax)
         zmax_seg = min(zmax_seg, zmax)
@@ -1750,14 +1749,9 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                             tmp_active(ix,iy,iz)  = .true.
                         endif
                     endif
-                    
-                    
-
                 enddo
             enddo
         enddo
-
-
     enddo  ! loop over polygon segments
 
     !-----------------------------------------------------------------------------
@@ -2527,7 +2521,6 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
   ! tedious for Fourier shapes, as the use cannot see it from the coefficients.
   ! Therefore, we compute the max / min of x / y here and store the result
   call set_wing_bounding_box( Insect, wingID )
-  !  call set_wing_bounding_box_fourier( Insect, wingID )
 
   ! this is the old default value:
   if (maxval(Insect%corrugation_array_bbox(:,wingID)) == 0.0_rk) then
@@ -2612,7 +2605,7 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
     !       the wing is a rectangular membrane (possibly with bristles)
     !       T. Engels, D. Kolomenskiy, F.-O. Lehmann, Flight efficiency is key to diverse wing morphologies in small insects, J. R. Soc. Interface 18 20210518, 2021
     ! polygon:
-    !       the wing contour is described in cartesian coordinates of points P(:,:) given in the wing-system and can be arbitrily shaped 
+    !       the wing contour is described in cartesian coordinates of points P(:,:) given in the wing-system and can be arbitrarily shaped 
 
     select case(Insect%wing_file_type(wingID))
     case ("kleemeier")
@@ -2749,8 +2742,8 @@ subroutine Setup_Wing_from_inifile( Insect, wingID, fname )
         allocate( tmparray(1:a,1:b) )
         call param_matrix_read_mpi(ifile, "Wing", "polygon_points", tmparray)
 
-        ! for now, I assume the wings are completly symmetric, later maybe we can add 
-        ! a second variable for e.g. asymmetric wing damage
+        ! for now, I assume the wings are completly symmetric (in the z direction, top/down), 
+        ! later maybe we can add a second variable for e.g. asymmetric wing damage (corrugation)
         if (.not. allocated(Insect%polygon_wings)) then
             ! ---- could be relevant in case at some point we call the function 
             ! multiple times in iteration w. different numbers of points l/r
@@ -2960,7 +2953,7 @@ subroutine set_wing_bounding_box( Insect, wingID)
     case("polygon")
         n = Insect%n_polygon_points
 
-    !          y
+    !         yw
     !         ^
     !         |
     !  ymax   |    +-----------------+
@@ -2974,7 +2967,7 @@ subroutine set_wing_bounding_box( Insect, wingID)
     !         |    |        o P1     |
     !  ymin   |    +-----------------+
     !         |
-    !         o------------------------------> x
+    !         o------------------------------> xw
     !            xmin               xmax     
 
 

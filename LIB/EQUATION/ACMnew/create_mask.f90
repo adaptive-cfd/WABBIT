@@ -223,12 +223,12 @@ subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
 
         case ('lamballais')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
-                call draw_lamballais( mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
+                call draw_lamballais( mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom, use_separate_ring_smoothing=.false. )
             endif
 
         case ('lamballais-local')
         if (stage == "time-independent-part" .or. stage == "all-parts") then
-            call draw_lamballais_local_variation(mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom )
+            call draw_lamballais(mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom, use_separate_ring_smoothing=.true. )
         endif
 
         case ('plate-free')
@@ -436,7 +436,7 @@ subroutine geometry_indicator_acm( time, Bs, g, x0, dx, refinement_status, stage
 end subroutine geometry_indicator_acm
 
 ! !-------------------------------------------------------------------------------
-subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
+subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom,  use_separate_ring_smoothing)
 
     use module_params
     use module_globals
@@ -452,9 +452,10 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
     real(kind=rk), dimension(2), intent(in) :: x0, dx
     !> geometry index
     integer(kind=ik), intent(in) :: i_geom
+    logical, intent(in) :: use_separate_ring_smoothing
 
     ! auxiliary variables
-    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi
+    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi, epsilon_ring, xi_ring
     ! loop variables
     integer(kind=ik) :: ix, iy, ix_global, iy_global
 
@@ -473,6 +474,15 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
     epsilon = sqrt(params_acm%nu * params_acm%C_eta)
     safety = 5.0_rk * epsilon
     delta = 2.64822828_rk
+
+    ! we need a distinction between 
+    ! lamballais      : cylinder, ring have the same penalisation parameters
+    ! lamballais-local: cylinder, ring have different penalisation parameters
+    if (use_separate_ring_smoothing) then
+        epsilon_ring = sqrt(params_acm%nu * params_acm%C_eta_ring)
+    else
+        epsilon_ring = epsilon
+    endif
 
     if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
 
@@ -496,12 +506,12 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
 
                 elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
                     ! inner part of ring
-                    xi = -1.0_rk*(r-params_acm%R1) / epsilon
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
                 elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
                     ! outer part of ring
-                    xi = (r-params_acm%R2) / epsilon
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
+                    xi_ring = (r-params_acm%R2) / epsilon_ring
+                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
 
                 endif
 
@@ -537,10 +547,25 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
                     ! do not copy to sponge, because we do not enforce a 
                     ! pressure BC inside the actual cylinder
 
-                elseif ((r >= params_acm%R1).and.(r <= params_acm%R2)) then
-                    ! ring
-                    mask(ix,iy,6) = 1.0_rk
+                else
+                    
+                    if (use_separate_ring_smoothing) then
 
+                        if ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                            ! inner part of ring
+                            xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
+                            mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                        elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                            ! outer part of ring
+                            xi_ring = (r-params_acm%R2) / epsilon_ring
+                            mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                        endif
+
+                    elseif (r >= params_acm%R1 .and. r <= params_acm%R2) then
+
+                        mask(ix,iy,6) = 1.0_rk
+
+                    endif
                 endif
 
                 ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
@@ -577,13 +602,29 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
                     ! do not copy to sponge, because we do not enforce a 
                     ! pressure BC inside the actual cylinder
 
-                elseif ( (r > params_acm%R0+safety).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
-                    ! inner part of ring
-                    mask(ix,iy,6) = step_cosine( params_acm%R1-r, 0.0_rk, params_acm%C_smooth*params_acm%dx_min)
-                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then                
-                    ! outer part of ring
-                    mask(ix,iy,6) = step_cosine(r, params_acm%R2, params_acm%C_smooth*params_acm%dx_min)
+                else
 
+                    if (use_separate_ring_smoothing) then
+
+                        if ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                            ! inner part of ring
+                            xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
+                            mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                        elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
+                        
+                            ! outer part of ring
+                            xi_ring = (r-params_acm%R2) / epsilon_ring
+                            mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
+                        endif
+
+                    elseif ( (r > params_acm%R0+safety).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
+                        ! inner part of ring
+                        mask(ix,iy,6) = step_cosine( params_acm%R1-r, 0.0_rk, params_acm%C_smooth*params_acm%dx_min)
+                    elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then                
+                        ! outer part of ring
+                        mask(ix,iy,6) = step_cosine(r, params_acm%R2, params_acm%C_smooth*params_acm%dx_min)
+
+                    endif
                 endif
 
                 ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
@@ -605,202 +646,6 @@ subroutine draw_lamballais(mask, x0, dx, Bs, g, i_geom )
     end select
 
 end subroutine draw_lamballais
-
-subroutine draw_lamballais_local_variation(mask, x0, dx, Bs, g, i_geom )
-
-    use module_params
-    use module_globals
-
-    implicit none
-
-    ! grid
-    integer(kind=ik), intent(in) :: g
-    integer(kind=ik), dimension(3), intent(in) :: Bs
-    !> mask term for every grid point of this block
-    real(kind=rk), dimension(:,:,:), intent(out)     :: mask
-    !> spacing and origin of block
-    real(kind=rk), dimension(2), intent(in) :: x0, dx
-    !> geometry index
-    integer(kind=ik), intent(in) :: i_geom
-
-    ! auxiliary variables
-    real(kind=rk)  :: x, y, r, h, dx_min, tmp, safety, delta, epsilon, xi, epsilon_ring, xi_ring
-    ! loop variables
-    integer(kind=ik) :: ix, iy, ix_global, iy_global
-
-    if (size(mask,1) /= Bs(1)+2*g .or. size(mask,2) /= Bs(2)+2*g ) then
-        call abort(777107, "mask: wrong array size, there's pirates, captain!")
-    endif
-
-    ! a mask for the reproduction of the following paper:
-    ! Gautier, R., Biau, D., Lamballais, E.: A reference solution of the flow over a circular cylinder at Re = 40,
-    ! Computers & Fluids 75, 103–111, 2013 
-
-    ! parameter for smoothing function (width)
-    dx_min = params_acm%dx_min
-    h = 1.5_rk * dx_min
-
-    epsilon = sqrt(params_acm%nu * params_acm%C_eta)
-    safety = 5.0_rk * epsilon
-    delta = 2.64822828_rk
-
-    epsilon_ring = sqrt(params_acm%nu * params_acm%C_eta_ring)
-
-    if (params_acm%dim /= 2) call abort(1409242, "lamballais is a 2D test case")
-
-    select case(params_acm%smoothing_type(i_geom))
-    !--------------------------------
-    case ("hester")
-    !--------------------------------
-        do iy = g+1, Bs(2)+g
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-            do ix = g+1, Bs(1)+g
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
-                ! distance from center of cylinder
-                r = dsqrt(x*x + y*y)
-
-                if (r <= 0.5_rk*(params_acm%R0+params_acm%R1)) then
-                    ! inner cylinder
-                    !xi = (r-params_acm%R0) / epsilon
-                    !mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
-
-                    xi = (r-params_acm%R0) / epsilon
-                    mask(ix,iy,1) = 0.5_rk * (1.0_rk -tanh(2*xi/delta))
-                    ! do not copy to sponge, because we do not enforce a 
-                    ! pressure BC inside the actual cylinder
-
-                    !*************************************
-                    ! CHANGED
-                    !*************************************
-                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
-                    ! inner part of ring
-                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
-                    ! outer part of ring
-                    xi_ring = (r-params_acm%R2) / epsilon_ring
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-
-                endif
-
-                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
-                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
-
-                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
-                    mask(ix,iy,2:3) = 0.0_rk
-                else
-                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
-                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
-                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
-                    ! attention this is 2d so we can use slot 4 for p
-                    ! it is not usz (this is a HACK)
-                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
-                endif
-
-            end do
-        end do
-    !--------------------------------
-    case("discontinuous", "dis")
-    !--------------------------------
-        do iy = g+1, Bs(2)+g
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-            do ix = g+1, Bs(1)+g
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
-                ! distance from center of cylinder
-                r = dsqrt(x*x + y*y)
-
-                if (r <= params_acm%R0) then
-                    ! inner cylinder
-                    mask(ix,iy,1) = 1.0_rk
-                    ! do not copy to sponge, because we do not enforce a 
-                    ! pressure BC inside the actual cylinder
-                    
-                    !*************************************
-                    ! CHANGED
-                    !*************************************
-                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
-                    ! ((r >= params_acm%R1) .and. (r <= params_acm%R2)) then 
-                    ! inner part of ring
-                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
-                
-                    ! outer part of ring
-                    xi_ring = (r-params_acm%R2) / epsilon_ring
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                endif
-
-
-
-                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
-                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
-
-                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
-                    mask(ix,iy,2:3) = 0.0_rk
-                else
-                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
-                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
-                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
-                    ! attention this is 2d so we can use slot 4 for p
-                    ! it is not usz (this is a HACK)
-                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
-                endif
-
-            end do
-        end do
-    !--------------------------------
-    case("cos")
-    !--------------------------------
-        safety = 2.0_rk*params_acm%C_smooth*params_acm%dx_min
-
-        do iy = g+1, Bs(2)+g
-            y = dble(iy-(g+1)) * dx(2) + x0(2) - params_acm%x_cntr(2)
-            do ix = g+1, Bs(1)+g
-                x = dble(ix-(g+1)) * dx(1) + x0(1) - params_acm%x_cntr(1)
-                ! distance from center of cylinder
-                r = dsqrt(x*x + y*y)
-
-                if (r < params_acm%R0+safety) then
-                    ! inner cylinder
-                    mask(ix,iy,1) = step_cosine(r, params_acm%R0, params_acm%C_smooth*params_acm%dx_min)
-                    ! do not copy to sponge, because we do not enforce a 
-                    ! pressure BC inside the actual cylinder
-
-                    !*************************************
-                    ! CHANGED
-                    !*************************************
-                elseif ( (r > 0.5_rk*(params_acm%R0+params_acm%R1)).and.(r <= 0.5_rk*(params_acm%R1+params_acm%R2) )) then
-                    ! ((r >= params_acm%R1) .and. (r <= params_acm%R2)) then
-                    ! inner part of ring
-                    xi_ring = -1.0_rk*(r-params_acm%R1) / epsilon_ring
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                elseif (r>=0.5_rk*(params_acm%R1+params_acm%R2)) then
-                
-                    ! outer part of ring
-                    xi_ring = (r-params_acm%R2) / epsilon_ring
-                    mask(ix,iy,6) = 0.5_rk * (1.0_rk -tanh(2*xi_ring/delta))
-                endif
-                
-
-                ix_global = int( (dble(ix-(g+1)) * dx(1) + x0(1))/dx(1) )
-                iy_global = int( (dble(iy-(g+1)) * dx(2) + x0(2))/dx(2) )
-
-                if ( r <= 0.5_rk*(params_acm%R0+params_acm%R1) ) then
-                    mask(ix,iy,2:3) = 0.0_rk
-                else
-                    ! Note inefficiently, each mpirank has the full array (does not matter as is 2D)
-                    mask(ix,iy,2) = params_acm%u_lamballais(ix_global,iy_global,1)
-                    mask(ix,iy,3) = params_acm%u_lamballais(ix_global,iy_global,2)
-                    ! attention this is 2d so we can use slot 4 for p
-                    ! it is not usz (this is a HACK)
-                    mask(ix,iy,4) = params_acm%u_lamballais(ix_global,iy_global,3)
-                endif
-
-            end do
-        end do
-    end select
-
-end subroutine draw_lamballais_local_variation
 
 !-------------------------------------------------------------------------------
 ! The "free cylinder" is a 2D mask function that is coupled with the insect module

@@ -2916,7 +2916,7 @@ subroutine set_wing_bounding_box( Insect, wingID)
 
 
     select case(Insect%wing_file_type(wingID))
-    case("fourier")
+    case("fourier", "linear")
     ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
     ! note flusi uses an angle between [0, 2*pi)
     do while ( theta < 2.0_rk*pi )

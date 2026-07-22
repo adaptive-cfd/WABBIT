@@ -318,7 +318,7 @@ program main
             ! This might not be given for the first iteration so we just skip this (if adapt_tree was not called yet)
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this can be the case as well, because
             ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks, resulting in spikes for blocks_rhs
-            if (params%refinement_indicator == "significant" .and. iteration == 0 .and. .not. params%adapt_inicond) then
+            if (params%refinement_indicator == "significant" .and. iteration == 0 ) then ! .and. .not. params%adapt_inicond) then
                 call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time )
             else
                 call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time )

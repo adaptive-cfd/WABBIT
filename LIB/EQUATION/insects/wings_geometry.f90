@@ -2103,6 +2103,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     0.0029238,0.0009108,-0.0020888,-0.0012848,-0.0003728,0.0004738  /)
     Insect%yc(wingID) = 0.3184928
     Insect%xc(wingID) = -0.2459908
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
 
   case ('drosophila')
     !********************************************
@@ -2133,6 +2134,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     ! center of circle
     Insect%xc(wingID) =-0.1206 + xroot
     Insect%yc(wingID) = 0.3619 + yroot
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('drosophila_mutated')
     !********************************************
     ! mutated Drosophila wing from Jan Gruber's png file
@@ -2173,6 +2175,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     ! center of circle
     Insect%xc(wingID) =-0.1206 + xroot
     Insect%yc(wingID) = 0.3619 + yroot
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('drosophila_sandberg')
     !********************************************
     !  Drosophila wing from Ramamurti & Sandberg ( JEB 210, 881-896, 2007)
@@ -2193,6 +2196,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     /)
     Insect%xc(wingID) =-0.0235498
     Insect%yc(wingID) = 0.1531398
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('drosophila_maeda')
     !********************************************
     !  Drosophila wing from Maeda and Liu, similar to Liu and Aono, BB2009
@@ -2245,6 +2249,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     !Insect%yc(wingID) = 0.7
     !Insect%yc(wingID) = 0.712 ! measured using kinematics snapshots
     Insect%yc(wingID) = 0.702 ! According to Maeda's email, Jun 21, 2014
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('drosophila_sun')
     !********************************************
     !  Drosophila virilis wing from Chen and Sun, Acta Mech Sin 2014
@@ -2273,6 +2278,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     2.9924999100355387E-4/)
     Insect%xc(wingID) = 0.0
     Insect%yc(wingID) = 0.399446382250523
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('bumblebee')
     !********************************************
     !  Bumblebee
@@ -2302,7 +2308,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     0.000710028654602170_rk/)
     Insect%xc(wingID) = -0.1_rk
     Insect%yc(wingID) = 0.501549263807117_rk
-
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('b_ignitus')
     !********************************************
     !  Bumblebee B. ignitus
@@ -2332,7 +2338,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     0.000278542046262820_rk/)
     Insect%xc(wingID) = -0.13_rk
     Insect%yc(wingID) = 0.434820393790595_rk
-
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('paratuposa_flatwing')
     !********************************************
     !  Paratuposa wing simplified as a flat plate
@@ -2354,7 +2360,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     0.000860757518054172_rk,0.00147755983849289_rk,-0.000638118479966807_rk/)
     Insect%xc(wingID) = -0.3_rk
     Insect%yc(wingID) = 0.7_rk
-
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('paratuposa_flatelytra')
     !********************************************
     !  Paratuposa elytra simplified as a flat plate
@@ -2382,7 +2388,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     * 0.62_rk
     Insect%xc(wingID) = -0.02_rk * 0.62_rk
     Insect%yc(wingID) = 0.65_rk * 0.62_rk
-
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('flapper_sane')
     !********************************************
     !  Mechanical model from Sane and Dickinson, JEB 205, 2002
@@ -2412,6 +2418,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     -1.9762601237675826E-4/)
     Insect%xc(wingID) = 0.0
     Insect%yc(wingID) = 0.6
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('flapper_dickinsonII')
     !********************************************
     ! Digitized from Dickinson et al 1999 Science, figure 1A, drawing
@@ -2431,7 +2438,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     -0.0005798,0.0001228/)
     Insect%yc(wingID) = 0.5282438
     Insect%xc(wingID) = -0.1184548
-
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
   case ('robofly_dickinson')
     !********************************************
     ! Digitized from the hand drawn figure M. Dickinson sent via email, which
@@ -2454,6 +2461,7 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     -0.0002348,0.0001398,0.0001398,-0.0002358/)
     Insect%yc(wingID) = 0.4645238
     Insect%xc(wingID) = -0.0716018
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
 
   case ('hawkmoth1')
     ! this wingshape is digitized from figure 1 from Kim et al. "Hovering and forward flight of the hawkmoth
@@ -2476,22 +2484,25 @@ subroutine Setup_Wing_Fourier_coefficients(Insect, wingID)
     -0.0004308,-0.0002758,0.0002298,-0.0000548/)
     Insect%yc(wingID) = 0.4171918
     Insect%xc(wingID) = -0.0395258
-    case ('hawkmoth2')
-        ! this wingshape is digitized from https://en.wikipedia.org/wiki/Manduca_sexta#/media/File:Manduca_sexta_female_sjh.JPG
-        ! it has a greater aerea (A=0.40), but the original image is tricky since it is rotated. we therefore used a bit of modeling
-        ! for this wing shape.
-        Insect%nfft_wings(wingID) = 18
-        Insect%a0_wings(wingID) = 0.6617728
-        Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = &
-        (/-0.0837648,-0.0802108,0.0703808,0.0069808,-0.0183478,0.0156518,&
-        -0.0000308,-0.0153718,-0.0011538,0.0032378,-0.0005008,0.0020798,&
-        0.0019888,-0.0009568,-0.0016378,-0.0010208,0.0005658,0.0009028/)
-        Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = &
-        (/0.0086968,0.0763208,0.0216658,-0.0322558,-0.0125988,0.0042128,&
-        -0.0066278,-0.0040288,0.0093858,0.0045358,-0.0043238,0.0006298,&
-        0.0010848,-0.0028958,0.0007268,0.0022578,-0.0013068,-0.0003538/)
-        Insect%yc(wingID) = 0.3946798
-        Insect%xc(wingID) = -0.2157968
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
+
+  case ('hawkmoth2')
+    ! this wingshape is digitized from https://en.wikipedia.org/wiki/Manduca_sexta#/media/File:Manduca_sexta_female_sjh.JPG
+    ! it has a greater aerea (A=0.40), but the original image is tricky since it is rotated. we therefore used a bit of modeling
+    ! for this wing shape.
+    Insect%nfft_wings(wingID) = 18
+    Insect%a0_wings(wingID) = 0.6617728
+    Insect%ai_wings(1:Insect%nfft_wings(wingID),wingID) = &
+    (/-0.0837648,-0.0802108,0.0703808,0.0069808,-0.0183478,0.0156518,&
+    -0.0000308,-0.0153718,-0.0011538,0.0032378,-0.0005008,0.0020798,&
+    0.0019888,-0.0009568,-0.0016378,-0.0010208,0.0005658,0.0009028/)
+    Insect%bi_wings(1:Insect%nfft_wings(wingID),wingID) = &
+    (/0.0086968,0.0763208,0.0216658,-0.0322558,-0.0125988,0.0042128,&
+    -0.0066278,-0.0040288,0.0093858,0.0045358,-0.0043238,0.0006298,&
+    0.0010848,-0.0028958,0.0007268,0.0022578,-0.0013068,-0.0003538/)
+    Insect%yc(wingID) = 0.3946798
+    Insect%xc(wingID) = -0.2157968
+    Insect%wing_file_type(wingID) = "fourier"  ! for readability only; default set in type(diptera) definition
 
     case default
 
@@ -2914,64 +2925,64 @@ subroutine set_wing_bounding_box( Insect, wingID)
     xmax = -999.d9
     ymax = -999.d9
 
+    if (root) write(*,*) "set_wing_bounding_box, wing_file_type=", trim(adjustl((Insect%wing_file_type(wingID))))
+
 
     select case(Insect%wing_file_type(wingID))
     case("fourier", "linear", "fourierY")
-    ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
-    ! note flusi uses an angle between [0, 2*pi)
-    do while ( theta < 2.0_rk*pi )
-        ! note this angle is [0, 2*pi)
-        R = Radius_Fourier( theta, Insect, wingID )
+        ! construct the wing border by looping over the angle theta, look for smallest and largest x,y values
+        ! note flusi uses an angle between [0, 2*pi)
+        do while ( theta < 2.0_rk*pi )
+            ! note this angle is [0, 2*pi)
+            R = Radius_Fourier( theta, Insect, wingID )
 
-        ! note how the usual atan2 gives angles [-pi, +pi)
-        ! so here we add pi
-        theta_prime = theta - pi
-        x = Insect%xc(wingID) + R * cos( theta_prime )
-        y = Insect%yc(wingID) + R * sin( theta_prime )
+            ! note how the usual atan2 gives angles [-pi, +pi)
+            ! so here we add pi
+            theta_prime = theta - pi
+            x = Insect%xc(wingID) + R * cos( theta_prime )
+            y = Insect%yc(wingID) + R * sin( theta_prime )
 
-        ! NOTE: A word on theta_prime: it is the angle described with the positve x-axis
-        ! and indeed rotates in positve z-direction. That means in the plane
-        !
-        !  ^ x_wing
-        !  |
-        !  |
-        !  o-------> y_wing
-        !
-        ! It rotates CLOCKWISE, starting from the x_wing axis (zero is the x-axis, vertical)
+            ! NOTE: A word on theta_prime: it is the angle described with the positve x-axis
+            ! and indeed rotates in positve z-direction. That means in the plane
+            !
+            !  ^ x_wing
+            !  |
+            !  |
+            !  o-------> y_wing
+            !
+            ! It rotates CLOCKWISE, starting from the x_wing axis (zero is the x-axis, vertical)
 
-        xmin = min( xmin, x )
-        ymin = min( ymin, y )
+            xmin = min( xmin, x )
+            ymin = min( ymin, y )
 
-        xmax = max( xmax, x )
-        ymax = max( ymax, y )
+            xmax = max( xmax, x )
+            ymax = max( ymax, y )
 
-        theta = theta + 1.0d-3
-    end do
+            theta = theta + 1.0d-3
+        end do
 
-    Insect%wing_bounding_box(1:4,wingID) = (/xmin, xmax, ymin, ymax/)
+        Insect%wing_bounding_box(1:4,wingID) = (/xmin, xmax, ymin, ymax/)
 
     case("polygon")
-        n = Insect%n_polygon_points
-
-    !         yw
-    !         ^
-    !         |
-    !  ymax   |    +-----------------+
-    !         |    |      P4 o       |
-    !         |    |        / \      |
-    !         |    |       /   o P3  |
-    !         |    |  P5 o     |     |
-    !         |    |     \     |     |
-    !         |    |      \    o P2  |
-    !         |    |       \  /      |
-    !         |    |        o P1     |
-    !  ymin   |    +-----------------+
-    !         |
-    !         o------------------------------> xw
-    !            xmin               xmax     
-
-
+        !         yw
+        !         ^
+        !         |
+        !  ymax   |    +-----------------+
+        !         |    |      P4 o       |
+        !         |    |        / \      |
+        !         |    |       /   o P3  |
+        !         |    |  P5 o     |     |
+        !         |    |     \     |     |
+        !         |    |      \    o P2  |
+        !         |    |       \  /      |
+        !         |    |        o P1     |
+        !  ymin   |    +-----------------+
+        !         |
+        !         o------------------------------> xw
+        !            xmin               xmax     
+        
         ! 2D box
+        n = Insect%n_polygon_points
         ! x = chord direction, y = span direction
         xmin = minval(Insect%polygon_wings(1:n,1))
         xmax = maxval(Insect%polygon_wings(1:n,1))

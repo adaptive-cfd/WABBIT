@@ -402,15 +402,15 @@ subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_I
         refinement_status = max(refinement_status, refinement_status_mask)
         lgt_block(lgt_ID, IDX_REFINE_STS) = refinement_status
 
-        ! check globally if a geometry is contained within a block
-        ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
-        call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, refinement_status_geometry, "coarsening")
-        if (max(refinement_status, refinement_status_geometry) >= 0) then
-            ! block has to stay if geometry_indicator says so AND the whole mask is 0 - then we can assume that the mask did not yet hit the geometry
-            if (mask_max < 1.0e-12_rk) then
-                lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
-            endif
-        endif
+        ! ! check globally if a geometry is contained within a block
+        ! ! It could be so small, that no mask value actually hits it, so we check actual geometry parameters - this is done by the physics modules
+        ! call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, refinement_status_geometry, "coarsening")
+        ! if (max(refinement_status, refinement_status_geometry) >= 0) then
+        !     ! block has to stay if geometry_indicator says so AND the whole mask is 0 - then we can assume that the mask did not yet hit the geometry
+        !     if (mask_max < 1.0e-12_rk) then
+        !         lgt_block(lgt_ID, IDX_REFINE_STS) = max(refinement_status, refinement_status_geometry)
+        !     endif
+        ! endif
 
         ! timing for debugging - block based so should not be deployed for productive versions
         ! call toc( "coarseningIndicator_block (mask_comp)", 1001, MPI_Wtime()-t0 )

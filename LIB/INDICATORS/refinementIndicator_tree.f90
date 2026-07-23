@@ -83,16 +83,18 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
 
-            ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
-            ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
-            ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
-            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
-            if (ref_status == +1) then
-                ! The origin of the object (geometry) is in fact inside this block.
-                ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
-                ! the rare exception did occur and we accidentally did not create the mask. 
-                if (mask_max < 1.0e-12_rk) then
-                    lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+            if (params%use_geometryIndicator) then
+                ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
+                ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
+                ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
+                call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
+                if (ref_status == +1) then
+                    ! The origin of the object (geometry) is in fact inside this block.
+                    ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
+                    ! the rare exception did occur and we accidentally did not create the mask. 
+                    if (mask_max < 1.0e-12_rk) then
+                        lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+                    endif
                 endif
             endif
         enddo
@@ -122,16 +124,18 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
             ! light id of this block
             call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
 
-            ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
-            ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
-            ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
-            call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
-            if (ref_status == +1) then
-                ! The origin of the object (geometry) is in fact inside this block.
-                ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
-                ! the rare exception did occur and we accidentally did not create the mask. 
-                if (mask_max < 1.0e-9_rk) then
-                    lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+            if (params%use_geometryIndicator) then
+                ! In rare cases (mostly with large domains and small Jmin), the grid may be so coarse that (dx >> object size). In this case, no
+                ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
+                ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
+                call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
+                if (ref_status == +1) then
+                    ! The origin of the object (geometry) is in fact inside this block.
+                    ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
+                    ! the rare exception did occur and we accidentally did not create the mask. 
+                    if (mask_max < 1.0e-9_rk) then
+                        lgt_block(lgt_ID, IDX_REFINE_STS) = +1 ! REFINE
+                    endif
                 endif
             endif
 

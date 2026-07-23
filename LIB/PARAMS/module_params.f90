@@ -133,6 +133,8 @@ module module_params
         ! block distribution for load balancing (also used for start distribution)
         character(len=cshort) :: block_distribution="sfc_hilbert"
 
+        logical :: use_geometryIndicator = .false.
+
         ! -------------------------------------------------------------------------------------
         ! physics
         ! -------------------------------------------------------------------------------------

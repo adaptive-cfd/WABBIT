@@ -198,7 +198,9 @@ subroutine ini_file_to_params( params, filename )
    call read_param_mpi(FILE, 'VPM', 'mask_time_dependent_part', params%mask_time_dependent_part, .true.)
    call read_param_mpi(FILE, 'VPM', 'mask_time_independent_part', params%mask_time_independent_part, .true.)
    call read_param_mpi(FILE, 'VPM', 'dont_use_pruned_tree_mask', params%dont_use_pruned_tree_mask, .false.)
-
+   if (params%threshold_mask) then
+      call read_param_mpi(FILE, 'VPM', 'use_geometryIndicator', params%use_geometryIndicator, .false.)
+   endif
 
 
    !***************************************************************************

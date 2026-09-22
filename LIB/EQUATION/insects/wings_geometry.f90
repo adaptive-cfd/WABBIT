@@ -1558,7 +1558,7 @@ end function point_in_polygon_2D
 !-------------------------------------------------------------------------------
 real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
     implicit none
-    integer :: i,j, n_radius
+    integer(kind=ik) :: i,j, n_radius, j1, j2
     real(kind=rk) :: R0, theta2, dphi, area
     type(diptera),intent(inout)::Insect
     real(kind=rk), intent(in) :: theta
@@ -1570,6 +1570,7 @@ real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
     dphi = (2.0_rk*pi) / (dble(n_radius-1))
 
 
+    !-------------------------------------------------------------------------------------
     ! evaluate the entire R(theta) once with very fine resolution, so when
     ! calling it for the second time we only need linear interpolation.
     !
@@ -1604,16 +1605,20 @@ real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
             Insect%Wings(wingID)%R0_table(j) = R0
         enddo
         ! call this setup only once.
-        ! Note: was not merged into Setup_WingShape because the hard-coded Fouier coefficients render that complicated
+        ! Note: was not merged into Setup_WingShape because the hard-coded Fouier coefficients make that complicated
         Insect%Wings(wingID)%wings_radius_table_ready = .true.
         ! for debugging
         if (root) write(*,*) "Radius Fourier: pre-computation done. ", maxval(Insect%Wings(wingID)%R0_table), minval(Insect%Wings(wingID)%R0_table)
     endif
 
-    ! linear interpolation, if already stored the radius
-    j = floor( theta / dphi ) + 1
-    Radius_Fourier = Insect%Wings(wingID)%R0_table(j) + ((theta-real(j-1,kind=rk)*dphi) / dphi) &
-    * (Insect%Wings(wingID)%R0_table(j+1) - Insect%Wings(wingID)%R0_table(j))
+    !-------------------------------------------------------------------------------------
+    ! linear interpolation, if already preprocessed the R(theta) table - that is faster than 
+    ! evaluating the Fourier series.
+    j1 = floor( theta / dphi ) + 1 ! note one-based indexing
+    j2 = j1 + 1
+    if (j2 > n_radius) j2 = 1 ! periodization
+    Radius_Fourier = Insect%Wings(wingID)%R0_table(j1) + ((theta-real(j1-1,kind=rk)*dphi) / dphi) &
+    * (Insect%Wings(wingID)%R0_table(j2) - Insect%Wings(wingID)%R0_table(j1))
 end function
 
 

@@ -45,7 +45,7 @@ HDF_SOURCE = $(HDF_ROOT)
 endif
 
 # to print the version number at each run. version number == git hash ID of current commit
-GIT_HASH := $(shell git rev-parse HEAD)
+GIT_HASH := $(shell git rev-parse HEAD 2>/dev/null || echo "no git found")
 BUILD_DATE := $(shell date)
 
 #Place of Sparse BLAS objects

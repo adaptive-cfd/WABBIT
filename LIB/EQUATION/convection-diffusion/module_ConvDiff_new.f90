@@ -27,7 +27,7 @@ module module_convdiff_new
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
-    real(kind=rk) :: domain_size(3)=0.0_rk, domain_slice_min(3)=0.0_rk, domain_slice_max(3)=1.0_rk, w0(3)=0.0_rk
+    real(kind=rk) :: domain_size(3)=0.0_rk, domain_cropping_min(3)=0.0_rk, domain_cropping_max(3)=1.0_rk, w0(3)=0.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary, scalar_integral, scalar_max
     real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs
@@ -139,10 +139,10 @@ contains
     call read_param_mpi(FILE, 'Domain', 'dim', params_convdiff%dim, 2 )
     call read_param_mpi(FILE, 'ConvectionDiffusion', 'w0', params_convdiff%w0(1:params_convdiff%dim) )
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_convdiff%domain_size(1:params_convdiff%dim) )
-    params_convdiff%domain_slice_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_slice_min', params_convdiff%domain_slice_min(1:params_convdiff%dim), params_convdiff%domain_slice_min(1:params_convdiff%dim) )
-    params_convdiff%domain_slice_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_slice_max', params_convdiff%domain_slice_max(1:params_convdiff%dim), params_convdiff%domain_slice_max(1:params_convdiff%dim) )
+    params_convdiff%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
+    call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params_convdiff%domain_cropping_min(1:params_convdiff%dim), params_convdiff%domain_cropping_min(1:params_convdiff%dim) )
+    params_convdiff%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
+    call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params_convdiff%domain_cropping_max(1:params_convdiff%dim), params_convdiff%domain_cropping_max(1:params_convdiff%dim) )
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_convdiff%periodic_BC(1:params_convdiff%dim), &
                                                        params_convdiff%periodic_BC(1:params_convdiff%dim) )
     if ( .not. All(params_convdiff%periodic_BC) ) then

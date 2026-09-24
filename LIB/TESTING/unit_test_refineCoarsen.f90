@@ -12,7 +12,7 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
 
     integer(kind=ik)                        :: k, hvy_id, lgt_id
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, Bs(1:3), Jmin_backup, Jmax_backup
-    real(kind=rk)                           :: x0(1:3), dx(1:3), domain_slice_min_backup(1:3), domain_slice_max_backup(1:3)
+    real(kind=rk)                           :: x0(1:3), dx(1:3), domain_cropping_min_backup(1:3), domain_cropping_max_backup(1:3)
     real(kind=rk), allocatable              :: norm(:), norm_ref(:)
     integer(kind=tsize)                     :: treecode
     character(len=80)                       :: file_dump
@@ -40,10 +40,10 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     Jmax_backup = params%Jmax
     params%Jmax = 1
     params%Jmin = 0
-    domain_slice_min_backup = params%domain_slice_min
-    domain_slice_max_backup = params%domain_slice_max
-    params%domain_slice_min = 0.0_rk
-    params%domain_slice_max = 1.0_rk
+    domain_cropping_min_backup = params%domain_cropping_min
+    domain_cropping_max_backup = params%domain_cropping_max
+    params%domain_cropping_min = 0.0_rk
+    params%domain_cropping_max = 1.0_rk
 
     !----------------------------------------------------------------------------
     ! create an equidistant grid on level J=0, that is sufficient for the test
@@ -154,6 +154,6 @@ subroutine unit_test_refineCoarsen( params, hvy_block, hvy_work, hvy_tmp, tree_I
     ! reset the Jmin and Jmax parameters to their original values
     params%Jmax = Jmax_backup
     params%Jmin = Jmin_backup
-    params%domain_slice_min = domain_slice_min_backup
-    params%domain_slice_max = domain_slice_max_backup
+    params%domain_cropping_min = domain_cropping_min_backup
+    params%domain_cropping_max = domain_cropping_max_backup
 end subroutine

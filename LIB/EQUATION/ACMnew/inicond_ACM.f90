@@ -32,7 +32,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
     ! NOTE: ACM only supports symmetry BC for the moment (which is handled by wabbit and not ACM)
     integer(kind=2), intent(in) :: n_domain(3)
 
-    real(kind=rk)    :: x, y, z, param_1, param_2, x0_local(1:3), dx_local(1:3)
+    real(kind=rk)    :: x, y, z, param_1, param_2
     integer(kind=ik) :: ix, iy, iz, idir, Bs(3), iscalar, ix_global, iy_global
 
     ! compute the size of blocks

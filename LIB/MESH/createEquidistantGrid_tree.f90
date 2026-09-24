@@ -39,8 +39,8 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
 
     ! slicing - we might want to select non-cubic domains, we have checked in ini-file that the slicing is valid and representable by a dyadic level. Therefore, we can compute the start and end indices of the blocks in each direction.
     ! for quadratic/cubic domains, this will fallback to 1 and nx/ny/nz
-    nxyz_start = nint(params%domain_slice_min(1:3) * real(2**Jmin, kind=rk)) + 1  ! +1 because fortran is 1-indexed
-    nxyz_end   = nint(params%domain_slice_max(1:3) * real(2**Jmin, kind=rk))
+    nxyz_start = nint(params%domain_cropping_min(1:3) * real(2**Jmin, kind=rk)) + 1  ! +1 because fortran is 1-indexed
+    nxyz_end   = nint(params%domain_cropping_max(1:3) * real(2**Jmin, kind=rk))
     nxyz = nxyz_end - nxyz_start + 1
 
     ! data dimensionality

@@ -13,7 +13,7 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
 
     integer(kind=ik)                  :: k, it_random, lgt_id, hvy_id, l_init
     integer(kind=ik)                  :: rank, number_procs
-    real(kind=rk)                     :: ddx(1:3), xx0(1:3), domain_slice_min_backup(1:3), domain_slice_max_backup(1:3)
+    real(kind=rk)                     :: ddx(1:3), xx0(1:3), domain_cropping_min_backup(1:3), domain_cropping_max_backup(1:3)
     integer(kind=ik)                  :: g, number_blocks, ix, iy, iz, JmaxA, JminA
     integer(kind=ik), dimension(3)    :: Bs
     real(kind=rk)                     :: Lx, Ly, Lz, x, y, z
@@ -49,10 +49,10 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     number_blocks = params%number_blocks
 
     ! this test works best on quadratic/cubic domains, so we set the domain slice to 0 and 1 for all dimensions
-    domain_slice_min_backup = params%domain_slice_min
-    domain_slice_max_backup = params%domain_slice_max
-    params%domain_slice_min = 0.0_rk
-    params%domain_slice_max = 1.0_rk
+    domain_cropping_min_backup = params%domain_cropping_min
+    domain_cropping_max_backup = params%domain_cropping_max
+    params%domain_cropping_min = 0.0_rk
+    params%domain_cropping_max = 1.0_rk
 
     if (rank == 0) then
         write(*,'("UNIT TEST: testing Bs=",i3," x ",i3," x ",i3," blocks-per-mpirank=",i0)')  Bs(1),Bs(2),Bs(3), params%number_blocks
@@ -261,6 +261,6 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     call reset_tree(params, .true., tree_ID=tree_ID)
 
     ! revert the domain slice to its original values
-    params%domain_slice_min = domain_slice_min_backup
-    params%domain_slice_max = domain_slice_max_backup
+    params%domain_cropping_min = domain_cropping_min_backup
+    params%domain_cropping_max = domain_cropping_max_backup
 end subroutine

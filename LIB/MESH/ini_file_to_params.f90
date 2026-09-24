@@ -391,16 +391,16 @@ subroutine ini_domain(params, FILE )
    call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
       params%domain_size(1:params%dim) )
    
-   params%domain_slice_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
-   call read_param_mpi(FILE, 'Domain', 'domain_slice_min', params%domain_slice_min(1:params%dim), params%domain_slice_min(1:params%dim) )
-   if ( any(params%domain_slice_min(1:params%dim) < 0.0_rk) .or. any(params%domain_slice_min(1:params%dim) >= 1.0_rk) ) then
-      call abort(92841123, "Get your crowbar: the arrays for domain_slice_min are outside the valid range [0, 1].")
+   params%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
+   call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params%domain_cropping_min(1:params%dim), params%domain_cropping_min(1:params%dim) )
+   if ( any(params%domain_cropping_min(1:params%dim) < 0.0_rk) .or. any(params%domain_cropping_min(1:params%dim) >= 1.0_rk) ) then
+      call abort(92841123, "Get your crowbar: the arrays for domain_cropping_min are outside the valid range [0, 1].")
    endif
 
-   params%domain_slice_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
-   call read_param_mpi(FILE, 'Domain', 'domain_slice_max', params%domain_slice_max(1:params%dim), params%domain_slice_max(1:params%dim) )
-   if ( any(params%domain_slice_max(1:params%dim) - params%domain_slice_min(1:params%dim) <= 0.0_rk) .or. any(params%domain_slice_max(1:params%dim) > 1.0_rk) ) then
-      call abort(92841123, "Get your crowbar: the arrays for domain_slice_max are outside the valid range [domain_slice_min, 1].")
+   params%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
+   call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params%domain_cropping_max(1:params%dim), params%domain_cropping_max(1:params%dim) )
+   if ( any(params%domain_cropping_max(1:params%dim) - params%domain_cropping_min(1:params%dim) <= 0.0_rk) .or. any(params%domain_cropping_max(1:params%dim) > 1.0_rk) ) then
+      call abort(92841123, "Get your crowbar: the arrays for domain_cropping_max are outside the valid range [domain_cropping_min, 1].")
    endif
 
    params%periodic_BC = .true.
@@ -511,24 +511,26 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
 
-   ! for sliced domains (in order to make it non-cubic), we need to check that the minimum level is sufficient to represent the sliced domain
+   ! for cropped domains (in order to make it non-cubic), we need to check that the minimum level is sufficient to represent the cropped domain
    ! for this, we need to check the common denominator of the slicing, which is represented as a/2^level
    jmin_tmp = 0
    do i=1,params%dim
-      call get_demonitator_dyadic_level(params%domain_slice_min(i), j, k)
+      call get_demonitator_dyadic_level(params%domain_cropping_min(i), j, k)
+      if (k == -1) call abort(92841123, "Get your crowbar: the arrays for domain_cropping_min are not dyadic fractions.")
       jmin_tmp = max(jmin_tmp, j)
-      call get_demonitator_dyadic_level(params%domain_slice_max(i), j, k)
+      call get_demonitator_dyadic_level(params%domain_cropping_max(i), j, k)
+      if (k == -1) call abort(92841123, "Get your crowbar: the arrays for domain_cropping_max are not dyadic fractions.")
       jmin_tmp = max(jmin_tmp, j)
    end do
    if (params%Jmin < jmin_tmp) then
       if (params%rank==0) then
-         write(*,  '(A, i0, A, i0)') "Warning!! 'min_treelevel' was set smaller as required for sliced non-quadratic or non-cubic domain, adapting it from ", params%Jmin, " to ", jmin_tmp
+         write(*,  '(A, i0, A, i0)') "Warning!! 'min_treelevel' was set smaller as required for cropped non-quadratic or non-cubic domain, adapting it from ", params%Jmin, " to ", jmin_tmp
       endif
       params%Jmin = jmin_tmp
    endif
    if (params%Jini < params%Jmin) then
       if (params%rank==0) then
-         write(*,  '(A, i0, A, i0)') "Warning!! 'ini_treelevel' was set smaller as required for sliced non-quadratic or non-cubic domain, adapting it from ", params%Jini, " to ", params%Jmin
+         write(*,  '(A, i0, A, i0)') "Warning!! 'ini_treelevel' was set smaller as required for cropped non-quadratic or non-cubic domain, adapting it from ", params%Jini, " to ", params%Jmin
       endif
       params%Jini = params%Jmin
    endif

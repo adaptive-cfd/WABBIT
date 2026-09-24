@@ -43,7 +43,7 @@ module module_globals
     ! default length of strings (short, long and huge character)
     integer, parameter, public :: cshort=80
     integer, parameter, public :: clong =120
-    integer, parameter, public :: chuge =200
+    integer, parameter, public :: chuge =2000
     integer, parameter, public :: int_prec=selected_int_kind(8)
     integer, parameter, public :: maxdigits = 16
     integer, parameter, public :: tsize = selected_int_kind(maxdigits)

@@ -227,11 +227,12 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
 
         ! Linear Forcing for HIT (Lundgren) requires us to know kinetic energy and dissipation
         ! rate at all times, so compute that, if we use the forcing.
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         if (params_nspp%HIT_linear_forcing) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_nspp%mean_flow = params_nspp%mean_flow / product(params_nspp%domain_size(1:params_nspp%dim) * (params_nspp%domain_slice_max(1:params_nspp%dim) - params_nspp%domain_slice_min(1:params_nspp%dim)))
+            params_nspp%mean_flow = params_nspp%mean_flow / get_active_domain_length(params_nspp%domain_size, params_nspp%domain_cropping_min, params_nspp%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
             params_nspp%dissipation = params_nspp%enstrophy * params_nspp%nu
         endif
 
@@ -604,7 +605,8 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
     ! =========================================================================
     if (params_nspp%HIT_linear_forcing) then
         G_gain = params_nspp%HIT_gain
-        e_kin_set = params_nspp%HIT_energy * product(params_nspp%domain_size(1:params_nspp%dim) * (params_nspp%domain_slice_max(1:params_nspp%dim) - params_nspp%domain_slice_min(1:params_nspp%dim)))
+        ! volume depends on the cropping of the domain, so we have to take care of that
+        e_kin_set = params_nspp%HIT_energy * get_active_domain_length(params_nspp%domain_size, params_nspp%domain_cropping_min, params_nspp%domain_cropping_max, dir=merge('xy', 'xyz', params_nspp%dim==3))
         t_l_inf = 1.0_rk  ! sqrt(nu/epsilon), adjusted via gain
         
         ! Compute forcing amplitude: A = (epsilon - G*(E-E_target)/t_l) / (2*E)
@@ -668,7 +670,7 @@ subroutine RHS_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     real(kind=rk), allocatable, dimension(:) :: FD1_l, FD2
     integer(kind=ik) :: FD1_ls, FD1_le, FD2_s, FD2_e
 
-    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply_inv(0:ncolors)
+    real(kind=rk) :: kappa, x, y, z, masksource, nu, R, R0sq, C_eta_apply_inv(0:ncolors), C_sponge_inv
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv
     real(kind=rk) :: ux, uy, uz, usx, usy, usz, wx, wy, wz, gx, gy, gz, D, chi, &
                      chidx, chidy, chidz, D_dx, D_dy, D_dz, gxx, gyy, gzz
@@ -696,6 +698,7 @@ subroutine RHS_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     C_eta_apply_inv = 1.0_rk / params_nspp%C_eta
     C_eta_apply_inv(params_nspp%penalization_startup_colors:) = 1.0_rk / params_nspp%C_eta_temp
     C_eta_apply_inv(0) = 0.0_rk  ! color 0 doesn't exist, it means no penalization
+    C_sponge_inv = 1.0_rk / params_nspp%C_sponge
 
     ! in 2D, the block has only a single z-plane (z-index fixed to 1), in 3D we loop
     ! over the ghost-node-padded z-range like x and y
@@ -832,7 +835,7 @@ subroutine RHS_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                     do ix = g+1, Bs(1)+g
                         ! for the source term, we use the usual dirichlet C_eta
                         ! to force scalar to 0
-                        source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) * C_eta_apply_inv( int(mask(ix,iy,iz,5), kind=2) )
+                        source(ix,iy,iz) = source(ix,iy,iz) - mask(ix,iy,iz,6)*phi(ix,iy,iz,j) * C_sponge_inv
                     end do
                 end do
             end do

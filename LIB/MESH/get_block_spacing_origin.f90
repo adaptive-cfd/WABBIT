@@ -44,9 +44,9 @@ subroutine get_adjacent_boundary_surface_normal(params, lgt_id, n_surface)
 
   ! option 2: compute the origin and spacing of the block, then check if the origin is at 0 or L
 
-  ! sliced domains can differ from 0 and L, so we need to compute the global min/max of the sliced domain
-  global_min(1:params%dim) = params%domain_slice_min(1:params%dim) * params%domain_size(1:params%dim)
-  global_max(1:params%dim) = params%domain_slice_max(1:params%dim) * params%domain_size(1:params%dim)
+  ! cropped domains can differ from 0 and L, so we need to compute the global min/max of the cropped domain
+  global_min(1:params%dim) = params%domain_cropping_min(1:params%dim) * params%domain_size(1:params%dim)
+  global_max(1:params%dim) = params%domain_cropping_max(1:params%dim) * params%domain_size(1:params%dim)
 
   call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
     params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)

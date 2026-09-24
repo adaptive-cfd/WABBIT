@@ -219,7 +219,7 @@ subroutine post_pressure_interpolation(params)
     end do
 
     ! actual interpolation (in global system of course)
-    call interpolatePointCloud_tree( params, hvy_block, tree_ID, xq, pq, "linear", sync=.true. )
+    call interpolatePointCloud_tree( params, hvy_block, tree_ID, xq, pq, "delta", sync=.true. )
 
     ! reshape result back in the format used here.
     pressure_data = reshape(pq, [npoints, nsurfaces])

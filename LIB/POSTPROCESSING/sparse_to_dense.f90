@@ -10,8 +10,8 @@ subroutine sparse_to_dense(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)  :: file_in
-    character(len=cshort)  :: file_out
+    character(len=chuge)  :: file_in
+    character(len=chuge)  :: file_out
     real(kind=rk)          :: time, time_given
     integer(kind=ik)       :: iteration
 

@@ -10,7 +10,7 @@ subroutine operator_reconstruction(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: file, infile
+    character(len=chuge) :: file, infile
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in, sign
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, iblock, ix, iy, &
     g, iz, a1, b1, a2, b2, level, j
@@ -24,7 +24,7 @@ subroutine operator_reconstruction(params)
 
     integer(kind=ik)                   :: tree_ID=1, hvy_id, g1,g2, npoints=0, g3
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain

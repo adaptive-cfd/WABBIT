@@ -11,7 +11,7 @@ subroutine post_dump_neighbors(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)      :: file, operator
+    character(len=chuge)      :: file, operator
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3) :: Bs

@@ -11,7 +11,7 @@ subroutine post_evaluate_thresholding(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: fname, indicator, operator, order
+    character(len=chuge)              :: fname, indicator, operator, order
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs

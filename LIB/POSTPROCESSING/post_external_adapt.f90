@@ -10,7 +10,7 @@ subroutine external_adapt(params)
 
     type(type_params), intent(inout) :: params
 
-    character(len=cshort) :: operator, file_in, file_out
+    character(len=chuge) :: operator, file_in, file_out
     real(kind=rk) :: time
     integer(kind=ik) :: iteration
     logical :: verbose = .true.

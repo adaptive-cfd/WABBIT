@@ -14,7 +14,7 @@ subroutine post_stl2dist(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: fname_ini, fname_stl, fname_out, dummy
+    character(len=chuge) :: fname_ini, fname_stl, fname_out, dummy
     integer :: i, Bs(1:3), g, ntri, k, iter, skips, a
     integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax, safety, mpicode
     real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal, vertex2_normal, &

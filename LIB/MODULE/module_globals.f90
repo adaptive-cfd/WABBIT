@@ -40,9 +40,10 @@ module module_globals
     ! define data precision parameters
     integer, parameter, public :: sngl_prec=selected_real_kind(4)
     integer, parameter, public :: dble_prec=selected_real_kind(8)
-    ! default length of strings (short and long character)
+    ! default length of strings (short, long and huge character)
     integer, parameter, public :: cshort=80
     integer, parameter, public :: clong =120
+    integer, parameter, public :: chuge =2000
     integer, parameter, public :: int_prec=selected_int_kind(8)
     integer, parameter, public :: maxdigits = 16
     integer, parameter, public :: tsize = selected_int_kind(maxdigits)

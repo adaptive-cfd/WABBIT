@@ -14,7 +14,7 @@ subroutine post_filter(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: file_in, file_out, filter_type
+    character(len=chuge)              :: file_in, file_out, filter_type
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
@@ -23,7 +23,7 @@ subroutine post_filter(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain

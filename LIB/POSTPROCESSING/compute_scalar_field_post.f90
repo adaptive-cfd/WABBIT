@@ -13,7 +13,7 @@ subroutine compute_scalar_field_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: file_fld, operator
+    character(len=chuge)              :: file_fld, operator
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3)     :: Bs
@@ -22,7 +22,7 @@ subroutine compute_scalar_field_post(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain

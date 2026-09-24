@@ -13,8 +13,8 @@ program main_post
     integer(kind=ik)                    :: rank                   ! process rank
     integer(kind=ik)                    :: number_procs           ! number of processes
     type (type_params)                  :: params
-    character(len=cshort)               :: mode
-    character(len=clong)                :: filename, key1, key2
+    character(len=chuge)               :: mode
+    character(len=chuge)                :: filename, key1, key2
     real(kind=rk)                       :: elapsed_time
 
     call MPI_Init(ierr)                                           ! init mpi

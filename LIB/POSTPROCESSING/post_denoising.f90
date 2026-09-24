@@ -11,7 +11,7 @@ subroutine post_denoising(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)  :: file_in, file_out
+    character(len=chuge)  :: file_in, file_out
     real(kind=rk)          :: time, time_given, domain(1:3)
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)

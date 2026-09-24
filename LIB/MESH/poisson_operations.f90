@@ -71,7 +71,8 @@ subroutine helmholtz_projection(params, time, hvy_block, hvy_tmp, tree_ID, diagn
         enddo
         call MPI_ALLREDUCE(MPI_IN_PLACE, div_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpicode)
         call MPI_ALLREDUCE(MPI_IN_PLACE, div_sum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpicode)
-        div_rms = sqrt(div_sum / product(params%domain_size(1:params%dim)))
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
+        div_rms = sqrt(div_sum / get_active_domain_length(params%domain_size, params%domain_cropping_min, params%domain_cropping_max, dir=merge('xy', 'xyz', params%dim==3)))
         if (params%rank == 0) write(*,'("Helmholtz: before projection max|div(u)|=", es12.4, " RMS=", es12.4)') div_max, div_rms
     endif
 
@@ -107,7 +108,8 @@ subroutine helmholtz_projection(params, time, hvy_block, hvy_tmp, tree_ID, diagn
         enddo
         call MPI_ALLREDUCE(MPI_IN_PLACE, div_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpicode)
         call MPI_ALLREDUCE(MPI_IN_PLACE, div_sum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpicode)
-        div_rms = sqrt(div_sum / product(params%domain_size(1:params%dim)))
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
+        div_rms = sqrt(div_sum / get_active_domain_length(params%domain_size, params%domain_cropping_min, params%domain_cropping_max, dir=merge('xy', 'xyz', params%dim==3)))
         if (params%rank == 0) write(*,'("Helmholtz: after projection  max|div(u)|=", es12.4, " RMS=", es12.4)') div_max, div_rms
     endif
     

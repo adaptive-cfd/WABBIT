@@ -41,6 +41,11 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
     ! new variables
     integer(kind=ik)                    :: dir_dim(1:3), dir_free, i_dim, i_dig, apply_free, vary_tc(3)
 
+    ! DEBUG/benchmarking only: force adjacent_wrapper_slice_b to take its slice-aware path on every axis
+    ! instead of only where n_domain flags an actual (cropped) domain edge. Flip to .true. to A/B the cost
+    ! of the slice-aware neighbor search against the ripple-carry adjacent_wrapper_b fast path.
+    logical, parameter                  :: FORCE_SLICE_NEIGHBOR_SEARCH = .false.
+
     level      = lgt_block( lgtID_block, IDX_MESH_LVL )
     tree_ID    = lgt_block( lgtID_block, IDX_TREE_ID )
     neighborDirCode_sameLevel     = -1
@@ -138,7 +143,8 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
         if (.not. search_overlapping) return
     else
         ! calculate treecode for neighbor on same level
-        call adjacent_wrapper_b(tcb_Block, tcb_Neighbor, dir, level=level, dim=params%dim, max_level=params%Jmax)
+        call adjacent_wrapper_slice_b(tcb_Block, tcb_Neighbor, dir, n_domain, params%domain_cropping_min, params%domain_cropping_max, &
+            level=level, dim=params%dim, max_level=params%Jmax, force_slice=FORCE_SLICE_NEIGHBOR_SEARCH)
 
         ! check if (hypothetical) neighbor exists and if so find its lgtID
         call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level, tree_id=tree_ID, max_level=params%Jmax)
@@ -165,7 +171,8 @@ subroutine find_neighbor(params, hvyID_block, lgtID_block, dir, error, n_domain,
             tcb_Virtual = tc_set_digit_at_level_b(tcb_Block, tcFinerAppendDigit(i_dig), level=level+1, max_level=params%Jmax, dim=params%dim)
 
             ! calculate treecode for neighbor on same level (virtual level)
-            call adjacent_wrapper_b(tcb_Virtual, tcb_Neighbor, dir, level=level+1, max_level=params%Jmax, dim=params%dim)
+            call adjacent_wrapper_slice_b(tcb_Virtual, tcb_Neighbor, dir, n_domain, params%domain_cropping_min, params%domain_cropping_max, &
+                level=level+1, max_level=params%Jmax, dim=params%dim, force_slice=FORCE_SLICE_NEIGHBOR_SEARCH)
             ! check if (hypothetical) neighbor exists and if so find its lgtID
             call doesBlockExist_tree(tcb_Neighbor, exists, lgtID_neighbor, dim=params%dim, level=level+1, tree_id=tree_ID, max_level=params%Jmax)
 

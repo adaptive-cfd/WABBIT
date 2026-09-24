@@ -13,7 +13,7 @@ subroutine post_prune_tree(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: fname_ini, fname1, fname_out
+    character(len=chuge) :: fname_ini, fname1, fname_out
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)

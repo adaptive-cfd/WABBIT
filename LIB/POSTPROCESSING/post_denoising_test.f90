@@ -12,7 +12,7 @@ subroutine post_denoising_test(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)  :: file_in, file_out, n_type
+    character(len=chuge)  :: file_in, file_out, n_type
     real(kind=rk)          :: n_s, n_f, n_i, signal_strength(1:1), r1, r2, t_den, std_est(1:1), time
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)

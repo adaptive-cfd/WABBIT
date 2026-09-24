@@ -27,7 +27,7 @@ subroutine performance_test(params)
 
     real(kind=rk)                       :: time = 0.0_rk
     integer(kind=ik)                    :: iteration = 0
-    character(len=cshort)               :: filename
+    character(len=chuge)               :: filename
     integer(kind=ik)                    :: k, Nblocks_rhs, Nblocks, it, lgt_n_tmp, j, a
     real(kind=rk)                       :: t0, dt, t4
     logical :: error_OOM, debug_setting

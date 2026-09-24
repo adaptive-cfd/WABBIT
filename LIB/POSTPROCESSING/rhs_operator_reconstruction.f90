@@ -12,7 +12,7 @@ subroutine rhs_operator_reconstruction(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: file, file_stem, mode, OPERATOR
+    character(len=chuge) :: file, file_stem, mode, OPERATOR
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu
     integer(kind=ik) :: iteration, k, tc_length, iblock, ix, iy, &
     g, iz, level,tree_ID_tmp,tree_ID_rhs_u,tree_ID_rhs_u_ei
@@ -25,7 +25,7 @@ subroutine rhs_operator_reconstruction(params)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :)
     integer :: hvy_id, lgt_id, fsize, j, tree_ID_u, tree_ID_ei, file_len
-    character(len=cshort)              :: fname, fname_ini
+    character(len=chuge)              :: fname, fname_ini
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain

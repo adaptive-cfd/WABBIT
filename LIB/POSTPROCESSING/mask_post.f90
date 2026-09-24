@@ -20,7 +20,7 @@ subroutine mask_post(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     real(kind=rk), allocatable :: us(:,:,:,:)
     integer(hid_t)                     :: file_id

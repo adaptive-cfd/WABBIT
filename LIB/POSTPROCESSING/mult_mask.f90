@@ -12,7 +12,7 @@ subroutine mult_mask(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)      :: fname_input, fname_mask, fname_result, operation
+    character(len=chuge)      :: fname_input, fname_mask, fname_result, operation
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3) :: Bs
@@ -21,7 +21,7 @@ subroutine mult_mask(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     real(kind=rk), allocatable :: us(:,:,:,:)
     integer(hid_t)                     :: file_id

@@ -18,7 +18,7 @@ subroutine post_compression_unit_test(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk) :: norm_L2, norm_Linfty, error_L2, error_Linfty
     real(kind=rk), dimension(3)        :: dx, x0
     real(kind=rk), dimension(3)        :: domain

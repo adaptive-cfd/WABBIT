@@ -11,7 +11,7 @@ subroutine adaption_test(params)
   !--------------------------------------------
   type (type_params), intent(inout)  :: params
   !--------------------------------------------
-  character(len=cshort):: file_out, order, args
+  character(len=chuge):: file_out, order, args
   real(kind=rk), allocatable      :: error(:)
   integer(kind=ik), allocatable   :: Nb_adapt(:)
   character(len=cshort),allocatable   :: eps_str_list(:)
@@ -24,7 +24,7 @@ subroutine adaption_test(params)
   integer(kind=ik) :: j, n_components=1, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
   logical :: verbose = .false., save_all = .true., save_ref=.false., adaption_only=.false.
-  character(len=clong) :: write_statement
+  character(len=chuge) :: write_statement
   real(kind=rk), allocatable :: norm(:), norm_tmp(:)
 
   ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,

@@ -23,7 +23,8 @@ subroutine post_dry_run(params)
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)               :: filename, fname, grid_list, headers(1:100), dummy
+    character(len=cshort)               :: headers(1:100)
+    character(len=chuge)                :: filename, fname, grid_list, dummy
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz, color
     real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect

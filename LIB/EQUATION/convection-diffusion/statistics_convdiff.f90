@@ -102,10 +102,11 @@ subroutine STATISTICS_convdiff( time, dt, u, g, x0, dx, stage)
         call append_t_file( 'scalar_max.t', (/time, params_convdiff%scalar_max /) )
 
         ! time statistics
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         if (params_convdiff%time_statistics) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%time_statistics_mean, params_convdiff%N_time_statistics, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_convdiff%time_statistics_maxabs, params_convdiff%N_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
-            params_convdiff%time_statistics_mean = params_convdiff%time_statistics_mean / product(params_convdiff%domain_size(1:params_convdiff%dim))
+            params_convdiff%time_statistics_mean = params_convdiff%time_statistics_mean / get_active_domain_length(params_convdiff%domain_size, params_convdiff%domain_cropping_min, params_convdiff%domain_cropping_max, dir=merge('xy', 'xyz', params_convdiff%dim==3))
 
             call append_t_file( 'time_statistics_mean.t', (/time, params_convdiff%time_statistics_mean /) )
             call append_t_file( 'time_statistics_maxabs.t', (/time, params_convdiff%time_statistics_maxabs /) )

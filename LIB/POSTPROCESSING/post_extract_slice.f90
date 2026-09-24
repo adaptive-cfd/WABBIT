@@ -19,7 +19,7 @@ subroutine post_extract_slice(params)
 
     implicit none
 
-    character(len=cshort)                       :: fname, fname_out
+    character(len=chuge)                       :: fname, fname_out
     type (type_params), intent(inout)       :: params
 
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)

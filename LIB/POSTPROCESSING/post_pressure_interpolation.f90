@@ -21,7 +21,7 @@ subroutine post_pressure_interpolation(params)
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_block(:, :, :, :, :)
     real(kind=rk)                       :: time, xx, yy, zz, delx, dely, delz, tmp           ! time loop variables
-    character(len=cshort)               :: pressure_filename, ini_filename, wing_fname, fname_out
+    character(len=chuge)                :: pressure_filename, ini_filename, wing_fname, fname_out
     integer(kind=ik)                    :: k, lgt_id, Bs(1:3), g, hvy_id, iter, iteration, tree_ID=1, N_support, nlines, ncols, n_blocks
     real(kind=rk)                       :: x(1:3), x0(1:3), dx(1:3), x_wing_w(1:3), x_wing_b(1:3), x_wing_g(1:3), x_wing_normal(1:3), coeff(1:3)
     real(kind=rk)                       :: block_x_min(1:3), block_x_max(1:3)

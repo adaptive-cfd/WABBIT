@@ -80,13 +80,13 @@ FFLAGS += -O3  # optimization flag
 FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -fimplicit-none -pedantic
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # error-catching flags
-FFLAGS += -fbounds-check -fbacktrace -ffpe-trap=zero,invalid
+FFLAGS += -fbounds-check -fbacktrace -ffpe-trap=zero,invalid # -fsanitize=address,leak
 FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
 # debugging flags
 FFLAGS += -g3 -g -ggdb
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_ROOT)/lib64 -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
 LDFLAGS += $(SB_LIB) -lz
 FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
@@ -98,7 +98,7 @@ endif
 # enable / disable FFT depending on the module
 ifdef FFT_ROOT
 FFLAGS += -I$(FFT_ROOT)/include
-LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3
+LDFLAGS += -L$(FFT_ROOT)/lib -L$(FFT_ROOT)/lib64 -lfftw3
 PRAGMAS += -DFFT_ROOT
 endif
 ifdef MKLROOT
@@ -137,7 +137,7 @@ FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_ROOT)/lib64 -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
 LDFLAGS += $(SB_LIB) -lz
 FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
@@ -148,7 +148,7 @@ PRAGMAS += -DDEV
 endif
 # enable / disable FFT depending on the module
 ifdef FFT_ROOT
-LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3
+LDFLAGS += -L$(FFT_ROOT)/lib -L$(FFT_ROOT)/lib64 -lfftw3
 PRAGMAS += -DFFT_ROOT
 FFLAGS += -I$(FFT_ROOT)/include
 endif

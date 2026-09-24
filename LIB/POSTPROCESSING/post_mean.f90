@@ -7,7 +7,7 @@ subroutine post_mean(params)
     use module_forestMetaData
 
     implicit none
-    character(len=cshort)                   :: fname, fname_out, option         !> name of the file
+    character(len=chuge)                   :: fname, fname_out, option         !> name of the file
     type (type_params), intent(inout)       :: params                           !> parameter struct
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)

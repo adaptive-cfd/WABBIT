@@ -11,7 +11,7 @@ subroutine post_wavelet_contributions(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: fname_in, fname_out
+    character(len=chuge)              :: fname_in, fname_out
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgt_ID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs

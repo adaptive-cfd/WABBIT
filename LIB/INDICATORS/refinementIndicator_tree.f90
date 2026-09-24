@@ -88,7 +88,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
                 ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
                 ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
                 call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
-                if (ref_status == +1) then
+                if (ref_status == +0) then
                     ! The origin of the object (geometry) is in fact inside this block.
                     ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
                     ! the rare exception did occur and we accidentally did not create the mask. 
@@ -129,7 +129,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
                 ! point on the grid may be assigned a nonzero mask value, even though the object (geometry) lies within this block. The "geometry_indicator"
                 ! checks if the origin of the object lies within the blocks extend, and returns +1 if this is the case.
                 call geometry_indicator_meta(params%physics_type, time, params%Bs, params%g, x0, dx, ref_status, "coarsening")
-                if (ref_status == +1) then
+                if (ref_status == +0) then
                     ! The origin of the object (geometry) is in fact inside this block.
                     ! Block has to refine if geometry_indicator says so AND the whole mask is 0 - then 
                     ! the rare exception did occur and we accidentally did not create the mask. 

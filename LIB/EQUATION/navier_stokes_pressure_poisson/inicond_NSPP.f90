@@ -352,6 +352,28 @@ subroutine INICOND_NSPP( time, u, g, x0, dx, n_domain )
         else
             call abort(250708, "taylor-green-vanRees2011 is a 3D test case. Use taylor-green for 2D case")
         endif
+    case("taylor-green-isotropic")
+        ! this condition is 3D only!
+        if (params_nspp%dim==3) then
+            do iz = 1, Bs(3)+2*g
+                z = dble(iz-(g+1)) * dx(3) + x0(3)
+                do iy = 1, Bs(2)+2*g
+                    y = dble(iy-(g+1)) * dx(2) + x0(2)
+                    do ix = 1, Bs(1)+2*g
+                        x = dble(ix-(g+1)) * dx(1) + x0(1)
+
+                        ! The initial condition is known analytically from Ono et al. (2024)
+                        ! It was presented on TSFP14 by Klein. 1 can be replaced by U0 as a factor
+                        ! isotropic means, that global reynolds stress tensor is isotropic
+                        u(ix, iy, iz, 1) = 1.0_rk/sqrt(6.0_rk) * ( -cos(x)*sin(y) + cos(x)*sin(z) )
+                        u(ix, iy, iz, 2) = 1.0_rk/sqrt(6.0_rk) * ( -cos(y)*sin(z) + cos(y)*sin(x) )
+                        u(ix, iy, iz, 3) = 1.0_rk/sqrt(6.0_rk) * ( -cos(z)*sin(x) + cos(z)*sin(y) )
+                    end do
+                end do
+            end do
+        else
+            call abort(250708, "taylor-green-isotropic is a 3D test case. Use taylor-green for 2D case")
+        endif
     case("mixing-layer")
         ! random excitement
         call random_data(u)
@@ -543,7 +565,7 @@ subroutine INICOND_NSPP( time, u, g, x0, dx, n_domain )
     if (params_nspp%use_passive_scalar) then
         ! loop over scalars
         do iscalar = 1, params_nspp%N_scalars
-            select case (params_nspp%scalar_inicond(iscalar))
+            select case (trim(standardize_string(params_nspp%scalar_inicond(iscalar))))
             case ("empty", "none", "zero")
                 u(:,:,:,params_nspp%dim + 1 + iscalar) = 0.0_rk
             case ("Kadoch2012")
@@ -558,11 +580,64 @@ subroutine INICOND_NSPP( time, u, g, x0, dx, n_domain )
 
                             ! in their original work, they set the initial condition
                             ! everywhere in the domain (even in the penalization layer)
-                            u(ix,iy,:,params_nspp%dim + 1 + iscalar) = cos(pi*y)*(cos(4.0_rk*pi*x)+cos(pi*x))
+                            u(ix,iy,:,params_nspp%dim + iscalar) = cos(pi*y)*(cos(4.0_rk*pi*x)+cos(pi*x))
                         end do
                     end do
                 else
                     call abort(0409191, "Scalar inicond Kadoch2012 is only for 2D")
+                endif
+            case ("rti")
+                ! Rayleigh-Taylor instability, is 1 at top and -1 at bottom, with a tanh profile in between. The interface is perturbed with a small noise to trigger the instability.
+                ! parameters are: tanh strength and noise size
+                param_1 = 2_rk  ! tanh strength
+                param_2 = 1.0e-2_rk ! noise size
+
+                if (params_nspp%dim == 3) then
+                    ! first create noise
+                    call random_data( u(:,:,:, params_nspp%dim + iscalar:params_nspp%dim + iscalar) )
+                    u(:,:,:, params_nspp%dim + iscalar) = (2.0_rk * u(:,:,:, params_nspp%dim + iscalar) - 1.0_rk) * param_2
+
+                    do iz = 1, Bs(3)+2*g
+                        z = x0(3) + dble(iz-g-1)*dx(3)
+
+                        ! focus the perturbations in center of domain
+                        u(:,:,iz, params_nspp%dim + iscalar) = u(:,:,iz, params_nspp%dim + iscalar) * exp(-(z-params_nspp%domain_size(3)/2.0_rk)**2/(2.0_rk*param_1**2))
+
+                        ! add the tanh profile
+                        u(:,:,iz,params_nspp%dim + iscalar) = u(:,:,iz,params_nspp%dim + iscalar) + tanh((z - params_nspp%domain_size(3)/2.0_rk)/param_1)
+                    enddo
+                else
+                    call abort(0409193, "Scalar inicond RTI is only for 3D")
+                endif
+            case ("rti-symmetric")
+                ! Rayleigh-Taylor instability, is 1 at top and -1 at bottom, with a tanh profile in between. The interface is perturbed with a small noise to trigger the instability, but it is symmetric in z-direction
+                ! parameters are: tanh strength and noise size
+                param_1 = 0.2_rk  ! tanh strength
+                param_2 = 1.0e-2_rk ! noise size
+
+                if (params_nspp%dim == 3) then
+                    ! first create noise
+                    ! for true symmetry, this would have to be made symmetric as well
+                    call random_data( u(:,:,:, params_nspp%dim + iscalar:params_nspp%dim + iscalar) )
+                    u(:,:,:, params_nspp%dim + iscalar) = (2.0_rk * u(:,:,:, params_nspp%dim + iscalar) - 1.0_rk) * param_2
+
+                    do iz = 1, Bs(3)+2*g
+                        z = x0(3) + dble(iz-g-1)*dx(3)
+                        if (z < params_nspp%domain_size(3)/2.0_rk) then
+                            z = params_nspp%domain_size(3) - z
+                        else
+                            z = z
+                        endif
+
+                        ! focus the perturbations in center of domain
+                        u(:,:,iz, params_nspp%dim + iscalar) = u(:,:,iz, params_nspp%dim + iscalar) * exp(-(z-params_nspp%domain_size(3)*3.0_rk/4.0_rk)**2/(2.0_rk*param_1**2))
+
+                        ! set actual inicond RTI
+                        u(:,:,iz,params_nspp%dim + iscalar) = u(:,:,iz,params_nspp%dim + iscalar) + tanh((z - params_nspp%domain_size(3)*3.0_rk/4.0_rk)/param_1)
+                    enddo
+                                            
+                else
+                    call abort(0409193, "Scalar inicond RTI is only for 3D")
                 endif
             case default
                 call abort(0409192, "Unkown scalar inicond")

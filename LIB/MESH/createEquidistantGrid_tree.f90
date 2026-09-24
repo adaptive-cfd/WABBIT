@@ -3,7 +3,7 @@
 !! Since the grid changes, the neighbor relations and active-lists are updated as well.
 ! ********************************************************************************************
 
-subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_ID )
+subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_ID)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -15,7 +15,7 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     logical, intent(in)                 :: verbosity                      !> write output
     integer(kind=ik), intent(in)        :: tree_ID
     integer(kind=ik)                    :: ierr                           ! MPI error variable
-    integer(kind=ik)                    :: ix, iy, iz, icpu, nx, ny, nz   ! loop control variables in space
+    integer(kind=ik)                    :: ix, iy, iz, icpu, nxyz(1:3)   ! loop control variables in space
     integer(kind=ik)                    :: num_blocks, number_procs, k
     integer(kind=ik)                    :: d
 
@@ -23,6 +23,9 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     integer(kind=ik)                    :: lgt_id_first, lgt_id_last, lgt_id, hvy_id
     integer(kind=ik),allocatable        :: blocks_per_rank_list(:)
     integer(kind=tsize)                 :: tc_b
+
+    ! some settings for non-quadratic/cubic domains
+    integer(kind=ik)                    :: nxyz_start(1:3), nxyz_end(1:3)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -34,29 +37,32 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     ! initialization
     !-----------------------------------------------------------------------------
 
+    ! slicing - we might want to select non-cubic domains, we have checked in ini-file that the slicing is valid and representable by a dyadic level. Therefore, we can compute the start and end indices of the blocks in each direction.
+    ! for quadratic/cubic domains, this will fallback to 1 and nx/ny/nz
+    nxyz_start = nint(params%domain_cropping_min(1:3) * real(2**Jmin, kind=rk)) + 1  ! +1 because fortran is 1-indexed
+    nxyz_end   = nint(params%domain_cropping_max(1:3) * real(2**Jmin, kind=rk))
+    nxyz = nxyz_end - nxyz_start + 1
+
     ! data dimensionality
-    d = params%dim
-    if (params%dim == 3) then
-        nz = 2**Jmin
-    else
-        nz = 1
+    if (params%dim == 2) then
+        nxyz_start(3) = 1
+        nxyz_end(3) = 1
+        nxyz(3) = 1
     endif
 
     ! therefore, the total number of blocks (on all cpus) is
-    num_blocks = (2**Jmin)**d
+    num_blocks = product(nxyz(1:params%dim))
     ! shortcut for number of cpu
     number_procs = params%number_procs
 
     call reset_tree(params, verbosity, tree_ID )
 
-    ! number of blocks in x,y direction
-    nx = 2**Jmin
-    ny = 2**Jmin
 
     if ( (params%rank == 0) .and. verbosity ) then
         write(*,'(A)') "EQUI: initializing an equidistant grid..."
         write(*,'("EQUI: Jmin=",i2," Nblocks=",i6," (on all cpus)")') Jmin, num_blocks
-        write(*,'("EQUI: On this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nx, ny, nz
+        write(*,'("EQUI: On this level, we have (",i3," x ",i3," x ",i3,") Blocks")') nxyz(1), nxyz(2), nxyz(3)
+        write(*,'("EQUI: Blocks have indices (",i0,"-",i0,", ",i0,"-",i0,", ",i0,"-",i0,")")') nxyz_start(1), nxyz_end(1), nxyz_start(2), nxyz_end(2), nxyz_start(3), nxyz_end(3)
         write(*,'("EQUI: tree_ID=",i2)') tree_ID
     endif
 
@@ -87,9 +93,9 @@ subroutine createEquidistantGrid_tree( params, hvy_block, Jmin, verbosity, tree_
     !-----------------------------------------------------------------------------
     ! loop over blocks in x,y,z directions (in the 2d case, 3rd loop degenerates)
     ! NOTE: This ordering is necessary for POSTPROCESSING flusi to wabbit!
-    do ix = nx, 1, -1
-        do iy = ny,1,-1
-            do iz = nz,1,-1
+    do ix = nxyz_end(1), nxyz_start(1), -1
+        do iy = nxyz_end(2), nxyz_start(2), -1
+            do iz = nxyz_end(3), nxyz_start(3), -1
                 ! for each of the points (ix,iy,iz), find an mpirank to hold it.
                 do icpu = 0, number_procs -1
                     ! can the current cpu "icpu" still accept more blocks?

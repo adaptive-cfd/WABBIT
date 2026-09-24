@@ -9,7 +9,7 @@ subroutine post_create_grid(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) :: grid_type, fname_out
+    character(len=chuge) :: grid_type, fname_out
     integer(kind=ik) :: level, iterations, tree_ID, Bs_input(3), Jmax_input, Jmin_input, dim_input
     real(kind=rk) :: max_grid_density_input
     real(kind=rk), allocatable :: hvy_block(:, :, :, :, :)

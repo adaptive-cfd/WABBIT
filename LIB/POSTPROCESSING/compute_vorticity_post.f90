@@ -13,16 +13,16 @@ subroutine compute_vorticity_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: file_ux, file_uy, file_uz, operator
+    character(len=chuge)              :: file_ux, file_uy, file_uz, operator
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
-    character(len=cshort)                   :: order
+    character(len=chuge)                   :: order
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
 
-    character(len=cshort)              :: fname
+    character(len=chuge)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain

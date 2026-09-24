@@ -12,7 +12,7 @@ subroutine post_generate_forest(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort) ::  fname_out,mode
+    character(len=chuge) ::  fname_out,mode
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)

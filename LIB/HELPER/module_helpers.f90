@@ -713,6 +713,59 @@ contains
 
 
     !-------------------------------------------------------------------------------
+    ! for a fraction of the type a=a_int/2^level, this function returns the level and the integer a
+    ! elemental so that I can call it with arrays
+    !-------------------------------------------------------------------------------
+    elemental subroutine get_demonitator_dyadic_level(a, level, a_int)
+        implicit none
+        real(kind=rk), intent(in) :: a
+        integer(kind=ik), intent(out) :: level, a_int
+        real(kind=rk) :: temp_a
+
+        temp_a = a
+        level = 0
+
+        ! Keep multiplying by 2 until temp_a is an integer
+        do while (abs(temp_a - nint(temp_a)) > 1.0e-12_rk)
+            temp_a = temp_a * 2.0_rk
+            level = level + 1
+            if (level > 60) then
+                ! this number does not have a representation of the form a/2^level
+                temp_a = 0.0_rk
+                level = -1
+                exit
+            endif
+        end do
+
+        a_int = nint(temp_a)
+    end subroutine get_demonitator_dyadic_level
+
+
+    ! -------------------------------------------------------------------------------
+    ! Sometimes we want to compute domain lengths for computing areas/volumes. However, with cropping, this might not simply map to prduct(domain_size(1:dim)). This is was this routine is for
+    pure function get_active_domain_length(domain_size, crop_min, crop_max, dir, active_length) result(active_length)
+        implicit none
+        real(kind=rk), intent(in) :: domain_size(1:3)
+        real(kind=rk), intent(in) :: crop_min(1:3)
+        real(kind=rk), intent(in) :: crop_max(1:3)
+        character(len=*), intent(in) :: dir
+        real(kind=rk), intent(out) :: active_length
+        real(kind=rk) :: len_dir(1:3)
+
+        ! Compute the active length in the specified direction, considering cropping
+        len_dir = domain_size(dir) * (crop_max(dir) - crop_min(dir))
+        active_length = 0.0_rk
+        if (dir == 'x' .or. dir == '1') active_length = len_dir(1)
+        if (dir == 'y' .or. dir == '2') active_length = len_dir(2)
+        if (dir == 'z' .or. dir == '3') active_length = len_dir(3)
+        if (dir == 'xy' .or. dir == '12') active_length = len_dir(1) * len_dir(2)
+        if (dir == 'xz' .or. dir == '13') active_length = len_dir(1) * len_dir(3)
+        if (dir == 'yz' .or. dir == '23') active_length = len_dir(2) * len_dir(3)
+        if (dir == 'xyz' .or. dir == '123') active_length = len_dir(1) * len_dir(2) * len_dir(3)
+    end function get_active_domain_length
+
+
+    !-------------------------------------------------------------------------------
     ! runtime control routines
     ! flusi regularily reads from a file runtime_control.ini if it should do some-
     ! thing, such as abort, reload_params or save data.
@@ -1011,7 +1064,7 @@ contains
         implicit none
         character(len=*), intent(in) :: name
         character(len=*), intent(in) :: default
-        character(len=cshort), intent(out) :: value
+        character(len=*), intent(out) :: value
 
         integer :: i, rank, ierr
         character(len=clong) :: args
@@ -1066,7 +1119,7 @@ contains
     subroutine get_cmd_arg_str_vct( name, value )
         implicit none
         character(len=*), intent(in) :: name
-        character(len=cshort), intent(out), ALLOCATABLE :: value(:)
+        character(len=*), intent(out), ALLOCATABLE :: value(:)
 
         integer :: i, rank, ierr, n, k
         character(len=600) :: args

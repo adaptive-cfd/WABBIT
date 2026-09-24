@@ -1307,7 +1307,7 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
     integer(kind=ik)    :: ix, iy, iz, iq, k1, k2, Nord, delta1, delta2, delta3
 
     real(kind=rk), allocatable , save ::  M(:)
-    real(kind=8) :: sprod, Volume, t_elapse, t_inc(2), sprod_block, tmp
+    real(kind=8) :: sprod, t_elapse, t_inc(2), sprod_block, tmp
     real(kind=rk) :: x0(3), dx(3)
 
     integer(kind=ik) , save, allocatable :: lgt_active_ref(:,:), lgt_block_ref(:,:)
@@ -1320,7 +1320,6 @@ function scalar_product_two_trees( params, hvy_block, hvy_tmp ,&
     Jmax = params%Jmax
     g = params%g
     Bs= params%Bs
-    Volume = product(params%domain_size(1:params%dim))
 
     ! depending on the predictor order, i.e. the order of the lagrange interpolation
     ! scheme. we have to use a different "FEM" Mass matrices. See:
@@ -1517,7 +1516,7 @@ function scalar_product_two_trees_old( params, hvy_block, hvy_tmp, &
     !---------------------------------------------------------------
     integer(kind=ik) :: free_tree_ID, Jmax, Bs(3), g, &
     N, k, lgt_id, hvy_id, rank, i, mpierr
-    real(kind=rk) :: sprod, Volume, t_elapse, t_inc(2)
+    real(kind=rk) :: sprod, t_elapse, t_inc(2)
     real(kind=rk) :: x0(3), dx(3)
 
     if ( present(buffer_tree_ID)) then
@@ -1531,7 +1530,6 @@ function scalar_product_two_trees_old( params, hvy_block, hvy_tmp, &
     Jmax = params%Jmax
     g = params%g
     Bs= params%Bs
-    Volume = product(params%domain_size(1:params%dim))
 
     !----------------------------------------------
     ! sprod = <X_i, X_j>

@@ -11,8 +11,8 @@ subroutine post_rhs(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=cshort)  :: fname_ini, dummy, fname
-    character(len=cshort), allocatable  :: files(:)
+    character(len=chuge)  :: fname_ini, dummy, fname
+    character(len=chuge), allocatable  :: files(:)
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, tc_length, g
     integer(kind=ik), dimension(3) :: Bs

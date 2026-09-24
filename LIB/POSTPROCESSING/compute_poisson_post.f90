@@ -16,7 +16,7 @@ subroutine compute_poisson_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: file_in1, file_in2, file_in3, operator
+    character(len=chuge)              :: file_in1, file_in2, file_in3, operator
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
@@ -26,7 +26,7 @@ subroutine compute_poisson_post(params)
     real(kind=rk), allocatable         :: hvy_mask(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
 
-    character(len=cshort)              :: fname, fname_mask
+    character(len=chuge)              :: fname, fname_mask
     logical                            :: read_mask
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id

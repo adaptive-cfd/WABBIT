@@ -13,7 +13,7 @@ subroutine post_add_two_masks(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=clong) :: mode, fname1, fname2, fname_out, args
+    character(len=chuge) :: mode, fname1, fname2, fname_out, args
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)

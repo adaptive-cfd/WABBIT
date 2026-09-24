@@ -111,6 +111,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%force_color = 0.0_rk
         params_acm%meanflow_channel = 0.0_rk
         params_acm%moment_color = 0.0_rk
+        params_acm%usolid_max_color = -1.0e9_rk
+        params_acm%usolid_min_color = 1.0e9_rk
         params_acm%e_kin = 0.0_rk
         params_acm%enstrophy = 0.0_rk
         params_acm%max_vort = 0.0_rk
@@ -118,8 +120,8 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         params_acm%mask_volume = 0.0_rk
         params_acm%sponge_volume = 0.0_rk
         params_acm%u_residual = 0.0_rk
-        params_acm%div_max = 0.0_rk
-        params_acm%div_min = 0.0_rk
+        params_acm%div_max = -1.0e9_rk
+        params_acm%div_min = 1.0e9_rk
         params_acm%penal_power = 0.0_rk
         params_acm%scalar_removal = 0.0_rk
         params_acm%dissipation = 0.0_rk
@@ -283,6 +285,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                         ! forces acting on this color
                         force_block(1:params_acm%dim, color) = force_block(1:params_acm%dim, color) - penal(1:params_acm%dim)
 
+                        ! usolid max/min for this color
+                        params_acm%usolid_max_color(1:params_acm%dim, color) = max( params_acm%usolid_max_color(1:params_acm%dim, color), mask(ix,iy,iz,2:params_acm%dim+1))
+                        params_acm%usolid_min_color(1:params_acm%dim, color) = min( params_acm%usolid_min_color(1:params_acm%dim, color), mask(ix,iy,iz,2:params_acm%dim+1))
+
                         if (params_acm%dim == 3) then
                             ! moment with color-dependent lever
                             x_lev(1:3) = (/x, y, z/) - x0_moment(1:3, color)
@@ -396,15 +402,17 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! this stage is called only once, NOT for each block.
 
         ! mean flow (in entire domain)
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domain_size(1:params_acm%dim))
+        params_acm%mean_flow = params_acm%mean_flow / get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
 
         if (params_acm%use_channel_forcing) then
             ! mean flow but only in fluid domain
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%meanflow_channel, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
 			! analytically compute the volume of our channel (no numerical integration required, simple multiplication)
-            V_channel = params_acm%domain_size(1)*params_acm%domain_size(3)*(params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)
+            ! This is the known channel height times the active area
+            V_channel = (params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)*get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir='xz')
             params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
         endif
 
@@ -414,6 +422,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mask_volume, size(params_acm%mask_volume), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             ! volume of sponge
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+
+            ! usolid max/min
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%usolid_max_color, size(params_acm%usolid_max_color), MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%usolid_min_color, size(params_acm%usolid_min_color), MPI_DOUBLE_PRECISION, MPI_MIN, WABBIT_COMM, mpierr)
 
             ! force & moment
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%force_color, size(params_acm%force_color), MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
@@ -466,9 +478,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%umag, 1, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
 
         ! time statistics
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         if (params_acm%time_statistics) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_mean, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_acm%time_statistics_mean = params_acm%time_statistics_mean / product(params_acm%domain_size(1:params_acm%dim))
+            params_acm%time_statistics_mean = params_acm%time_statistics_mean / get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_maxabs, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         endif
 
@@ -530,6 +543,9 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! some colors are (also) stored to different filenames. That's unfortunate but not a big deal.
                 ! Reshape flattens the array, so that we'd have for a(2,2): (/a(1,1), a(2,1), a(1,2), a(2,2)/)
                 call append_t_file( "forces_color.t", (/time, reshape(params_acm%force_color(:,:), (/3*ncolors/) ) /) )
+
+                ! usolid max/min for each color in one file
+                call append_t_file( "usolid_color.t", (/time, reshape(params_acm%usolid_max_color(:,:), (/3*ncolors/) ), reshape(params_acm%usolid_min_color(:,:), (/3*ncolors/) ) /) )
 
                 ! save moment for each color in one file
                 call append_t_file( "moments_color.t", (/time, reshape(params_acm%moment_color(:,:), (/3*ncolors/) ) /) )
@@ -618,12 +634,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 call append_t_file( 'dissipation.t', (/time, params_acm%dissipation/) )
             endif
 
-            ! turbulent statistics - these are normed by the volume!
+            ! turbulent statistics - these are normed by the volume, which depends on the cropping of the domain!
             if (params_acm%nu*params_acm%enstrophy > 0.0_rk .and. params_acm%HIT_linear_forcing) then
                 ! dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
-                dissipation = params_acm%dissipation/product(params_acm%domain_size(1:params_acm%dim))
-                u_RMS = sqrt(2*params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim))/3)
-                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/product(params_acm%domain_size(1:params_acm%dim)), u_RMS, &
+                dissipation = params_acm%dissipation/get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
+                u_RMS = sqrt(2.0_rk*params_acm%e_kin/get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))/3.0_rk)
+                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
             endif

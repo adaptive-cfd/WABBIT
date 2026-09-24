@@ -636,13 +636,17 @@ contains
       block_extent = dx * real(BS, kind=rk)
       xend = x0 + block_extent
 
-      ! check if body center is contained - it is located around xc_body_g
-      if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
-         geometry_in_block = .true.
+      ! if there is a body, then check if the body center is contained in the block
+      if (trim(standardize_string(Insects(insect_id)%BodyType)) /= 'nobody') then
+         ! check if body center is contained - it is located around xc_body_g
+         if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
+            geometry_in_block = .true.
+         endif
       endif
 
       ! Check if wing is contained - this is tricky, as we usually only have the pivot point (which often outside the wing) and complex shapes
       ! so for now, I skip this and hope that (fingers cross), resolving the body is enough to draw the wings as well
+      ! The case of no body is usually for validation purposes, so we accept that any user (looking at you, Thomas) ensures that it is sufficiently resolved
 
    end subroutine insect_geometry_indicator
 

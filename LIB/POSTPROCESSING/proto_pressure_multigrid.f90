@@ -38,14 +38,14 @@ subroutine proto_pressure_multigrid(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: file_ux, file_uy, file_uz, file_p
+    character(len=chuge)              :: file_ux, file_uy, file_uz, file_p
     real(kind=rk)                      :: dt, t, time
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, Bs(1:3)
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, Jmin, ic, nc, i_cycle, it, tc_length, mpierr, g(1:3)
 
-    character(len=cshort)              :: fname, cycle_type
+    character(len=chuge)              :: fname, cycle_type
     logical                            :: exist_p
     real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:9), volume
     integer(kind=tsize)                :: treecode
@@ -397,14 +397,14 @@ subroutine proto_NSI_EE(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)              :: file_params
+    character(len=chuge)              :: file_params
     real(kind=rk)                      :: dt, time
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, Bs(1:3), g(1:3), iteration, j, l
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_mask(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, Jmin, ic, nc, i_cycle, it, tc_length, mpierr
 
-    character(len=cshort)              :: fname, order_disc_nonlinear, order_disc_pressure, order_laplacian
+    character(len=chuge)              :: fname, order_disc_nonlinear, order_disc_pressure, order_laplacian
     real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:6), volume
     integer(kind=tsize)                :: treecode
     logical                            :: it_is_time_to_save_data=.false., overwrite, error_OOM, is_equidistant

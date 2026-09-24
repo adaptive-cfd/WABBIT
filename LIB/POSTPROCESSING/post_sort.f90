@@ -9,7 +9,7 @@ subroutine post_sort(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=clong) :: mode, fname, fname_out, args
+    character(len=chuge) :: mode, fname, fname_out, args
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)

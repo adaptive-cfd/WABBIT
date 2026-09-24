@@ -13,7 +13,7 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     integer(kind=ik)                        :: k, hvy_id, lgt_id, i_adapt, it_random, l_init
     integer(kind=ik)                        :: g, ix, iy, iz, nc, ic, ii, block_dump_max, Bs(1:3)
     real(kind=rk), allocatable :: norm_1(:), norm_ref(:), norm_2(:)
-    real(kind=rk)                           :: x0(1:3), dx(1:3)
+    real(kind=rk)                           :: x0(1:3), dx(1:3), domain_cropping_min_backup(1:3), domain_cropping_max_backup(1:3)
     integer(kind=tsize)        :: treecode
     character(len=80)                       :: file_dump
     logical                                 :: apply_verbose, problem, grid_is_equidistant
@@ -38,6 +38,12 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
     allocate(norm_1(1:params%n_eqn))
     allocate(norm_2(1:params%n_eqn))
     allocate(norm_ref(1:params%n_eqn))
+
+    ! this test works best on quadratic/cubic domains, so we set the domain slice to 0 and 1 for all dimensions
+    domain_cropping_min_backup = params%domain_cropping_min
+    domain_cropping_max_backup = params%domain_cropping_max
+    params%domain_cropping_min = 0.0_rk
+    params%domain_cropping_max = 1.0_rk
 
     !----------------------------------------------------------------------------
     ! Construct a random grid for testing
@@ -164,4 +170,8 @@ subroutine unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_
 
     ! delete the grid we created for this subroutine
     call reset_tree(params, .true., tree_ID=tree_ID)
+
+    ! revert the domain slice to its original values
+    params%domain_cropping_min = domain_cropping_min_backup
+    params%domain_cropping_max = domain_cropping_max_backup
 end subroutine

@@ -13,8 +13,8 @@ subroutine post_cvs_invertibility_test(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=cshort)  :: file_in
-    character(len=cshort)  :: file_out
+    character(len=chuge)  :: file_in
+    character(len=chuge)  :: file_out
     real(kind=rk)          :: time, time_given, norm_1(1:1), norm_2(1:1), norm_ref1(1:1), norm_ref2(1:1)
     integer(kind=ik)       :: iteration
 
@@ -26,7 +26,7 @@ subroutine post_cvs_invertibility_test(params)
     integer(kind=ik)                        :: Bs, Jmin_diff, Nb_old
     integer(hid_t)                          :: file_id
     character(len=cshort)                   :: order
-    character(len=cshort)                   :: fname1
+    character(len=chuge)                   :: fname1
     real(kind=rk), dimension(3)             :: domain
     integer(hsize_t), dimension(2)          :: dims_treecode
     integer(kind=ik)                        :: number_dense_blocks, Nb_file

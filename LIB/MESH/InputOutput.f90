@@ -344,6 +344,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik), dimension(4) :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
+    real(kind=rk) :: x0(1:3), dx(1:3)
     integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n, version(1), datarank, Bs_file(1:3)=0
 
     logical          :: read_treecode_num, readRefStatus
@@ -701,6 +702,25 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
         params%Jmin = level_min
     else
         Jmin_set = -1
+    endif
+
+    ! in case domain_cropping_min or domain_cropping_max is set, we need to crop the domain
+    if (any(params%domain_cropping_min(:) > 0.0_rk) .or. any(params%domain_cropping_max(:) < params%domain_size(:))) then
+        ! check if Jmin is too small for the domain slice - we then assume it cannot be cut
+        if (params%Jmin < minActiveLevel_tree(tree_ID, use_active_list=.false.)) then
+            call abort(240929, "This input data is too coarse for the specified domain slice. It would be cropped in the middle of a block, which is currently not supported.")
+        endif
+
+        ! we need active lists for lgt_n
+        call createActiveSortedLists_tree(params, tree_ID)
+        do k = 1, lgt_n(tree_ID)
+            lgt_ID = lgt_active(k, tree_ID)
+            ! get block spacing and origin for the geometry indicator
+            call get_block_spacing_origin( params, lgt_id, x0, dx )
+            if (any(x0(1:params%dim) < params%domain_cropping_min(1:params%dim) - 1.0e-14_rk) .or. any(x0(1:params%dim) + params%Bs(1:params%dim) * dx(1:params%dim) > params%domain_cropping_max(1:params%dim) + 1.0e-14_rk)) then
+                lgt_block( lgt_id, : ) = -1
+            endif
+        enddo
     endif
 
     ! it is good practice that this routine returns a working forest, i.e., all meta

@@ -398,12 +398,23 @@ program main
                 call toc( "TOPLEVEL: statistics", 13, MPI_wtime()-t4)
             endif
 
+            !***********************************************************************
+            ! Probe points or lines
+            !***********************************************************************
             if (params%n_probes > 0 .or. params%n_probe_lines > 0) then
                 if (it_is_time_to_probe(time, iteration, params)) then
                     t4 = MPI_wtime()
                     call probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
                     call toc( "TOPLEVEL: probes", 18, MPI_wtime()-t4)
                 endif
+            endif
+
+            !***********************************************************************
+            ! Write fields to HDF5 file - debug version before adapt_tree
+            !***********************************************************************
+            if (it_is_time_to_save_data .and. params%save_data_before_adapt_tree) then
+                call save_data( iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow )
+                output_time = time
             endif
 
             ! if multiple time steps are performed on the same grid, we have to be careful
@@ -429,7 +440,7 @@ program main
         !***********************************************************************
         ! Write fields to HDF5 file
         !***********************************************************************
-        if (it_is_time_to_save_data) then
+        if (it_is_time_to_save_data .and. .not. params%save_data_before_adapt_tree) then
             ! NOTE new versions (>16/12/2017) call physics module routines call prepare_save_data. These
             ! routines create the fields to be stored in the work array hvy_tmp in the first 1:params%N_fields_saved
             ! slots. the state vector (hvy_block) is copied if desired.

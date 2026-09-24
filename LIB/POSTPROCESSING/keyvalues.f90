@@ -180,7 +180,8 @@ subroutine keyvalues(fname, params)
     call MPI_ALLREDUCE(MPI_IN_PLACE,val_mean,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
     call MPI_ALLREDUCE(MPI_IN_PLACE,val_grid,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
 
-    val_mean = val_mean / product(params%domain_size(1:params%dim))
+    ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
+    val_mean = val_mean / get_active_domain_length(params%domain_size, params%domain_cropping_min, params%domain_cropping_max, dir=merge('xy', 'xyz', params%dim==3))
 
     if (rank == 0) then
         open  (59, file=fname(1:index(fname,'.'))//'key', &

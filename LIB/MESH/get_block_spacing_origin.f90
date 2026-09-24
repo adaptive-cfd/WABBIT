@@ -30,15 +30,23 @@ subroutine get_adjacent_boundary_surface_normal(params, lgt_id, n_surface)
   type (type_params), intent(in)             :: params              !> user defined parameter structure
   integer(kind=ik), intent(in)               :: lgt_id              !> the block in question
   ! The normal on the domain indicates (if non-periodic BC are used), if a block
-  ! is at the outer, usually periodic border of the domain ( x,y,z == 0 and x,y,z == L)
+  ! is at the outer, usually periodic border of the domain ( x,y,z == global_min and x,y,z == global_max)
+  ! global_min/max are defined as fractions of the domain_size, for quadratic/cubic domains these are 0 and L
   ! Nonzero values indicate this is the case, e.g., n_domain=(/1, 0, -1/) means in x-axis, our block
   ! is way at the back and its boundary normal points in +x, and in z, its at the bottom (z=0), thus
   ! its normal points downwards.
   integer(kind=2), intent(out) :: n_surface(3)
 
-  real(kind=rk), dimension(1:3) :: x0, dx
-  real(kind=rk) :: tolerance
+  real(kind=rk) :: tolerance, x0(1:3), dx(1:3), global_min(1:3), global_max(1:3)
   integer(kind=ik) :: i_dim
+
+  ! option 1: compute the indices of the block in the global grid, then check if they are at 0 or nx/ny/nz
+
+  ! option 2: compute the origin and spacing of the block, then check if the origin is at 0 or L
+
+  ! cropped domains can differ from 0 and L, so we need to compute the global min/max of the cropped domain
+  global_min(1:params%dim) = params%domain_cropping_min(1:params%dim) * params%domain_size(1:params%dim)
+  global_max(1:params%dim) = params%domain_cropping_max(1:params%dim) * params%domain_size(1:params%dim)
 
   call get_block_spacing_origin_b( get_tc(lgt_block(lgt_id, IDX_TC_1 : IDX_TC_2)), params%domain_size, &
     params%Bs, x0, dx, dim=params%dim, level=lgt_block(lgt_id, IDX_MESH_LVL), max_level=params%Jmax)
@@ -47,11 +55,11 @@ subroutine get_adjacent_boundary_surface_normal(params, lgt_id, n_surface)
 
   n_surface(1:params%dim) = 0
   do i_dim = 1, params%dim
-    ! check if origin_b = 0
-    if (abs(x0(i_dim)-0.0_rk) < tolerance ) then !x_i == 0
+    ! check if origin_b = global_min
+    if (abs(x0(i_dim)-global_min(i_dim)) < tolerance ) then !x_i == global_min
       n_surface(i_dim) = -1
-    ! check if origin_b + BS*dx = L
-    elseif (abs(x0(i_dim)+dx(i_dim)*real(params%Bs(i_dim),kind=rk) - params%domain_size(i_dim)) < tolerance) then ! x_i == L
+    ! check if origin_b + BS*dx = global_max
+    elseif (abs(x0(i_dim)+dx(i_dim)*real(params%Bs(i_dim),kind=rk) - global_max(i_dim)) < tolerance) then ! x_i == global_max
       n_surface(i_dim) = +1
     endif
   end do

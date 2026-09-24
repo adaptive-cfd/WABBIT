@@ -564,6 +564,143 @@ module module_treelib
   !===============================================================================
 
   !===============================================================================
+  !> \author JB
+  !> \brief Obtain neighbour for a single axis, wrapping periodically at the (dyadic) domain-slice
+  !! boundary domain_cropping_min/domain_cropping_max instead of the full unit cube [0,1].
+  !> \details adjacent_faces_b wraps by ripple-carry addition of +-1 to a bit-plane, which only works
+  !! because a full-cube wrap is a power-of-two modulus aligned to bit boundaries. A domain slice can
+  !! have an arbitrary dyadic width (e.g. [1/8, 6/8), width 5/8, not a power of two), so no bit trick
+  !! can wrap it correctly - we need actual integer modulo arithmetic on the axis' cell index.
+  !! We therefore decode the treecode into a 1-based cell index (ix,iy,iz) at the given level (decoding_b),
+  !! step and wrap that single axis' index modulo the slice width, then re-encode (encoding_b).
+  !! With the default domain_cropping_min=0/domain_cropping_max=1 this reduces exactly to a full-cube wrap,
+  !! so this routine can replace adjacent_faces_b outright once/if performance allows (see adjacent_wrapper_slice_b).
+  !! This is however noticeably more expensive than adjacent_faces_b: decoding_b/encoding_b always loop
+  !! over all "level" bits, whereas adjacent_faces_b's carry loop exits after one step for the (overwhelming
+  !! majority of) calls that do not actually overflow. Only call this where an overflow can actually happen.
+  ! ********************************************************************************************
+  subroutine adjacent_faces_slice_b(treecode, treecode_neighbor, axis, dir_sign, domain_cropping_min, domain_cropping_max, dim, level, max_level)
+    implicit none
+
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional    :: dim
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Numerical treecode out
+    integer(kind=tsize), intent(out)    :: treecode_neighbor
+    !> which axis (1=x, 2=y, 3=z) we step along
+    integer(kind=ik), intent(in)        :: axis
+    !> step direction along that axis, +1 or -1
+    integer(kind=ik), intent(in)        :: dir_sign
+    !> domain slice bounds as dyadic fractions of the full domain [0,1] - default (0,1) is the full domain
+    real(kind=rk), intent(in)           :: domain_cropping_min(1:3), domain_cropping_max(1:3)
+
+    integer(kind=ik)                    :: n_dim, max_tclevel, n_level, ix(3), lo, hi, width
+
+    ! Set defaults for dimension, level and max_level
+    n_dim = 3; if (present(dim)) n_dim = dim
+    max_tclevel = maxdigits; if (present(max_level)) max_tclevel = max_level
+    n_level = max_tclevel; if (present(level)) n_level = level
+    if (n_level < 0) n_level = max_tclevel + n_level + 1
+
+    ! cell index (1-based) of this block along all axes at the search level
+    call decoding_b(ix, treecode, dim=n_dim, level=n_level, max_level=max_tclevel)
+
+    ! slice bounds in cell indices at this level - both bounds are guaranteed representable
+    ! as integers here because ini_file_to_params.f90 raises Jmin until domain_cropping_min/max
+    ! are exactly representable dyadic fractions, and that holds for every finer level as well
+    lo    = nint(domain_cropping_min(axis) * real(2**n_level, kind=rk), kind=ik) + 1
+    hi    = nint(domain_cropping_max(axis) * real(2**n_level, kind=rk), kind=ik)
+    width = hi - lo + 1
+
+    ! step by +-1 and wrap within the slice, not within the full cube
+    ix(axis) = lo + modulo(ix(axis) - lo + dir_sign, width)
+
+    call encoding_b(ix, treecode_neighbor, dim=n_dim, level=n_level, max_level=max_tclevel)
+
+  end subroutine
+  !===============================================================================
+
+  !===============================================================================
+  !> \author JB
+  !> \brief Drop-in alongside-replacement for adjacent_wrapper_b that is aware of periodic domain slices.
+  !> \details For each axis this picks one of two implementations:
+  !!  - the cheap, O(1)-amortized ripple-carry adjacent_faces_b (unchanged behaviour), used whenever this
+  !!    axis cannot actually overflow the (cropped) domain in the requested direction, which is true for the
+  !!    overwhelming majority of the 26 (3D) neighbor searches done per block;
+  !!  - the more expensive but slice-correct adjacent_faces_slice_b, used for BOTH directions of an axis
+  !!    whenever n_domain flags that this block touches the (cropped) domain edge in that axis at all (see
+  !!    the comment at the call site for why both directions, not just the matching sign, must be covered).
+  !! Pass force_slice=.true. to always take the slice-aware path on every nonzero axis, ignoring n_domain -
+  !! this is meant purely for A/B performance and correctness benchmarking against adjacent_wrapper_b.
+  ! ********************************************************************************************
+  subroutine adjacent_wrapper_slice_b(treecode, treecode_neighbor, direction, n_domain, domain_cropping_min, domain_cropping_max, level, dim, max_level, force_slice)
+    implicit none
+    !> dimension (2 or 3), defaults to 3
+    integer(kind=ik), optional    :: dim
+    !> Level at which to encode, can be negative to set from max_level, defaults to max_level
+    integer(kind=ik), optional, intent(in)    :: level
+    !> Max level possible, should be set after params%Jmax
+    integer(kind=ik), optional, intent(in)    :: max_level
+    !> Numerical treecode in
+    integer(kind=tsize), intent(in)     :: treecode
+    !> Numerical treecoude out
+    integer(kind=tsize), intent(out)    :: treecode_neighbor
+    !> direction for neighbor search - number where each digit represents a cardinal direction
+    !> XYZ, values are 1 for dir +, 9 for dir - and 0 for nothing
+    integer(kind=ik), intent(in)        :: direction
+    !> per-axis domain/slice edge flag of the block itself: -1/0/+1, see find_neighbors.f90 header
+    integer(kind=2), intent(in)         :: n_domain(1:3)
+    !> domain slice bounds as dyadic fractions of the full domain [0,1] - default (0,1) is the full domain
+    real(kind=rk), intent(in)           :: domain_cropping_min(1:3), domain_cropping_max(1:3)
+    !> DEBUG/benchmarking only: force the slice-aware path on every axis, bypassing the n_domain fast-path check
+    logical, optional, intent(in)       :: force_slice
+    integer(kind=tsize)                 :: tc1
+    integer(kind=ik)                    :: i_dim, dir_now, dir_sign
+    logical                             :: do_force
+
+    do_force = .false.; if (present(force_slice)) do_force = force_slice
+
+    treecode_neighbor = treecode
+    ! loop over all letters in direction and treat each axis independently
+    do i_dim = 1,3
+      tc1 = treecode_neighbor
+      dir_now = mod(direction/(10**(3-i_dim)),10)
+
+      if (dir_now == 0) then
+        cycle  ! this axis does not change
+      elseif (dir_now == 9) then
+        dir_sign = -1
+      else
+        dir_sign = 1
+      endif
+
+      ! Only the slice-aware path can correctly wrap a non-power-of-two slice width, but it is more
+      ! expensive, so only take it where n_domain flags that this block touches a (cropped) domain edge
+      ! in this axis at all - not just where the sign matches the search direction. This also covers the
+      ! case where the slice is only one block wide along this axis (the block is then simultaneously at
+      ! its own min and max edge): get_adjacent_boundary_surface_normal's if/elseif can only ever report
+      ! one signed edge per axis (-1 wins), so relying on a sign match here would silently miss the other
+      ! direction and fall back to the (wrong) full-domain wraparound. Taking the slice-aware path for
+      ! both directions whenever n_domain(axis)/=0 costs nothing in the "at exactly one edge" case either:
+      ! the direction that is not actually at an edge never triggers the modulo wrap, so it returns the
+      ! same result as the ripple-carry path would have, just slightly more expensively.
+      if (do_force .or. int(n_domain(i_dim), kind=ik) /= 0) then
+        call adjacent_faces_slice_b(tc1, treecode_neighbor, i_dim, dir_sign, domain_cropping_min, domain_cropping_max, &
+                                     dim=dim, level=level, max_level=max_level)
+      else
+        ! adjacent_faces_b case numbering: 2*(i_dim-1)+1 is the "-" direction, 2*(i_dim-1)+2 the "+" direction
+        call adjacent_faces_b(tc1, treecode_neighbor, int(2*(i_dim-1) + merge(1,2,dir_sign==-1), kind=tsize), level=level, dim=dim, max_level=max_level)
+      endif
+    end do
+  end subroutine
+  !===============================================================================
+
+  !===============================================================================
   !> \brief Obtain neighbour for given direction with numerical decimal treecode
   !> \details This function takes the directions and splits it into the desire cardinal directions and calls function adjacent
   !> \author JB

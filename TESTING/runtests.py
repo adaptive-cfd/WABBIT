@@ -1,707 +1,878 @@
 #!/usr/bin/env python3
-import os, sys, argparse, subprocess, time, shutil, glob, logging, select
+"""
+Simplified WABBIT unit testing framework.
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# these are all tests that we can run
-# new groups can be added with "---NAME---" and new tests by providing name, wavelet and dimension
-# new tests need to be implemented in the class WabbitTest by doing:
-#   - defining the test folder location in __init__
-#   - defining what should be executed in run
-#   - defining where the log-file should be in init_logging
+This script runs all WABBIT tests defined in the `tests` list below. It supports
+two types of tests with different execution models:
 
-group_names = ["post", "wavelets", "ghost_nodes", "invertibility", "adaptive", "convection", "acm", "insects", "cvs"]
-tests = [
-        # f"---{group_names[0]}---",
-        # "TESTING/wabbit_post/pod/pod_test.sh",
-        f"---{group_names[1]}---",  # group identifier
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF24", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF26", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF28", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF42", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF46", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF64", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF66", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF80", "dim":2},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF82", "dim":2},
+Test types:
+- "wabbit-internal": Internal WABBIT tests that run directly in TESTING/{root_folder}/
+  using a dedicated log file per test: {name}_{dim}D_{wavelet}.log
+  These tests verify wavelet operations like refine/coarsen and decomposition.
+  
+- "simulation": Full simulation tests that run in TESTING/{root_folder}/{name}/tmp/
+  with all output captured in log.txt. Input files are copied from the test directory
+  to tmp/, commands are executed there, and HDF5 output files are compared against
+  reference files in the test directory. The tmp/ directory is cleaned up after each test.
 
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF20", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF22", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF40", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF42", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF44", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF60", "dim":3},
-        {"test_name":"equi_refineCoarsen_FWT_IWT", "wavelet":"CDF62", "dim":3},
+Directory structure:
+  TESTING/
+    wavelets/          - Wavelet-specific tests
+    conv/             - Convection tests
+    acm/              - ACM (Adaptive Cartesian Mesh) tests
+    insects/          - Insect flight simulation tests
 
-        f"---{group_names[2]}---",  # group identifier
-        {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF80", "dim":2},
-        {"test_name":"ghost_nodes", "wavelet":"CDF20", "dim":3},
-        {"test_name":"ghost_nodes", "wavelet":"CDF40", "dim":3},
-        {"test_name":"ghost_nodes", "wavelet":"CDF60", "dim":3},
+The test definitions use Python list comprehensions for wabbit-internal and adaptive
+tests to avoid repetition, with explicit entries for tests requiring unique configurations.
+"""
 
-        f"---{group_names[3]}---",  # group identifier
-        {"test_name":"invertibility", "wavelet":"CDF20", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF22", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF24", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF26", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF28", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF40", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF42", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF44", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF46", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF60", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF62", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF64", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF66", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF80", "dim":2},
-        {"test_name":"invertibility", "wavelet":"CDF82", "dim":2},
+import os
+import sys
+import argparse
+import subprocess
+import shutil
+import glob
+import time
+import contextlib
+import fnmatch
+import itertools
 
-        f"---{group_names[4]}---",  # group identifier
-        {"test_name":"adaptive", "wavelet":"CDF20", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF22", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF40", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF42", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF44", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF60", "dim":2},
-        {"test_name":"adaptive", "wavelet":"CDF62", "dim":2},
-
-        f"---{group_names[5]}---",  # group identifier
-        {"test_name":"blob_equi", "wavelet":"CDF40", "dim":2},
-        {"test_name":"blob_equi", "wavelet":"CDF20", "dim":3},
-        {"test_name":"blob_equi", "wavelet":"CDF40", "dim":3},
-        {"test_name":"blob_adaptive", "wavelet":"CDF20", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF42", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF60", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF62", "dim":2},
-        {"test_name":"blob_adaptive", "wavelet":"CDF22", "dim":3},
-        {"test_name":"blob_adaptive", "wavelet":"CDF40", "dim":3},
-        {"test_name":"blob_adaptive", "wavelet":"CDF44", "dim":3},
-        {"test_name":"blob_equi_avg", "wavelet":"CDF40", "dim":2},
-
-        f"---{group_names[6]}---",  # group identifier
-        {"test_name":"acm", "wavelet":"CDF40", "dim":2},
-        {"test_name":"acm", "wavelet":"CDF44", "dim":2},
-        {"test_name":"acm_norm", "wavelet":"CDF44", "dim":2},
-        {"test_name":"acm_significant", "wavelet":"CDF44", "dim":2},        
-        {"test_name":"3vorticesEquiFD2", "wavelet":"CDF20", "dim":2},
-        {"test_name":"3vorticesEquiFD4", "wavelet":"CDF40", "dim":2},
-        {"test_name":"3vorticesEquiFD6", "wavelet":"CDF60", "dim":2},
-        {"test_name":"3vorticesAdaptFD2", "wavelet":"CDF20", "dim":2},
-        {"test_name":"3vorticesAdaptFD2", "wavelet":"CDF22", "dim":2},
-        {"test_name":"3vorticesAdaptFD4", "wavelet":"CDF40", "dim":2},
-        {"test_name":"3vorticesAdaptFD4", "wavelet":"CDF42", "dim":2},
-        {"test_name":"3vorticesAdaptFD6", "wavelet":"CDF60", "dim":2},  
-        {"test_name":"3vorticesAdaptFD6", "wavelet":"CDF62", "dim":2},
-        {"test_name":"taylorGreenEqui_FD2", "wavelet":"CDF20", "dim":3},
-        {"test_name":"taylorGreenEqui_FD4", "wavelet":"CDF40", "dim":3},
-        {"test_name":"taylorGreenEqui_FD6", "wavelet":"CDF60", "dim":3},
-        {"test_name":"bumblebeeFlowEquiFD4", "wavelet":"CDF40", "dim":3},
-
-        f"---{group_names[7]}---",  # group identifier
-        {"test_name":"dry_fractal_tree", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_bumblebee", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_emundus_4wings", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_muscaComplete", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_dipteraFourier", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_dipteraHermite", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_dipteraBodyRotation", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_paratuposaComplete", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_butterflyKineloaderV2", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_snowman", "wavelet":"CDF22", "dim":2},
-        {"test_name":"dry_snowman", "wavelet":"CDF22", "dim":3},
-        {"test_name":"dry_3Dbristles", "wavelet":"CDF22", "dim":3}
-
-#        f"---{group_names[8]}---",  # group identifier
-#        {"test_name":"denoise_butterfly", "wavelet":"CDF42", "dim":2},
-#        {"test_name":"denoise_grey", "wavelet":"CDF42", "dim":2},
-    ]
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-fail_color, pass_color, end_color, underline = '\033[31;1m', '\033[92;1m', '\033[0m', '\033[4m'
-import importlib  
-try: wabbit_tools = importlib.import_module("wabbit_tools")  # this needs file with wabbit_tools loaded to env PYTHONPATH
-except:
-    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    print("Since 15 Aug 2023, the unit testing framework has evolved. It now stores full HDF5 files in the TESTING directory, which makes it easier to visualize the reference data and current results, should they be different.")
-    print("We now calculate the L2 error of the field, if the grid is identical. This new framework requires the https://github.com/adaptive-cfd/python-tools repository for comparing two WABBIT HDF5 files.")
-    print(f"\n You do not seem to have {fail_color}wabbit_tools{end_color} available! Either you do not have the repository, or its directory is not in your $PYTHONPATH")
-    print(f"\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    print(f"{fail_color}Cannot run unit tests !!{end_color}")
-    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+try:
+    import wabbit_tools
+except ImportError:
+    print("ERROR: wabbit_tools module not found")
     sys.exit(881)
 
-def run_command(command, logger):
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', errors='ignore')
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# TEST DEFINITIONS
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Each test is a dictionary with the following fields:
+# - name (str): Test name, used for logging and directory structure
+# - type (str): Either "wabbit-internal" or "simulation"
+# - root_folder (str): Subdirectory under TESTING/ where test files are located
+#
+# For wabbit-internal tests:
+# - wavelet (str): Wavelet type (e.g., "CDF20", "CDF40")
+# - dim (int): Dimensionality (2 or 3)
+# - commands (list): List of command templates to execute
+#
+# For simulation tests:
+# - wavelet (str, optional): Wavelet type for adaptive tests
+# - input_files (list): Files to copy from test directory to tmp/ before execution
+# - commands (list): List of command templates to execute in tmp/
+#
+# Command templates support {placeholders} that are replaced at runtime:
+# - {mpi_command}: MPI execution command (e.g., "nice mpirun -n 4")
+# - {run_dir}: Path to WABBIT directory
+# - {memory}: Memory allocation flag
+# - {wavelet}: Wavelet type from test definition
+# - {name}: Test name from test definition
+# - {dim}: Dimensionality from test definition
+#
+# String separators ("---") are used to group tests in output.
 
-    # Poll both stdout and stderr
-    while True:
-        reads = [process.stdout.fileno(), process.stderr.fileno()]
-        ret = select.select(reads, [], [])
 
-        for fd in ret[0]:
-            if fd == process.stdout.fileno():
-                read = process.stdout.readline()
-                if read: logger.info(read.strip("\n"))
-            if fd == process.stderr.fileno():
-                read = process.stderr.readline()
-                if read: logger.error(read.strip('\00').strip("\n"))
-        
-        # very little wait so that line buffers can be filled appropriately, elsewise
-        time.sleep(0.01)
-                    
-        # Check if the process has finished
-        if process.poll() is not None: break
+tests = [
+    # ===== WABBIT-INTERNAL TESTS =====
+    # These tests verify internal WABBIT wavelet operations.
+    # They run quickly and don't require reference HDF5 files.
+    "\n--- WABBIT internal test (wavelet transform)---",
 
-    # Ensure all remaining output is processed
-    for read in process.stdout:
-        if read: logger.info(read.strip("\n"))
+    # Equidistant refine-coarsening tests. After refining and subsequent coarsening, the original data should be recovered. 
+    # If it is not, the wavelet coefficients have a serious problem.
+    # 2D
+    *[{"name": "equi_refineCoarsen_FWT_IWT", "type": "wabbit-internal", "root_folder": "wavelets", "wavelet": wavelet, "dim": 2,
+       "groups": ["wabbit_internal", "refine_coarsen"],
+       "commands": [ "{mpi_command} {run_dir}/wabbit-post --refine-coarsen-test --wavelet={wavelet} --memory={memory} --dim={dim}",
+                     "{mpi_command} {run_dir}/wabbit-post --wavelet-decomposition-unit-test --wavelet={wavelet} --memory={memory} --dim={dim}" ]}
+      for wavelet in ["CDF20", "CDF22", "CDF24", "CDF26", "CDF28", "CDF40", "CDF42", "CDF44", "CDF46", "CDF60", "CDF62", "CDF64", "CDF66", "CDF80", "CDF82"]],
 
-    for read in process.stderr:
-        if read: logger.error(read.strip('\00').strip("\n"))
+    # 3D
+    *[{"name": "equi_refineCoarsen_FWT_IWT", "type": "wabbit-internal", "root_folder": "wavelets", "wavelet": wavelet, "dim": 3,
+       "groups": ["wabbit_internal", "refine_coarsen"] + (["short"] if wavelet in ["CDF20", "CDF22", "CDF40", "CDF42", "CDF60", "CDF62"] else []),
+       "commands": [ "{mpi_command} {run_dir}/wabbit-post --refine-coarsen-test --wavelet={wavelet} --memory={memory} --dim={dim}",
+                     "{mpi_command} {run_dir}/wabbit-post --wavelet-decomposition-unit-test --wavelet={wavelet} --memory={memory} --dim={dim}" ]}
+      for wavelet in ["CDF20", "CDF22", "CDF40", "CDF42", "CDF44", "CDF60", "CDF62"]],
+
+    # ghost_nodes tests
+    # 2D
+    *[{"name": "ghost_nodes", "type": "wabbit-internal", "root_folder": "wavelets", "wavelet": wavelet, "dim": 2,
+       "groups": ["wabbit_internal", "ghost_nodes"],
+       "commands": ["{mpi_command} {run_dir}/wabbit-post --ghost-nodes-test --wavelet={wavelet} --memory={memory} --dim={dim} --Jmax=5"]}
+      for wavelet in ["CDF20", "CDF40", "CDF60", "CDF80"]],
+     # 3D
+    *[{"name": "ghost_nodes", "type": "wabbit-internal", "root_folder": "wavelets", "wavelet": wavelet, "dim": 3,
+       "groups": ["wabbit_internal", "ghost_nodes", "short"],
+       "commands": ["{mpi_command} {run_dir}/wabbit-post --ghost-nodes-test --wavelet={wavelet} --memory={memory} --dim={dim}"]}
+      for wavelet in ["CDF20", "CDF40", "CDF60"]],
+
+    # invertibility tests (2D only)
+    *[{"name": "invertibility", "type": "wabbit-internal", "root_folder": "wavelets", "wavelet": wavelet, "dim": 2,
+       "groups": ["wabbit_internal", "invertibility"] + (["short"] if wavelet in ["CDF20", "CDF22", "CDF40", "CDF42", "CDF60", "CDF62"] else []),
+       "commands": ["{mpi_command} {run_dir}/wabbit-post --wavelet-decomposition-invertibility-test --wavelet={wavelet} --memory={memory} --dim={dim} --Jmax=7"]}
+      for wavelet in ["CDF20", "CDF22", "CDF24", "CDF26", "CDF28", "CDF40", "CDF42", "CDF44", "CDF46", "CDF60", "CDF62", "CDF64", "CDF66", "CDF80", "CDF82"]],
+
+    # ===== SIMULATION TESTS =====
+    # Full simulation tests that produce HDF5 output files.
+    # These tests copy input files to a tmp/ directory, run the simulation,
+    # then compare the HDF5 output against reference files.
+    #"---simulation---",
+
+    # Adaptive mesh refinement tests
+    # These test the adaptive refine/coarsen functionality by starting with
+    # a coarse mesh (vor_000020000000.h5), refining it, then coarsening it back.
+    # Wavelet is parameterized via {wavelet} in the commands.
+    # Same idea as equidistant refine-coarsening test above, but on a non-equidistant grid.
+    *[{"name": f"adaptive_{wavelet}", "type": "simulation", "root_folder": "wavelets", "wavelet": wavelet, "dim": 2,
+       "groups": ["adaptive", "refine_coarsen", "short"],
+       "input_files": ["../vor_000020000000.h5"],
+       "commands": [ "{mpi_command} {run_dir}/wabbit-post --refine-everywhere vor_000020000000.h5 vor_00100.h5 --wavelet={wavelet} --time=1.0",
+                     "{mpi_command} {run_dir}/wabbit-post --coarsen-everywhere vor_00100.h5 vor_00200.h5 --wavelet={wavelet} --time=2.0",
+                     # remove input files after completion to not check these
+                     # for one wavelet (unlifted ones), we also test the refined solution (should be the same for all wavelets with the same interpolation order X of CDFXY)
+                     f"rm vor_000020000000.h5{' vor_00100.h5' if wavelet not in ['CDF20', 'CDF40', 'CDF60'] else ''}" ]}
+      for wavelet in ["CDF20", "CDF22", "CDF40", "CDF42", "CDF44", "CDF60", "CDF62"]],
+
+    "\n---Blob convection tests (convection module)---",
+    # Blob convection tests
+    # Test equispaced and adaptive mesh simulations with blob convection.
+    # These verify basic simulation setup and execution.
+    {"name": "blob_equi_2D_CDF40", "type": "simulation", "root_folder": "conv", "wavelet": 40, "dim": 2,
+        "groups": ["blob", "equi"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_equi_3D_CDF20", "type": "simulation", "root_folder": "conv", "wavelet": 20, "dim": 3,
+        "groups": ["blob", "equi", "short"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_equi_3D_CDF40", "type": "simulation", "root_folder": "conv", "wavelet": 40, "dim": 3,
+        "groups": ["blob", "equi", "short"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_equi_avg_2D_CDF40", "type": "simulation", "root_folder": "conv", "wavelet": 40, "dim": 2,
+        "groups": ["blob", "equi"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+
+    {"name": "blob_adaptive_2D_CDF20", "type": "simulation", "root_folder": "conv", "wavelet": 20, "dim": 2,
+        "groups": ["blob", "adaptive"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_adaptive_2D_CDF22", "type": "simulation", "root_folder": "conv", "wavelet": 22, "dim": 2,
+        "groups": ["blob", "adaptive"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_adaptive_2D_CDF40", "type": "simulation", "root_folder": "conv", "wavelet": 40, "dim": 2,
+        "groups": ["blob", "adaptive", "short"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_adaptive_2D_CDF42", "type": "simulation", "root_folder": "conv", "wavelet": 42, "dim": 2,
+        "groups": ["blob", "adaptive"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+
+    {"name": "blob_adaptive_3D_CDF40", "type": "simulation", "root_folder": "conv", "wavelet": 40, "dim": 3,
+            "groups": ["blob", "adaptive", "short"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+    {"name": "blob_adaptive_3D_CDF44", "type": "simulation", "root_folder": "conv", "wavelet": 44, "dim": 3,
+        "groups": ["blob", "adaptive", "short"], "input_files": ["*.ini"], "commands": ["{mpi_command} {run_dir}/wabbit blob-convection.ini --memory={memory}"]},
+
+    "\n---ACM tests, with and without penalization---",
+    # ACM (Adaptive Cartesian Mesh) cylinder tests
+    # Test cylindrical geometry simulations with different wavelet types.
+    # acm tests
+    {"name": "flowPastCylinder_FD4_CDF40", "type": "simulation", "root_folder": "acm/flowPastCylinder", "wavelet": 40, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder", "short"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+    {"name": "flowPastCylinder_FD4_CDF44", "type": "simulation", "root_folder": "acm/flowPastCylinder", "wavelet": 44, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder", "short"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+    {"name": "flowPastCylinder_threshold_norm", "type": "simulation", "root_folder": "acm/flowPastCylinder", "wavelet": 44, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+    {"name": "flowPastCylinder_significant_refinement", "type": "simulation", "root_folder": "acm/flowPastCylinder", "wavelet": 44, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+    {"name": "flowPastCylinder_nonquadratic_domain", "type": "simulation", "root_folder": "acm/flowPastCylinder", "wavelet": 40, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+
+    # Three vortices tests
+    # Test vortex interaction simulations with different finite difference orders (FD2, FD4, FD6)
+    # and both equispaced and adaptive meshes.
+    # 3vortices tests
+    {"name": "3vorticesEquiFD2_CDF20", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 20, "dim": 2,
+        "groups": ["acm", "3vortices", "equi"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesEquiFD4_CDF40", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 40, "dim": 2,
+        "groups": ["acm", "3vortices", "equi"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesEquiFD6_CDF60", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 60, "dim": 2,
+        "groups": ["acm", "3vortices", "equi"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+
+    {"name": "3vorticesAdaptFD2_CDF20", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 20, "dim": 2,
+        "groups": ["acm", "3vortices", "adaptive"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesAdaptFD2_CDF22", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 22, "dim": 2,
+        "groups": ["acm", "3vortices", "adaptive"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesAdaptFD4_CDF40", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 40, "dim": 2,
+        "groups": ["acm", "3vortices", "adaptive"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesAdaptFD4_CDF42", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 42, "dim": 2,
+        "groups": ["acm", "3vortices", "adaptive"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesAdaptFD6_CDF60", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 60, "dim": 2,
+        "groups": ["acm", "3vortices", "adaptive"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+    {"name": "3vorticesAdaptFD6_CDF62", "type": "simulation", "root_folder": "acm/3vortices", "wavelet": 62, "dim": 2,
+        "groups": ["acm", "3vortices", "adaptive"], "input_files": ["*_000010000000.h5", "*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_3vortices.ini --memory={memory}"]},
+
+    # Taylor-Green vortex tests
+    # Classic fluid dynamics benchmark: decaying vortex flow.
+    # Tests different finite difference orders with equispaced meshes.
+    # taylorGreen tests
+    {"name": "taylorGreenEqui_FD2_CDF20", "type": "simulation", "root_folder": "acm/taylorGreen", "wavelet": 20, "dim": 3,
+        "groups": ["acm", "taylorGreen", "equi"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_taylor_green.ini --memory={memory}"]},
+    {"name": "taylorGreenEqui_FD4_CDF40", "type": "simulation", "root_folder": "acm/taylorGreen", "wavelet": 40, "dim": 3,
+        "groups": ["acm", "taylorGreen", "equi"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_taylor_green.ini --memory={memory}"]},
+    {"name": "taylorGreenEqui_FD6_CDF60", "type": "simulation", "root_folder": "acm/taylorGreen", "wavelet": 60, "dim": 3,
+        "groups": ["acm", "taylorGreen", "equi"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_taylor_green.ini --memory={memory}"]},
+
+    # Bumblebee flow test
+    # Insect-scale fluid flow simulation with kinematics.
+    # bumblebeeFlowEquiFD4
+    {"name": "bumblebeeFlowEquiFD4_CDF40", "type": "simulation", "root_folder": "acm", "wavelet": 40, "dim": 3,
+        "groups": ["acm", "insects"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS.ini --memory={memory}"]},
+
+    "\n---Mask generation tests (dry runs)---",
+    # Dry run tests (insect flight simulations)
+    # These are quick validation tests that don't produce full simulation output.
+    # They verify the simulation setup without running the full computation.
+    # Used for testing various insect geometries and configurations.
+    {"name": "dry_fractal_tree_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+    {"name": "dry_bumblebee_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask", "short"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+    {"name": "dry_emundus_4wings_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_muscaComplete_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_dipteraFourier_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_dipteraHermite_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_dipteraBodyRotation_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_paratuposaComplete_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_butterflyKineloaderV2_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini", "*.kineloader", "*.superstl"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_3Dbristles_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+    # wing geometry models
+    {"name": "dry_Insects-Wing-Fourier", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned"]},
+    {"name": "dry_Insects-Wing-Linear", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned"]},
+    {"name": "dry_Insects-Wing-Polygon", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned"]},
+    {"name": "dry_Insects-Wing-BumblebeeHardcoded", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned"]},
+    {"name": "dry_Insects-Wing-FourierCorrugated", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned"]},
+    {"name": "dry_Insects-Wing-FourierDamaged", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned"]},
+    # kinematics
+    {"name": "dry_Insects-Kinematics-Fourier", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_Insects-Kinematics-Hermite", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_Insects-Kinematics-SuzukiHardcoded", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned --save-us"]},
+
+    {"name": "dry_Insects-CompleteModel-Dragonfly", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini","*.sstl"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_snowman_2D_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 2,
+        "groups": ["mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+    {"name": "dry_snowman_3D_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+        "groups": ["mask"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+]
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# EXECUTION
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+FAIL_COLOR = '\033[31;1m'
+PASS_COLOR = '\033[92;1m'
+END_COLOR = '\033[0m'
+
+
+def format_string(string, **kwargs):
+    """
+    Safely format a string with the given keyword arguments.
     
-    return process
+    This function attempts to format the string using the provided keyword arguments.
+    If a KeyError occurs (i.e., a placeholder in the string doesn't have a matching
+    keyword argument), it returns the original string unchanged instead of raising
+    an exception. This allows command templates to work even when some placeholders
+    are not applicable to all test types.
+    
+    Args:
+        string: The string to format, potentially containing {placeholders}
+        **kwargs: Keyword arguments to substitute into the string
+    
+    Returns:
+        The formatted string, or the original string if formatting fails
+    """
+    try:
+        return string.format(**kwargs)
+    except KeyError:
+        return string
 
-# this object defines a wabbit test
-class WabbitTest:
-    ini = test_name = wavelet = dim = mpi_command = memory = test_dir = cwd = run_dir = logger = None
-    valid = True  # check if something in initialization went wrong
 
-    # init the class itself
-    def __init__(self, ini=None, test_name=None, wavelet=None, dim=None, mpi_command="nice mpirun -n 8", memory="8.0GB", run_dir=None):
-        if run_dir == None: self.run_dir = os.getcwd()  # this should be the run directory
-        else: self.run_dir = os.path.abspath(run_dir)
-        self.ini = ini
-        self.test_name = test_name
-        self.wavelet = wavelet
-        self.dim = dim
-        self.mpi_command = mpi_command
-        self.memory = memory
+def run_wabbit_internal(test, mpi_command, memory, run_dir, verbose=False):
+    """
+    Run a wabbit-internal test.
+    
+    Wabbit-internal tests verify internal WABBIT wavelet operations without
+    running full simulations. They execute directly in the TESTING/{root_folder}/
+    directory and write output to a dedicated log file per test:
+    {name}_{dim}D_{wavelet}.log
+    
+    These tests are fast and don't require reference HDF5 files for comparison.
+    They typically test wavelet decomposition, reconstruction, and other core
+    wavelet operations.
+    
+    Args:
+        test: Test definition dictionary with name, type, root_folder, wavelet, dim, commands
+        mpi_command: MPI execution command (e.g., "nice mpirun -n 4")
+        memory: Memory allocation flag (e.g., "8.0GB")
+        run_dir: Path to the WABBIT directory containing the wabbit executable
+        verbose: If True, print command output to screen in addition to log file
+    
+    Returns:
+        subprocess.CompletedProcess: Result of the last command executed, or None if test dir not found
+    """
+    test_dir = os.path.join(run_dir, "TESTING", test["root_folder"])
+    log_file = os.path.join(test_dir, f'{test["name"]}_{test["dim"]}D_{test["wavelet"]}.log')
 
-        # define here where the test folder will be located relative to the run directory!
-        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "wavelets")
-        elif self.test_name == "adaptive":
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "wavelets", f"{self.test_name}_{self.wavelet}")
-        elif self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg"]:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "conv", f"{self.test_name}_{self.dim}D_{self.wavelet}")
-        elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"{self.test_name}_{self.wavelet}")
-        elif "3vortices" in self.test_name:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", "3vortices", f"{self.test_name}_{self.wavelet}")
-        elif "taylorGreen" in self.test_name:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", "taylorGreen", f"{self.test_name}_{self.wavelet}")
-        elif "bumblebeeFlowEquiFD4" in  self.test_name:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "acm", f"{self.test_name}_{self.wavelet}")
-        elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", 
-                                "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete",
-                                "dry_butterflyKineloaderV2", "dry_3Dbristles", "dry_snowman"]:
-            name = f"{self.test_name}_{self.wavelet}"
-            if self.test_name == "dry_snowman": name = f"{self.test_name}_{self.dim}D_{self.wavelet}"  # snowman has 3D and 2D version
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "insects", name)
-        elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
-            self.test_dir = os.path.join(self.run_dir, "TESTING", "cvs", f"{self.test_name}_{self.wavelet}")
+    if not os.path.isdir(test_dir):
+        print(f"    Skip: {test_dir} not found")
+        return None
+
+    with open(log_file, 'w') as log_f:
+        for command in test.get("commands", [test.get("command")]):
+            formatted_cmd = format_string(
+                command,
+                mpi_command=mpi_command,
+                memory=memory,
+                run_dir=run_dir,
+                wavelet=test.get("wavelet", ""),
+                name=test.get("name", ""),
+                dim=test.get("dim", "")
+            )
+            if verbose:
+                print(f"    {formatted_cmd}")
+            result = subprocess.run(formatted_cmd, shell=True, capture_output=True, text=True, cwd=test_dir)
+            if result.stdout:
+                log_f.write(result.stdout)
+            if result.stderr:
+                log_f.write(result.stderr)
+            if verbose:
+                print(result.stdout + result.stderr, end='')
+            if result.returncode != 0:
+                return result
+    return result
+
+
+def run_simulation(test, mpi_command, memory, run_dir, verbose=False, write_diff=False, keep_tmp=False):
+    """
+    Run a simulation test.
+    
+    Simulation tests run full WABBIT simulations that produce HDF5 output files.
+    The workflow is:
+    1. Remove existing tmp/ directory to discard old data
+    2. Create fresh tmp/ directory under TESTING/{root_folder}/{name}/
+    3. Copy input files from test directory to tmp/
+    4. Change to tmp/ directory
+    5. Log tmp/ directory contents
+    6. Execute all commands in tmp/
+    7. Compare HDF5 output files against reference files in test directory
+    8. Clean up tmp/ directory (unless keep_tmp=True or test failed)
+    
+    All command output and HDF5 comparison output is captured in log.txt.
+    
+    Args:
+        test: Test definition dictionary with name, type, root_folder, input_files, commands
+        mpi_command: MPI execution command
+        memory: Memory allocation flag
+        run_dir: Path to WABBIT directory
+        verbose: If True, print command output to screen
+        write_diff: If True, write difference files for failing HDF5 comparisons
+        keep_tmp: If True, keep tmp directory after test (also kept on failure)
+    
+    Returns:
+        subprocess.CompletedProcess: Result of the last command, or None if test dir not found
+    """
+    # Build paths: test directory, tmp directory, and log file
+    test_dir = os.path.join(run_dir, "TESTING", test["root_folder"], test["name"])
+    tmp_dir = os.path.join(test_dir, "tmp")
+    log_file = os.path.join(test_dir, "log.txt")
+
+    # Skip if test directory doesn't exist
+    if not os.path.isdir(test_dir):
+        print(f"    Skip: {test_dir} not found")
+        return None
+
+    # Remove existing tmp directory to start fresh (discard old data)
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    
+    # Create tmp directory for this test run
+    os.makedirs(tmp_dir, exist_ok=True)
+    original_dir = os.getcwd()
+
+    try:
+        # Copy all input files from test directory to tmp/
+        # Supports glob patterns like "*.kineloader" in input_files
+        for pattern in test.get("input_files", []):
+            source_pattern = os.path.join(test_dir, pattern)
+            for source_file in glob.glob(source_pattern):
+                if os.path.isfile(source_file):
+                    destination_file = os.path.join(tmp_dir, os.path.basename(source_file))
+                    shutil.copy2(source_file, destination_file)
+
+        # Run commands in tmp/ directory
+        os.chdir(tmp_dir)
+
+        # Open log file and write tmp/ contents for debugging
+        with open(log_file, 'w') as log_f:
+            log_f.write("tmp/ folder contents:\n")
+            for item in sorted(os.listdir(tmp_dir)):
+                log_f.write(f"  {item}\n")
+            log_f.write("\n")
+
+            for command in test.get("commands", [test.get("command")]):
+                formatted_cmd = format_string(
+                    command,
+                    mpi_command=mpi_command,
+                    memory=memory,
+                    run_dir=run_dir,
+                    wavelet=test.get("wavelet", ""),
+                    name=test.get("name", ""),
+                    dim=test.get("dim", "")
+                )
+                if verbose:
+                    print(f"    {formatted_cmd}")
+                result = subprocess.run(formatted_cmd, shell=True, capture_output=True, text=True)
+                if result.stdout:
+                    log_f.write(result.stdout)
+                if result.stderr:
+                    log_f.write(result.stderr)
+                if verbose:
+                    print(result.stdout + result.stderr, end='')
+                if result.returncode != 0:
+                    break
+
+            # Compare HDF5 files if commands succeeded
+            if result and result.returncode == 0:
+                try:
+                    log_f.write("\nHDF5 file comparison:\n")
+                    # Always use verbose=True for comparison so output goes to log
+                    if not compare_hdf5_files(test_dir, tmp_dir, True, write_diff, log_f):
+                        result.returncode = 1
+                except Exception as error:
+                    log_f.write(f"    Compare error: {error}\n")
+                    if verbose:
+                        print(f"    Compare error: {error}")
+                    result.returncode = 1
+
+        return result
+    finally:
+        # Always restore original directory
+        os.chdir(original_dir)
+        # Keep tmp dir if keep_tmp flag is set or if test failed
+        if not (keep_tmp or (result and result.returncode != 0)):
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def compare_hdf5_files(test_dir, tmp_dir, verbose=False, write_diff=False, log_f=None):
+    """
+    Compare all HDF5 output files against reference files.
+    
+    This function compares each HDF5 file produced in tmp_dir with its corresponding
+    reference file in test_dir. It uses the wabbit_tools.WabbitHDF5file class
+    to read both files and check if they are "close" (within numerical tolerance).
+    
+    If write_diff is True and files differ, a difference file (diff-{filename})
+    is written to the test directory for debugging.
+    
+    All comparison output (including any print statements from wabbit_tools)
+    is redirected to log_f if provided, otherwise printed to stdout/stderr.
+    
+    Args:
+        test_dir: Path to the test directory containing reference HDF5 files
+        tmp_dir: Path to tmp/ directory containing newly generated HDF5 files
+        verbose: If True, wabbit_tools functions produce verbose output
+        write_diff: If True, write difference files for mismatched comparisons
+        log_f: File handle to write comparison output to (optional)
+    
+    Returns:
+        bool: True if all files match, False if any comparison failed
+    """
+    all_ok = True
+    # Get all HDF5 files produced by the simulation
+    tmp_files = sorted(glob.glob(os.path.join(tmp_dir, "*.h5")))
+
+    # check if there are any HDF5 files to compare, otherwise something is wrong
+    if not tmp_files:
+        msg = "    No HDF5 output files found in tmp/ directory\n"
+        if log_f:
+            log_f.write(msg)
         else:
-            print("Unknown test name")
-            self.valid = False
-        if not os.path.isdir(self.test_dir):
-            print(f"Skipping a test. Test directory does not exist: {self.test_dir}")
-            self.valid = False
+            print(msg, end='')
+        return False
 
-        if self.valid:
-            os.chdir(self.test_dir)
+    for tmp_file in tmp_files:
+        filename = os.path.basename(tmp_file)
+        # Skip diff and new files (these are outputs from comparison, not simulation)
+        if filename.startswith("diff-") or filename.startswith("new-"):
+            continue
+        # Reference file should be in the test directory with same name
+        ref_file = os.path.join(test_dir, filename)
 
-
-    # actually run the test! Here new tests can be added, when working with ini-files, use the block with blob and acm and point to the correct ini file
-    def run(self, write_diff=False):
-        if self.test_name == "equi_refineCoarsen_FWT_IWT":
-            # change to directory
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --refine-coarsen-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --wavelet-decomposition-unit-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
-            result1 = run_command(command1, self.logger)
-            if result1.returncode != 0:
-                return result1
-            result2 = run_command(command2, self.logger)
-            return result2
-        
-        elif self.test_name == "ghost_nodes":
-            command = f"{self.mpi_command} {self.run_dir}/wabbit-post --ghost-nodes-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
-            result = run_command(command, self.logger)
-            return result
-        
-        elif self.test_name == "invertibility":
-            command = f"{self.mpi_command} {self.run_dir}/wabbit-post --wavelet-decomposition-invertibility-test --wavelet={self.wavelet} --memory={self.memory} --dim={self.dim}"
-            result = run_command(command, self.logger)
-            return result
-        
-        elif self.test_name == "adaptive":
-            in_file = os.path.join("..", "..", "vor_000020000000.h5")  # relative to tmp_dir
-            
-            # change to directory to tmp
-            tmp_dir = f"{self.test_dir}/tmp"
-            if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
-            os.chdir(tmp_dir)
-
-            # run commands
-            file1, file2 = "vor_00100.h5", "vor_00200.h5"
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --refine-everywhere \"{in_file}\" \"{file1}\" --wavelet={self.wavelet} --time=1.0"
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --coarsen-everywhere \"{file1}\" \"{file2}\" --wavelet={self.wavelet} --time=2.0"
-            result1 = run_command(command1, self.logger)
-            if result1.returncode != 0:
-                return result1
-            result2 = run_command(command2, self.logger)
-
-            # the refined file is quite data-heavy but always the same betweend different Y-wavelets if CDFXY. Let's just keep them and test them for unlifted wavelets!
-            if (self.wavelet not in ["CDF20", "CDF40", "CDF60"]):
-                os.remove("vor_00100.h5")
-
-            # compare all files present in test_dir
-            try:
-                all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
-                result2.returncode = not all_similar
-            # catch any error - for example HDF5 error - and then say the test failed
-            # this is important to still print the log (and continue)
-            except:
-                result2.returncode = 1
-
-            # change back to test_dir
-            os.chdir(self.test_dir)
-            return result2
-        elif "denoise" in self.test_name:
-            # change to directory to tmp
-            tmp_dir = f"{self.test_dir}/tmp"
-            if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
-            os.chdir(tmp_dir)
-
-            test_file = self.test_name.split("_")[1]
-
-            # define commands, the first creates the file to be denoised and the second actually does the denoising
-            denoise_file = f"../{test_file}.png"
-            denoise_h5 = f"./{test_file}.h5"
-            noise_add = "-n 10"if test_file == "grey" else ""  # grey file gets noise added on top
-            command1 = f"image2wabbit.py {denoise_file} -o {denoise_h5} --level 5 --bs 16 {noise_add}"  # image is already noisy so no extra noise is added
-            command2 = f"{self.mpi_command} {self.run_dir}/wabbit-post --denoise --files=\"{denoise_h5}\" --wavelet={self.wavelet} --memory={self.memory}"
-                        
-            # first, convert image to a valid wabbit file
-            result1 = run_command(command1, self.logger)
-            if result1.returncode != 0:
-                return result1
-            # now, denoise the file
-            result2 = run_command(command2, self.logger)
-
-            # # remove files which are not used for comparisons
-            # os.remove(denoise_h5)
-
-            # compare all files present in test_dir
-            try:
-                all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
-                result1.returncode = not all_similar
-            # catch any error - for example HDF5 error - and then say the test failed
-            # this is important to still print the log (and continue)
-            except Exception as e:
-                self.logger.error("ERROR: Was not able to compare files")
-                self.logger.error(e)
-                result1.returncode = 1
-
-            # change back to test_dir
-            os.chdir(self.test_dir)
-            return result1
-        
-        elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_dipteraBodyRotation", "dry_bumblebee", "dry_emundus_4wings", "dry_paratuposaComplete", "dry_butterflyKineloaderV2", "dry_3Dbristles", "dry_snowman"]:
-            ini_file = os.path.join("..", "PARAMS_dry_run.ini")  # relative to tmp_dir
-
-            # change to directory to tmp
-            tmp_dir = f"{self.test_dir}/tmp"
-            if not os.path.isdir(tmp_dir): os.mkdir(tmp_dir)
-            os.chdir(tmp_dir)
-
-            save_us = ""
-            if self.test_name in ["dry_emundus_4wings", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", 
-                                  "dry_dipteraBodyRotation", "dry_paratuposaComplete", "dry_butterflyKineloaderV2", "dry_3Dbristles"]:
-                save_us = "--save-us"
-
-            if self.test_name == "dry_butterflyKineloaderV2":
-                os.system( 'ln -s ../*.kineloader')
-                os.system( 'ln -s ../*.superstl')
-                os.system( 'ln -s ../singlewing.ini')
-            if self.test_name == "dry_bumblebee":
-                os.system('cp ../*.ini .')
-
-
-            # run simmulation
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit-post --dry-run {ini_file} --memory={self.memory} --pruned {save_us}"
-            result1 = run_command(command1, self.logger)
-
-            # compare all files present in test_dir
-            try:
-                all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
-                result1.returncode = not all_similar
-            # catch any error - for example HDF5 error - and then say the test failed
-            # this is important to still print the log (and continue)
-            except Exception as e:
-                self.logger.error("ERROR: Was not able to compare files")
-                self.logger.error(e)
-                result1.returncode = 1
-
-            # change back to test_dir
-            os.chdir(self.test_dir)
-            return result1
-        
-        # this part is meant for any tests which simply call an ini file, just provide the ini-file in the beginning and the rest is handled automatically
-        elif self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg", "acm", "acm_norm", "acm_significant", "bumblebeeFlowEquiFD4"] or "3vortices" in self.test_name or "taylorGreen" in self.test_name:
-            # lets say where the ini-file is
-            if self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg"]:
-                ini_file = os.path.join("..", "blob-convection.ini")  # relative to tmp_dir
-            elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
-                ini_file = os.path.join("..", "acm_cyl.ini")  # relative to tmp_dir
-            elif "3vortices" in self.test_name:
-                ini_file = os.path.join("..", "PARAMS_3vortices.ini")  # relative to tmp_dir
-            elif "taylorGreen" in self.test_name:
-                ini_file = os.path.join("..", "PARAMS_taylor_green.ini")  # relative to tmp_dir
-            elif "bumblebeeFlowEqui" in self.test_name:
-                ini_file = os.path.join("..", "PARAMS.ini")  # relative to tmp_dir
-
-            # change to directory to tmp
-            tmp_dir = f"{self.test_dir}/tmp"
-            if not os.path.isdir(tmp_dir): 
-                os.mkdir(tmp_dir)
+        # Check if reference file exists
+        if not os.path.isfile(ref_file):
+            msg = f"    No reference file for {filename}\n"
+            if log_f:
+                log_f.write(msg)
             else:
-                os.system( "rm -rf %s" % (tmp_dir) )
-                os.mkdir(tmp_dir)
-            os.chdir(tmp_dir)
+                print(msg, end='')
+            all_ok = False
+            continue
 
-            if "3vortices" in self.test_name:
-                os.system("cp ../ux_000010000000.h5 .")
-                os.system("cp ../uy_000010000000.h5 .")
-                os.system("cp ../p_000010000000.h5 .")
-            if "bumblebeeFlowEqui" in self.test_name:
-                os.system("cp ../bumblebee_new_kinematics.ini .")
+        try:
+            # Create WabbitHDF5file objects for reference and new output
+            state_ref = wabbit_tools.WabbitHDF5file()
+            state_new = wabbit_tools.WabbitHDF5file()
             
-            # run simmulation
-            command1 = f"{self.mpi_command} {self.run_dir}/wabbit {ini_file} --memory={self.memory}"
-            result1 = run_command(command1, self.logger)
-
-            # compare all files present in test_dir
-            try:
-                all_similar = self.compare_files(tmp_dir, write_diff=write_diff)
-                result1.returncode = not all_similar
-            # catch any error - for example HDF5 error - and then say the test failed
-            # this is important to still print the log (and continue)
-            except Exception as e:
-                self.logger.error("ERROR: Was not able to compare files")
-                self.logger.error(e)
-                result1.returncode = 1
-
-            # change back to test_dir
-            os.chdir(self.test_dir)
-            return result1
-        else:
-            self.logger.error("Not implemented yet")
-            return False
-    
-
-    # I want to log at the same time to the console and possibly files as well, so I solve this with the logging module which handles the streams
-    # for a new test the log-file location needs to be specified
-    def init_logging(self, verbose=False, suite_log_handler=None, stdout_handler=None):
-        self.log_file = None
-        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
-            self.log_file = os.path.join(self.test_dir, f"{self.test_name}_{self.dim}D_{self.wavelet}.log")
-        elif self.test_name == "adaptive":
-            self.log_file = os.path.join(self.test_dir, "run.log")
-        elif self.test_name in ["blob_equi", "blob_adaptive", "blob_equi_avg"]:
-            self.log_file = os.path.join(self.test_dir, "blob-convection.log")
-        elif self.test_name in ["acm", "acm_norm", "acm_significant"]:
-            self.log_file = os.path.join(self.test_dir, "acm_cyl.log")
-        elif self.test_name in ["dry_fractal_tree", "dry_muscaComplete", "dry_dipteraFourier", "dry_dipteraHermite", "dry_bumblebee", 
-                                "dry_emundus_4wings", "dry_dipteraBodyRotation", "dry_paratuposaComplete", "dry_butterflyKineloaderV2", "dry_3Dbristles", "dry_snowman"]:
-            self.log_file = os.path.join(self.test_dir, "dry_run.log")
-        elif self.test_name in ["denoise_butterfly", "denoise_grey"]:
-            self.log_file = os.path.join(self.test_dir, "denoise.log")
-        else:
-            self.log_file = os.path.join(self.test_dir, "test.log")
-        
-        open(self.log_file, 'w').close()  # Clear the log file at the beginning
-        # Set up logging for runs, which writes to different log file and with verbose to test log file and stdout as well
-        self.logger = logging.getLogger("logger_run")
-        self.logger.setLevel(logging.INFO)
-        test_log_handler = logging.FileHandler(self.log_file, mode='a')
-        test_log_handler.setFormatter(logging.Formatter('%(message)s'))
-        self.logger.handlers = []
-        self.logger.addHandler(test_log_handler)
-        if verbose:
-            self.logger.addHandler(suite_log_handler)
-            self.logger.addHandler(stdout_handler)
-
-
-    # remove residual files and possibly overwrite reference results
-    def clean_up(self, replace=False, keep_tmp=False, logger=logger):
-        if self.test_name in ["equi_refineCoarsen_FWT_IWT", "ghost_nodes", "invertibility"]:
-            # remove files - only .dat files are created
-            if not keep_tmp:
-                for file in glob.glob("*.dat"):
-                    os.remove(file)
-        else:
-            if replace:
-                # remove all old files
-                for file in glob.glob(os.path.join(self.test_dir, "*.h5")):
-                    os.remove(file)
-                    logger.info(f"   Del  ref file: {file}")
-                # copy over new files, we are currently in tmp folder
-                for file in glob.glob(os.path.join(self.test_dir, "tmp", "*.h5")):
-                    shutil.copy(file, os.path.join(self.test_dir, os.path.split(file)[1]))
-                    logger.info(f"   Copy new file: {file}")
-                    logger.info(f"         to file: {os.path.join(self.test_dir, os.path.split(file)[1])}")
-            if not keep_tmp:
-                shutil.rmtree(os.path.join(self.test_dir, "tmp"))
-        
-        # change back to directory where we were
-        os.chdir(self.run_dir)
-
-
-    # takes every reference file in the test folder and tries to compare it to available test results in tmp folder
-    def compare_files(self, tmp_dir, verbose=True, write_diff=False):
-        tmp_files = glob.glob(os.path.join(tmp_dir, "*.h5"))
-        tmp_split = [os.path.split(i_file)[1] for i_file in tmp_files]
-        all_similar = True
-        if verbose:
-            self.logger.info("\n" * 10 + "=" * 80 + "\nRun done, analyzing results now\n" + "=" * 80 + "\n" * 10)
-        happy, sad = 0, 0  # count the number of tests
-        for file in sorted(glob.glob(os.path.join(self.test_dir, "*.h5"))):
-                file_split = os.path.split(file)[1]
-                if file_split in tmp_split:
-                    t_compare_s = time.time()
-                    if verbose:
-                        self.logger.info("*" * 80 + "\nComparing wabbit HDF5 files")
-                        self.logger.info(f"Reference file (1) = {os.path.join(self.test_dir, file_split)}")
-                        self.logger.info(f"Test result    (2) = {os.path.join(tmp_dir, file_split)}")
-
-                    state_ref = wabbit_tools.WabbitHDF5file()
-                    state_ref.read(file, verbose=False)
-                    state_new = wabbit_tools.WabbitHDF5file()
-                    state_new.read(os.path.join(tmp_dir, file_split), verbose=False)
-
-                    bool_similar = state_ref.isClose(state_new, verbose=verbose, logger=self.logger)
-                    if not bool_similar:
-                        all_similar = False
-                        sad += 1
-                    else: happy += 1
-
-                    # this is to be able to visualize the difference
-                    if not bool_similar and write_diff:
+            # Read and compare files, redirecting all output to log if provided
+            if log_f:
+                with contextlib.redirect_stdout(log_f), contextlib.redirect_stderr(log_f):
+                    # Read both files - these may produce verbose output
+                    state_ref.read(ref_file, verbose=verbose)
+                    state_new.read(tmp_file, verbose=verbose)
+                    # Check if states are close (within numerical tolerance)
+                    if not state_ref.isClose(state_new, verbose=verbose):
+                        all_ok = False
+                        # Write difference file if requested
+                        if write_diff:
+                            state_diff = state_ref - state_new
+                            state_diff.write(os.path.join(test_dir, f"diff-{filename}"))
+            else:
+                state_ref.read(ref_file, verbose=verbose)
+                state_new.read(tmp_file, verbose=verbose)
+                if not state_ref.isClose(state_new, verbose=verbose):
+                    all_ok = False
+                    if write_diff:
                         state_diff = state_ref - state_new
-                        state_diff.write(os.path.join(self.test_dir, "diff-" + file_split))
-                        # state_new_int = (state_ref * 0) + state_new  # sneaky way to interpolate w_obj2 grid onto w_obj_new
-                        # state_new_int.write(os.path.join(self.test_dir, "new-" + file_split))
-                    
-                    if verbose:
-                        t_compare = time.time() - t_compare_s 
-                        self.logger.info(f"Finished comparison. Time= {t_compare:7.3f} s\n")
-                # file is not present in tmp directory
-                else:
-                    # it could start with "new" or "diff" - this is likely a debug file used for visualization so lets skip it
-                    if file_split.startswith("new") or file_split.startswith("diff"): continue
+                        state_diff.write(os.path.join(test_dir, f"diff-{filename}"))
+        except Exception as error:
+            msg = f"    Error comparing {filename}: {error}\n"
+            if log_f:
+                log_f.write(msg)
+            else:
+                print(msg, end='')
+            all_ok = False
 
-                    self.logger.info("*" * 80 + "\nComparing wabbit HDF5 files")
-                    self.logger.info(f"Reference file (1) = {os.path.join(self.test_dir, file_split)}")
-                    self.logger.info(f"ERROR: file not found for test result")
-                    all_similar = False
-                    sad += 1
+    # check if any hdf5 file from the reference is missing
+    ref_files = sorted(glob.glob(os.path.join(test_dir, "*.h5")))
+    for ref_file in ref_files:
+        # Skip diff and new files (these are outputs from comparison, not simulation)
+        if os.path.basename(ref_file).startswith(("diff-", "new-")):
+            continue
 
-        # write summary
-        self.logger.info(f"\nFinished {happy+sad} tests")
-        self.logger.info(f"\tHappy tests: {happy:2d} :)")
-        self.logger.info(f"\t  Sad tests: {sad:2d} :(")
-        return all_similar
+        # Check if the corresponding output file exists in tmp
+        tmp_file = os.path.join(tmp_dir, os.path.basename(ref_file))
+        if not os.path.isfile(tmp_file):
+            msg = f"    Missing output file for reference {os.path.basename(ref_file)}\n"
+            if log_f:
+                log_f.write(msg)
+            else:
+                print(msg, end='')
+            all_ok = False
 
+    return all_ok
+
+
+def iter_tests_with_headers(tests):
+    """Yield (section_header, test_dict) pairs, skipping the header strings themselves."""
+    header = None
+    for item in tests:
+        if isinstance(item, str):
+            header = item.strip()
+            continue
+        yield header, item
+
+
+def test_matches(test, name_patterns, group_patterns):
+    """Check whether a test matches the requested -t/-g filters (wildcards via fnmatch)."""
+    if name_patterns and not any(fnmatch.fnmatch(test["name"], pat) for pat in name_patterns):
+        return False
+    if group_patterns:
+        test_groups = test.get("groups", [])
+        if not any(fnmatch.fnmatch(group, pat) for group in test_groups for pat in group_patterns):
+            return False
+    return True
+
+
+def print_test_catalog(tests):
+    """Print all available tests grouped by section header, and all known groups."""
+    printed_header = None
+    all_groups = set()
+
+    grouped_by_name = itertools.groupby(iter_tests_with_headers(tests), key=lambda h_t: (h_t[0], h_t[1]["name"]))
+    for (header, name), entries in grouped_by_name:
+        entries = list(entries)
+        test_groups = entries[0][1].get("groups", [])
+        all_groups.update(test_groups)
+
+        if header != printed_header:
+            print(f"\n{header}")
+            printed_header = header
+
+        variant_info = f"  ({len(entries)} variants)" if len(entries) > 1 else ""
+        groups_info = f"  [{', '.join(test_groups)}]" if test_groups else ""
+        print(f"  {name}{variant_info}{groups_info}")
+
+    print("\nAvailable groups:")
+    for group in sorted(all_groups):
+        print(f"  {group}")
 
 
 def main():
+    """
+    Main entry point for running WABBIT tests.
+    
+    This function:
+    1. Parses command-line arguments for MPI configuration, memory, etc.
+    2. Validates that the wabbit executable exists
+    3. Iterates through all test definitions and runs them
+    4. Prints colored PASS/FAIL/SKIP status for each test
+    5. Prints summary statistics at the end
+    
+    Test execution order follows the order in the `tests` list.
+    String separators (starting with "---") are printed but not executed.
+    
+    Color coding:
+    - Green: PASS (test completed successfully)
+    - Red: FAIL (test failed or comparison mismatch)
+    - Red: SKIP (test directory not found)
+    
+    For failing tests, the path to the log file is printed to help with debugging.
+    """
     parser = argparse.ArgumentParser(description='Run WABBIT unit tests.')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Print output of test directly to screen')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Print test output to screen')
     mpi_group = parser.add_mutually_exclusive_group()
-    mpi_group.add_argument('--nprocs', type=int, default=4, help='Number of processors, default is 4')
-    mpi_group.add_argument('--mpi_command', type=str, default=None, help=r'MPI command, default is "nice mpirun -n {nprocs}"')
-    parser.add_argument('--memory', type=str, default='8.0GB', help='Memory flag, default is \"8.0GB\"')
-    parser.add_argument('--test', type=str, default="all", help="Specific test to run, provide \"NAME-DIM-WAVELET\". You can also provide \"all\" or a specific group")
-    # parser.add_argument('--print_test', action='store_true', help="Print output of test directly to screen")
-    rep_group = parser.add_mutually_exclusive_group()
-    rep_group.add_argument('--replace', action='store_true', help="Replace reference values with results")
-    rep_group.add_argument('--replace-fail', action='store_true', help="Replace reference values with results only for failing tests")
-    parser.add_argument('--keep-tmp', action="store_true", help="Do not delete the temporary directories to investigate files")
-    parser.add_argument('--write-diff', action="store_true", help="Write the difference between reference and deviating new results to a file. Could be possibly interpolated")
-    parser.add_argument('--wabbit-dir', type=str, default=None, help="Location to where WABBIT is located to run the tests if not in present directory")
+    mpi_group.add_argument('--nprocs', type=int, default=4, help='Number of processors (default: 4)')
+    mpi_group.add_argument('--mpi_command', type=str, default=None, help='MPI command (default: "nice mpirun -n {nprocs}")')
+    parser.add_argument('--memory', type=str, default='8.0GB', help='Memory flag (default: "8.0GB")')
+    parser.add_argument('--write-diff', action='store_true', help='Write difference files for failing tests')
+    parser.add_argument('--wabbit-dir', type=str, default=None, help='Directory containing wabbit executable')
+    parser.add_argument('--keep-tmp', action='store_true', help='Keep tmp directories for all simulation tests')
+    parser.add_argument('--update-failed-tests', action='store_true', help='Update reference data for failed simulation tests')
+    parser.add_argument('--list', action='store_true', help='List all available tests and groups, then exit')
+    parser.add_argument('-t', '--tests', nargs='+', default=None, metavar='NAME',
+                         help='Run only tests matching these names (wildcards allowed, e.g. "blob_*")')
+    parser.add_argument('-g', '--groups', nargs='+', default=None, metavar='GROUP',
+                         help='Run only tests belonging to these groups (see --list, wildcards allowed)')
     args = parser.parse_args()
 
-    nprocs = args.nprocs
-    mpi_command = args.mpi_command or f"nice mpirun -n {nprocs}"
+    if args.list:
+        print_test_catalog(tests)
+        return
+
+    mpi_command = args.mpi_command or f"nice mpirun -n {args.nprocs}"
     memory = args.memory
+    run_dir = os.path.abspath(args.wabbit_dir) if args.wabbit_dir else os.getcwd()
 
-    # check run directory
-    if args.wabbit_dir == None: args.wabbit_dir = os.getcwd()  # this should be the run directory
-    else: args.wabbit_dir = os.path.abspath(args.wabbit_dir)
-    # check if we can access wabbit-post
-    executable = shutil.which(os.path.join(args.wabbit_dir, "wabbit"))
-    if executable is None:
-        logging.error(f"ERROR: Did not find wabbit executable in wabbit_dir: {args.wabbit_dir}")
+    # Validate wabbit executable exists
+    if not os.path.isfile(os.path.join(run_dir, "wabbit")):
+        print(f"ERROR: wabbit executable not found in {run_dir}")
         sys.exit(1)
-    
-    # Set up logging for general output
-    # this at the same time writes to the log file and to stdout
-    log_total = os.path.join(args.wabbit_dir, "TESTING", "test.log")
-    open(log_total, 'w').close()  # Clear the log file at the beginning
-    logger_suite = logging.getLogger("logger_suite")
-    logger_suite.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(message)s')
-    suite_log_handler = logging.FileHandler(log_total, mode='a')
-    suite_log_handler.setFormatter(formatter)
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(formatter)
-    logger_suite.addHandler(suite_log_handler)
-    logger_suite.addHandler(stdout_handler)
 
-    # check if user actually wants to replace test results
-    if args.replace or args.replace_fail:
-        response = input("Are you REALLY sure you want to reset all or some reference results? (yes/no): ").strip().lower()
-        if response in ['yes', 'y']:
-            logger_suite.info("Going to replace all or some reference results!")
-        else:
-            logger_suite.info("Ok alright, I understand. I also often do not know what I am doing so come back once you know that it's the right time.")
-            sys.exit()
+    print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print(f"         WABBIT unit testing ")
+    print(f"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
-    # run all tests
-    group_run = "all"  # init group variable
-    if args.test == "all":
-        tests_run = tests
-        logger_suite.info(f"\n\t{underline}WABBIT: run all existing unit tests{end_color}\n")
-    # run a group of tests only
-    elif args.test in group_names:
-        group_run = args.test
-        tests_run = tests  # we will check later what tests to run from this group
-    else:
-        # check if this test exists
-        test_parts = args.test.split("-")
-        if len(test_parts) != 3:
-            test_exists = False
-        # replace D in dimension entry if it was provided
-        try:
-            test_parts[1] = test_parts[1].replace("D", "")
-            test_dict = {"test_name":test_parts[0], "wavelet": test_parts[2], "dim": int(test_parts[1])}
-            test_exists = test_dict in tests
-        except: test_exists = False
+    # Print configuration for verification
+    print(f"Configuration:")
+    print(f"  MPI command: {mpi_command}")
+    print(f"  Memory: {memory}")
+    print(f"  WABBIT directory: {run_dir}")
+    print()
 
-        if test_exists:
-            logger_suite.info(f"\n\t \033[4m WABBIT: run existing unit test {args.test} \033[0m\n")
-            tests_run = [test_dict]
-        else:
-            logger_suite.error(f"ERROR: {args.test} is not a valid unit test or group of tests")
-            sys.exit(1)
+    # Select tests according to -t/--tests and -g/--groups (both default to "run everything")
+    selected_tests = [(header, test_item) for header, test_item in iter_tests_with_headers(tests)
+                       if test_matches(test_item, args.tests, args.groups)]
 
-    happy_sum = 0
-    sad_sum = 0
-    summary = []
+    if not selected_tests:
+        print("No tests matched the given --tests/--groups filters.")
+        return
 
-    # give user some information
-    logger_suite.info(f"employed command for parallel exec: {mpi_command}")
-    logger_suite.info(f"memory flag for wabbit is: {memory}\n")
-
+    happy_count = 0  # Number of passed tests
+    sad_count = 0     # Number of failed or skipped tests
     start_time = time.time()
+    printed_header = None
 
-    group_now = ""
-    for ts in tests_run:
-        if isinstance(ts, str):
-            if ts.startswith("---"):
-                group_now = ts.replace("-", "")
-                if group_run == "all" or group_now == group_run: print(ts)
+    # Iterate through the selected test definitions
+    for header, test_item in selected_tests:
+        # Print the section header once, the first time a selected test appears under it
+        if header != printed_header:
+            print(header)
+            printed_header = header
+
+        # Extract test metadata for display
+        test_name = test_item.get("name", "?")
+        test_type = test_item.get("type", "?")
+        test_wavelet = test_item.get("wavelet", "-----")
+        test_dim = test_item.get("dim", "-")
+        
+        # Print test info: name (of specific length) wavelet=... dim=...D
+        print(f"  {test_name:<40} wavelet={test_wavelet} dim={test_dim}D ", end="")
+
+        test_start = time.time()
+        
+        # Dispatch to appropriate test runner based on type
+        if test_type == "wabbit-internal":
+            result = run_wabbit_internal(test_item, mpi_command, memory, run_dir, verbose=args.verbose)
+        elif test_type == "simulation":
+            result = run_simulation(test_item, mpi_command, memory, run_dir, verbose=args.verbose, write_diff=args.write_diff, keep_tmp=args.keep_tmp)
         else:
-            # cycle if this is not part of the group we want to check
-            if group_run != "all" and group_now != group_run: continue
+            result = None  # Unknown test type - will be counted as SKIP
 
-            # build test object
-            test_obj = WabbitTest(test_name=ts["test_name"], dim=ts["dim"], wavelet=ts["wavelet"], mpi_command=mpi_command, memory=memory, run_dir=args.wabbit_dir)
-            if test_obj.valid == False: continue  # in case initialization did not work out
+        elapsed = time.time() - test_start
 
-            # create logger for this specific test
-            test_obj.init_logging(verbose=args.verbose, suite_log_handler=suite_log_handler, stdout_handler=stdout_handler)
-            # print some infos to console about this test, disable line-break so that it looks nice
-            for i_handler in logger_suite.handlers: i_handler.terminator = ""
-            logger_suite.info(f"Test= {ts['test_name']:<50}wavelet={ts['wavelet']} dim={ts['dim']}D")
-            for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
-
-            ts_start_time = time.time()
-            result = test_obj.run(write_diff=args.write_diff)
-            ts_end_time = time.time() - ts_start_time
-
-            for i_handler in logger_suite.handlers: i_handler.terminator = ""
-            if isinstance(result, subprocess.Popen):
-                # write output to console, make it a bit fancy
-                if result.returncode == 0:
-                    print(f"{pass_color}", end="")  # this only works for console
-                    logger_suite.info(f"\tPass ")
-                    happy_sum += 1
-                    summary.append(0)
-                else:
-                    print(f"{fail_color}", end="")  # this only works for console
-                    logger_suite.info(f"\tFail ")
-                    sad_sum += 1
-                    summary.append(1)
-
-                for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
-                print(f"{end_color}", end="")  # this only works for console                    
-                logger_suite.info(f"\tTime= {ts_end_time:7.3f} s")
-
-                if result.returncode != 0:
-                    # test failed, provide direct link to log file
-                    print(f"{end_color}", end="")  # this only works for console  
-                    logger_suite.info(f"logfile: \t"+test_obj.log_file+"\n")
+        # Classify and count test results
+        if result is None:
+            # Test directory not found - test was skipped
+            print(f"{FAIL_COLOR}SKIP{END_COLOR} ({elapsed:.1f}s)")
+            sad_count += 1
+        elif result.returncode == 0:
+            # All commands succeeded and HDF5 comparison passed (if applicable)
+            print(f"{PASS_COLOR}PASS{END_COLOR} ({elapsed:.1f}s)")
+            happy_count += 1
+        else:
+            # Command failed or HDF5 comparison failed
+            print(f"{FAIL_COLOR}FAIL{END_COLOR} ({elapsed:.1f}s)")
+            sad_count += 1
+            # Print log file path for debugging
+            if test_type == "simulation":
+                print(f"    Log: {os.path.join(run_dir, 'TESTING', test_item['root_folder'], test_item['name'], 'log.txt')}")
             else:
-                print(f"{fail_color}", end="")  # this only works for console
-                logger_suite.info(f"\tFail ")
-                print(f"{end_color}", end="")  # this only works for console   
+                log_name = f"{test_item['name']}_{test_item['dim']}D_{test_item['wavelet']}.log"
+                print(f"    Log: {os.path.join(run_dir, 'TESTING', test_item['root_folder'], log_name)}")
 
-                for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
-                logger_suite.info(f"\tTest was not executed")
-
-            # remove temporary dir and replace reference results if wanted
-            if args.replace_fail:
-                test_obj.clean_up(replace=(result.returncode != 0), keep_tmp=args.keep_tmp, logger=logger_suite)
-            else:
-                test_obj.clean_up(replace=args.replace, keep_tmp=args.keep_tmp, logger=logger_suite)
-            
-
+    # Print summary
     total_time = time.time() - start_time
-    logger_suite.info(f"\nFinished all tests. Time= {total_time:7.3f} s\n")
+    print()
+    print(f"Results: {PASS_COLOR}{happy_count} passed{END_COLOR}, {FAIL_COLOR}{sad_count} failed{END_COLOR} in {total_time:.1f}s")
 
-    # give a little summary
-    logger_suite.info(f"All in all we have:")
-    for i_handler in logger_suite.handlers: i_handler.terminator = ""
-    logger_suite.info(f"\t")
-    for i_res in summary:
-        if i_res==0:
-            print(f"{pass_color}", end="")  # this only works for console
-            logger_suite.info(f"O")
+    # Handle --update-failed-tests: update reference data for failed simulation tests
+    if args.update_failed_tests:
+        print("\n" + "=" * 70)
+        print("UPDATE FAILED TESTS MODE")
+        print("=" * 70)
+        print("The following simulation tests failed and have tmp/ directories remaining.")
+        print("You can update their reference data with the output from this run.")
+        print()
+        
+        # Collect failed simulation tests with tmp dirs
+        failed_sim_tests = []
+        for header, test_item in selected_tests:
+            if isinstance(test_item, str):
+                continue
+            if test_item.get("type") == "simulation":
+                test_dir = os.path.join(run_dir, "TESTING", test_item["root_folder"], test_item["name"])
+                tmp_dir = os.path.join(test_dir, "tmp")
+                if os.path.exists(tmp_dir):
+                    failed_sim_tests.append(test_item)
+        
+        if not failed_sim_tests:
+            print("No failed simulation tests with tmp/ directories found.")
         else:
-            print(f"{fail_color}", end="")  # this only works for console
-            logger_suite.info(f"X")
-        print(f"{end_color}", end="")  # this only works for console                    
-    for i_handler in logger_suite.handlers: i_handler.terminator = "\n"
+            print(f"Found {len(failed_sim_tests)} failed simulation test(s) with tmp/ directories:")
+            print()
+            
+            for test_item in failed_sim_tests:
+                test_name = test_item.get("name", "?")
+                test_dir = os.path.join(run_dir, "TESTING", test_item["root_folder"], test_item["name"])
+                tmp_dir = os.path.join(test_dir, "tmp")
+                
+                print(f"  Test: {test_name}")
+                print(f"    tmp dir: {tmp_dir}")
+                print(f"    Reference dir: {test_dir}")
+                
+                # Only simulation-output HDF5 files are reference data.  Do
+                # not update or delete diagnostic diff-/new- files.
+                h5_files = [
+                    path for path in sorted(glob.glob(os.path.join(tmp_dir, "*.h5")))
+                    if not os.path.basename(path).startswith(("diff-", "new-"))
+                ]
+                reference_h5_files = [
+                    path for path in sorted(glob.glob(os.path.join(test_dir, "*.h5")))
+                    if not os.path.basename(path).startswith(("diff-", "new-"))
+                ]
+                output_names = {os.path.basename(path) for path in h5_files}
+                stale_reference_files = [
+                    path for path in reference_h5_files
+                    if os.path.basename(path) not in output_names
+                ]
+                if h5_files:
+                    print(f"    HDF5 files to update: {len(h5_files)}")
+                    for f in h5_files:
+                        print(f"      - {os.path.basename(f)}")
+                else:
+                    print(f"    No HDF5 files found in tmp/")
 
-    print(f"{pass_color}", end="")  # this only works for console
-    logger_suite.info(f"\n\n\t   sum happy tests:\t{happy_sum}")
-    print(f"{fail_color}", end="")  # this only works for console
-    logger_suite.error(f"\t   sum sad tests:\t{sad_sum}")
-    print(f"{end_color}", end="")  # this only works for console                    
+                if stale_reference_files:
+                    print(f"    Stale reference HDF5 files to delete: {len(stale_reference_files)}")
+                    for f in stale_reference_files:
+                        print(f"      - {os.path.basename(f)}")
+                
+                # Ask for confirmation before overwriting or deleting reference data.
+                response = input("    Replace the listed references and delete the listed stale references? [yes/no]: ").strip().lower()
+                if response in ["yes", "y"]:
+                    updated_count = 0
+                    for h5_file in h5_files:
+                        dest = os.path.join(test_dir, os.path.basename(h5_file))
+                        shutil.copy2(h5_file, dest)
+                        updated_count += 1
+                    deleted_count = 0
+                    for reference_file in stale_reference_files:
+                        os.remove(reference_file)
+                        deleted_count += 1
+                    print(f"    Updated {updated_count} reference file(s); deleted {deleted_count} stale reference file(s)")
+                    # Clean up tmp dir after updating
+                    if os.path.exists(tmp_dir):
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                else:
+                    print(f"    Skipped updating {test_name}")
+                print()
 
 
 if __name__ == "__main__":

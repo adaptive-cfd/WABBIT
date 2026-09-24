@@ -14,8 +14,6 @@ subroutine ini_file_to_params( params, filename )
    type(inifile)                                   :: FILE
    ! maximum memory available on all cpus
    real(kind=rk)                                   :: maxmem, mem_per_block, nstages
-   ! string read from command line call
-   character(len=cshort)                           :: memstring
    integer(kind=ik)                                :: d,i, Nblocks_Jmax, g, N_files, Nrk, g_RHS_min, diff_L, diff_R, Bs(1:3)
    ! some parameters for checking ghost node sizes with FD discretization
    real(kind=rk), allocatable                      :: filter_dummy(:)
@@ -227,6 +225,9 @@ subroutine ini_file_to_params( params, filename )
    ! However, for very large grids (>50k blocks) the loadbalance will become very expensive. As experimental feature, we can do only loadbalance 1) and 2), as 3) only concerns saving.
    call read_param_mpi(FILE, 'Debug', 'no_loadbalance_after_adapt_tree', params%no_loadbalance_after_adapt_tree, .false.)
 
+   ! save data before adapt_tree instead of afterwards for debugging purposes
+   call read_param_mpi(FILE, 'Debug', 'save_data_before_adapt_tree', params%save_data_before_adapt_tree, .false.)
+
    ! Hack.
    ! Small ascii files are written with the module_t_files, which is just a buffered wrapper.
    ! Instead of directly dumping the files to disk, it collects data and flushes after "flush_frequency"
@@ -389,6 +390,18 @@ subroutine ini_domain(params, FILE )
    params%domain_size=(/ 1.0_rk, 1.0_rk, 0.0_rk /) !default
    call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
       params%domain_size(1:params%dim) )
+   
+   params%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
+   call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params%domain_cropping_min(1:params%dim), params%domain_cropping_min(1:params%dim) )
+   if ( any(params%domain_cropping_min(1:params%dim) < 0.0_rk) .or. any(params%domain_cropping_min(1:params%dim) >= 1.0_rk) ) then
+      call abort(92841123, "Get your crowbar: the arrays for domain_cropping_min are outside the valid range [0, 1].")
+   endif
+
+   params%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
+   call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params%domain_cropping_max(1:params%dim), params%domain_cropping_max(1:params%dim) )
+   if ( any(params%domain_cropping_max(1:params%dim) - params%domain_cropping_min(1:params%dim) <= 0.0_rk) .or. any(params%domain_cropping_max(1:params%dim) > 1.0_rk) ) then
+      call abort(92841123, "Get your crowbar: the arrays for domain_cropping_max are outside the valid range [domain_cropping_min, 1].")
+   endif
 
    params%periodic_BC = .true.
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )
@@ -415,7 +428,7 @@ subroutine ini_blocks(params, FILE )
    type(inifile) ,intent(inout)     :: FILE
    !> params structure of WABBIT
    type(type_params),intent(inout)  :: params
-   integer(kind=ik) :: i, g_default, g_RHS_default, CDFX, CDFY
+   integer(kind=ik) :: i, j, k, jmin_tmp, g_default, g_RHS_default, CDFX, CDFY
    real(kind=rk), dimension(:), allocatable  :: tmp
    logical :: lifted_wavelet
 
@@ -497,6 +510,30 @@ subroutine ini_blocks(params, FILE )
    call read_param_mpi(FILE, 'Blocks', 'max_treelevel', params%Jmax, 5 )
    call read_param_mpi(FILE, 'Blocks', 'min_treelevel', params%Jmin, 1 )
    call read_param_mpi(FILE, 'Blocks', 'ini_treelevel', params%Jini, params%Jmin )
+
+   ! for cropped domains (in order to make it non-cubic), we need to check that the minimum level is sufficient to represent the cropped domain
+   ! for this, we need to check the common denominator of the slicing, which is represented as a/2^level
+   jmin_tmp = 0
+   do i=1,params%dim
+      call get_demonitator_dyadic_level(params%domain_cropping_min(i), j, k)
+      if (k == -1) call abort(92841123, "Get your crowbar: the arrays for domain_cropping_min are not dyadic fractions.")
+      jmin_tmp = max(jmin_tmp, j)
+      call get_demonitator_dyadic_level(params%domain_cropping_max(i), j, k)
+      if (k == -1) call abort(92841123, "Get your crowbar: the arrays for domain_cropping_max are not dyadic fractions.")
+      jmin_tmp = max(jmin_tmp, j)
+   end do
+   if (params%Jmin < jmin_tmp) then
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0)') "Warning!! 'min_treelevel' was set smaller as required for cropped non-quadratic or non-cubic domain, adapting it from ", params%Jmin, " to ", jmin_tmp
+      endif
+      params%Jmin = jmin_tmp
+   endif
+   if (params%Jini < params%Jmin) then
+      if (params%rank==0) then
+         write(*,  '(A, i0, A, i0)') "Warning!! 'ini_treelevel' was set smaller as required for cropped non-quadratic or non-cubic domain, adapting it from ", params%Jini, " to ", params%Jmin
+      endif
+      params%Jini = params%Jmin
+   endif
 
    if (params%g_RHS < g_RHS_default) then
       if (params%rank==0) then

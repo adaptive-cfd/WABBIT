@@ -32,8 +32,9 @@ subroutine post_pressure_interpolation(params)
     type(inifile) :: FILE
     character(len=cshort)               :: wing_type
     integer(kind=ik)                    :: surface_type    ! 1=bottom, 2=middle 3=top surface
-    real(kind=rk), allocatable          :: wing_points_w(:,:), pressure_data(:,:), wing_points_g(:,:,:)
-    integer(kind=ik)                    :: mpierr, n_header, isurface
+    real(kind=rk), allocatable          :: wing_points_w(:,:), pressure_data(:,:), wing_points_g(:,:,:), xq(:,:), pq(:,:)
+    integer(kind=ik)                    :: mpierr, n_header, isurface, npoints, nsurfaces
+
     allocate( hvy_n(1) )
 
     !---------------------------------------------------------------------------
@@ -50,7 +51,7 @@ subroutine post_pressure_interpolation(params)
             write(*, '(A)') " Given a txt file with coordinates on the wing surface (the midline, i.e. zw==0)"
             write(*, '(A)') " this routine interpolates a given wabbit field (usually this will be the pressure)"
             write(*, '(A)') " at the top, bottom and middle surface of the. The result is stored to CSV file."
-            write(*, '(A)') " The input file is a SPACE-separated file with two columns, xw and yw, with one header line."
+            write(*, '(A)') " The input file is a semicolon-separated file with two columns, xw and yw, with one header line."
             write(*, '(A)') " "
             write(*, '(A)') " "
             write(*, '(A)') " Call:"
@@ -80,22 +81,6 @@ subroutine post_pressure_interpolation(params)
 
     ! setup the wavelet etc
     call setup_wavelet(params)
-
-    ! ! modifications to parameters (because we use hvy_block instead of hvy_mask, NEQN set
-    ! ! in ini file is not correct)
-    ! deallocate( params%butcher_tableau )
-    ! allocate( params%butcher_tableau(1,1) )
-    ! ! mask, usx,usy,usz, color, sponge = 6 components
-    ! params%n_eqn = 6
-    ! deallocate(params%threshold_state_vector_component)
-    ! allocate(params%threshold_state_vector_component(1:params%n_eqn))
-    ! params%threshold_state_vector_component = 0
-    ! params%threshold_state_vector_component(1) = 1
-
-    ! deallocate(params%symmetry_vector_component)
-    ! allocate(params%symmetry_vector_component(1:params%n_eqn))
-    ! params%symmetry_vector_component = "0"
-
 
     Bs = params%Bs
     g  = params%g
@@ -136,7 +121,9 @@ subroutine post_pressure_interpolation(params)
     ! BEFORE WE CAN INTERPOLATE THE GHOTS NODES NEED TO BE FILLED
     call sync_ghosts_tree( params, hvy_block, tree_ID=tree_ID )
 
-
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! prepare pointcloud for interpolation (one for each surface)
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! read in the wing points
     ! in the wing system
     n_header = 1
@@ -147,18 +134,22 @@ subroutine post_pressure_interpolation(params)
         call abort(202512081, "Input file should just contain list of points on the wing midplance (xw,yw), zw==0")
     endif
 
+    npoints = nlines
+
     allocate(wing_points_w( 1:nlines, 1:3) )
-    allocate(wing_points_g( 1:nlines, 1:3, 1:3) )
+    allocate(wing_points_g( 1:nlines, 1:3, 1:3) ) ! for the 3 surfaces
     allocate(pressure_data( 1:nlines, 1:3) ) ! result for all 3 surfaces
 
     ! wing_points_w: xw, yw
     call read_array_from_ascii_file_mpi(wing_fname, wing_points_w(:,1:2), n_header)
 
-    ! always interpolate all points
-    do surface_type = 1, 3
+    nsurfaces = 3
+
+    ! always interpolate all surfaces
+    do surface_type = 1, nsurfaces
         ! transform point data to global system 
         if (wing_type == "right") then
-            do ipoint = 1, size(wing_points_w, 1)
+            do ipoint = 1, npoints
                 ! input is in wing system, midplane of the wing
                 x_wing_w(1:3) = (/ wing_points_w(ipoint, 1:2), 0.0_rk /)
                 x_wing_normal(1:3) = (/ 0.0_rk, 0.0_rk, 1.0_rk /)
@@ -167,9 +158,10 @@ subroutine post_pressure_interpolation(params)
                 if (surface_type == 2) then                    
                     x_wing_w(1:3) = x_wing_w(1:3)
                 else if (surface_type == 3) then
-                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
+                    ! Wings: 1=left 2=right 3=left hind 4=right hind
+                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insects(1)%Wings(2)%WingThickness * x_wing_normal(1:3)
                 else if (surface_type == 1) then
-                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
+                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insects(1)%Wings(2)%WingThickness * x_wing_normal(1:3)
                 else
                     call abort(372936, "surface type must be 1=bottom, 2=middle 3=top surface")
                 end if
@@ -182,7 +174,7 @@ subroutine post_pressure_interpolation(params)
                 wing_points_g(ipoint, 1:3, surface_type) = x_wing_g(1:3)
             enddo
         else if (wing_type == "left") then
-            do ipoint = 1, size(wing_points_w, 1)
+            do ipoint = 1, npoints
                 ! input is in wing system, midplane of the wing
                 x_wing_w(1:3) = (/ wing_points_w(ipoint, 1:2), 0.0_rk /)
 
@@ -192,9 +184,10 @@ subroutine post_pressure_interpolation(params)
                 if (surface_type == 2) then                    
                     x_wing_w(1:3) = x_wing_w(1:3)
                 else if (surface_type == 3) then
-                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
+                    ! Wings: 1=left 2=right 3=left hind 4=right hind
+                    x_wing_w(1:3) = x_wing_w(1:3) + 0.5_rk*Insects(1)%Wings(1)%WingThickness * x_wing_normal(1:3)
                 else if (surface_type == 1) then
-                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insects(1)%WingThickness * x_wing_normal(1:3)
+                    x_wing_w(1:3) = x_wing_w(1:3) - 0.5_rk*Insects(1)%Wings(1)%WingThickness * x_wing_normal(1:3)
                 else
                     call abort(372936, "surface type must be 1=bottom, 2=middle 3=top surface")
                 end if
@@ -211,83 +204,29 @@ subroutine post_pressure_interpolation(params)
         endif
     end do
 
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! interpolate pressure
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    allocate(xq( 1:3, 1:npoints*nsurfaces))
+    allocate(pq( 1:1, 1:npoints*nsurfaces)) ! interpolate just one component (pressure)
 
-
-    N_support = 3
-
-    if ( params%g < N_support ) then
-        call abort(1809251,"Error: not enough ghostpoints for delta interpolation. Increase number_ghost_nodes in PARAMS file!")
-    endif
-
-    ! set the array to a very large number. Why? If a point is NOT interpolated by a CPU, then the CPU
-    ! will not touch the data. So it remains that large negative number. IN other words, the array looks like this:
-    ! CPU1 = (/12.2, 13.4, -9e9, -9e9/)
-    ! CPU2 = (/-9e9, -9e9, 7.2,  -39.9/)
-    ! now I can just take the MAXIMUM of all values across all CPU
-    ! and the final result is:
-    ! (/12.2, 13.4, 7.2, -39.9 )
-    pressure_data = -9.9e9_rk
-
-    ! now we can interpolate each point
-    do ipoint = 1, size(wing_points_w, 1)
-        do isurface = 1, 3
-            do k = 1, hvy_n(tree_ID)
-                hvy_id = hvy_active(k,tree_ID)
-                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
-                call get_block_spacing_origin( params, lgt_id, x0, dx )
-
-                block_x_min(1:3) = x0(1:3)
-                block_x_max(1:3) = x0(1:3) + real(Bs(1:3), rk) * dx(1:3)
-
-                x_wing_g(1:3) =  wing_points_g(ipoint, 1:3, isurface)
-
-                
-                ! !//COMMENT for test, trilinear interpolation
-                ! tmp = trilinear_interpolation(x0, dx, hvy_block( params%g+1: bs(1)+params%g+1,  params%g+1: bs(2)+params%g+1,  params%g+1: bs(3)+params%g+1, 1, hvy_id ), x_wing_g, .false.)  
-                ! if (tmp /= -9.9e9_rk) then
-                !     pressure_data(ipoint, jpoint) = tmp
-                ! endif
-
-                ! //COMMENT delta interpolation
-                ! not all blocks are relevant: only one single block contains the interpolation 
-                ! point we are looking at. Find the block! 
-                if ( x_wing_g(1) >= block_x_min(1) .and. x_wing_g(2) >= block_x_min(2) .and. x_wing_g(3) >= block_x_min(3) .and. x_wing_g(1) < block_x_max(1) .and. x_wing_g(2) < block_x_max(2) .and. x_wing_g(3) < block_x_max(3)) then               
-
-                    ! convert interpolation point to integer, nearest integer
-                    x = x_wing_g(1:3) - x0(1:3)
-                    ix0 = floor( x(1) / dx(1)) + (params%g + 1)
-                    iy0 = floor( x(2) / dx(2)) + (params%g + 1)
-                    iz0 = floor( x(3) / dx(3)) + (params%g + 1)
-
-                    pressure_data(ipoint, isurface) = 0.0_rk
-                    do iz = iz0-N_support,iz0+N_support ! the box size around the point
-                        zz = real(iz - (params%g + 1), rk) * dx(3)
-                        delz = delta_interpolation(abs(zz - x(3)),dx(3))
-
-                        do iy = iy0-N_support,iy0+N_support
-                            yy = real(iy - (params%g + 1), rk) * dx(2)
-                            dely = delta_interpolation(abs(yy - x(2)),dx(2))
-
-                            do ix = ix0-N_support,ix0+N_support
-                                xx = real(ix - (params%g + 1), rk) * dx(1)
-                                delx = delta_interpolation(abs(xx - x(1)),dx(1))
-
-                                ! tmp = hvy_block( ix, iy, iz, 1, hvy_id )
-                                pressure_data(ipoint, isurface) = pressure_data(ipoint, isurface) + delx * dely * delz * hvy_block( ix, iy, iz, 1, hvy_id )
-                            enddo
-                        enddo
-                    enddo   
-                endif
-            end do
+    ! reshape in the format expected by interpolation (simple list of points)
+    do isurface = 1, nsurfaces
+        do ipoint = 1, npoints
+            k = (isurface-1)*npoints + ipoint
+            xq(:, k) = wing_points_g(ipoint, :, isurface)
         end do
     end do
 
+    ! actual interpolation (in global system of course)
+    call interpolatePointCloud_tree( params, hvy_block, tree_ID, xq, pq, "delta", sync=.true. )
 
-    call MPI_allreduce( MPI_IN_PLACE, pressure_data, size(pressure_data), MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+    ! reshape result back in the format used here.
+    pressure_data = reshape(pq, [npoints, nsurfaces])
 
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! output the data
-
-    ! call summarize_profiling(WABBIT_COMM)
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if (params%rank == 0) then
         ! write original cell_id, face_id, qpoint and new interpolated pressure data to disk
         call get_command_argument(5,fname_out)
@@ -302,7 +241,7 @@ subroutine post_pressure_interpolation(params)
         close(14) 
     endif
 
-    deallocate(wing_points_w, wing_points_g, pressure_data)
+    deallocate(wing_points_w, wing_points_g, pressure_data, xq, pq)
     call deallocate_forest(params, hvy_block)
 
 end subroutine post_pressure_interpolation

@@ -78,6 +78,8 @@ contains
 #include "check_lgt_block_synchronization.f90"
 #include "remove_nonperiodic_neighbors.f90"
 #include "forest.f90"
+#include "pointInBlock_block.f90"
+#include "interpolatePointCloud_tree.f90"
 
 ! former module_initialization
 #include "setInitialCondition_tree.f90"

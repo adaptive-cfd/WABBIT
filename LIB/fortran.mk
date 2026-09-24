@@ -45,7 +45,7 @@ HDF_SOURCE = $(HDF_ROOT)
 endif
 
 # to print the version number at each run. version number == git hash ID of current commit
-GIT_HASH := $(shell git rev-parse HEAD)
+GIT_HASH := $(shell git rev-parse HEAD 2>/dev/null || echo "no git found")
 BUILD_DATE := $(shell date)
 
 #Place of Sparse BLAS objects
@@ -343,7 +343,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
 	remove_nonperiodic_neighbors.f90 forest.f90 setInitialCondition_tree.f90 securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90 \
-	multigrid_vcycle.f90 poisson_operations.f90 probes.f90
+	multigrid_vcycle.f90 poisson_operations.f90 probes.f90 pointInBlock_block.f90 interpolatePointCloud_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

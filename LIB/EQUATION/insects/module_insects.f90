@@ -168,6 +168,7 @@ module module_insects
 
       ! most variables are hidden here, because they are wing-specific
       ! (yes, I know that diptera have only two wings.)
+      ! Wings: 1=left 2=right 3=left hind 4=right hind
       type(wing_type) :: Wings(1:4)
 
       !-------------------------------------------------------------

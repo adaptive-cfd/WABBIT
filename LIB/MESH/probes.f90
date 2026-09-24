@@ -247,6 +247,10 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
 
         ! loop over all probe points
         t0 = MPI_Wtime()
+
+        ! todo: merge xq in 2D array, check which components are used for probing
+        ! call interpolatePointCloud_tree(params, )
+
         do ip = 1, params%n_probes
             xq = 0.0_rk
             xq(1) = params%probe_x(ip)
@@ -259,7 +263,7 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
                 call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                 call get_block_spacing_origin(params, lgt_id, x0, dx)
 
-                if (point_in_block(params, xq, x0, dx)) then
+                if (pointInBlock_block(params, xq, x0, dx)) then
                     do iv = probe_var_0, probe_var_E
                         vals((ip-1)*params%N_probe_variables + iv) = interpolate_probe_tensor(params, hvy_tmp(:,:,:,iv-probe_var_0+1,hvy_id), xq, x0, dx, params%probe_interpolation_order)
                     enddo
@@ -282,7 +286,7 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
                     call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
                     call get_block_spacing_origin(params, lgt_id, x0, dx)
 
-                    if (point_in_block(params, xq, x0, dx)) then
+                    if (pointInBlock_block(params, xq, x0, dx)) then
                         do iv = probe_var_0, probe_var_E
                             vals((params%n_probes + sum(params%probe_line_npoints(1:il-1)) + ip-1)*params%N_probe_variables + iv) = &
                                 interpolate_probe_tensor(params, hvy_tmp(:,:,:,iv-probe_var_0+1,hvy_id), xq, x0, dx, params%probe_interpolation_order)
@@ -313,27 +317,6 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
     endif
 
 contains
-
-    logical function point_in_block(params_local, xq_local, x0_local, dx_local)
-        implicit none
-        type(type_params), intent(in) :: params_local
-        real(kind=rk), intent(in) :: xq_local(3)
-        real(kind=rk), intent(in) :: x0_local(3)
-        real(kind=rk), intent(in) :: dx_local(3)
-
-        real(kind=rk) :: xmin, xmax
-        integer(kind=ik) :: d
-
-        point_in_block = .true.
-        do d = 1, params_local%dim
-            xmin = x0_local(d)
-            xmax = x0_local(d) + dx_local(d) * real(params_local%Bs(d), rk)
-            if (xq_local(d) < xmin - 1e-14_rk .or. xq_local(d) > xmax + 1e-14_rk) then
-                point_in_block = .false.
-                return
-            endif
-        enddo
-    end function point_in_block
 
 
     real(kind=rk) function interpolate_probe_tensor(params_local, f, xq_local, x0_local, dx_local, p)
@@ -381,14 +364,14 @@ contains
                 if (params_local%dim == 2) then
                     wz = 1.0_rk
                 else
-                    wz = linear_interpolation(xq_local(3) - z_grid, dx_local(3))
+                    wz = linearInterpolationKernel(xq_local(3) - z_grid, dx_local(3))
                 endif
                 do iy = iy0 - support, iy0 + support
                     y_grid = x0_local(2) + real(iy - (g_local + 1), rk) * dx_local(2)
-                    wy = linear_interpolation(xq_local(2) - y_grid, dx_local(2))
+                    wy = linearInterpolationKernel(xq_local(2) - y_grid, dx_local(2))
                     do ix = ix0 - support, ix0 + support
                         x_grid = x0_local(1) + real(ix - (g_local + 1), rk) * dx_local(1)
-                        wx = linear_interpolation(xq_local(1) - x_grid, dx_local(1))
+                        wx = linearInterpolationKernel(xq_local(1) - x_grid, dx_local(1))
                         interpolate_probe_tensor = interpolate_probe_tensor + wx * wy * wz * f(ix, iy, iz)
                     enddo
                 enddo
@@ -405,14 +388,14 @@ contains
                 if (params_local%dim == 2) then
                     wz = 1.0_rk
                 else
-                    wz = delta_interpolation(xq_local(3) - z_grid, dx_local(3))
+                    wz = deltaInterpolationKernel(xq_local(3) - z_grid, dx_local(3))
                 endif
                 do iy = iy0 - support, iy0 + support
                     y_grid = x0_local(2) + real(iy - (g_local + 1), rk) * dx_local(2)
-                    wy = delta_interpolation(xq_local(2) - y_grid, dx_local(2))
+                    wy = deltaInterpolationKernel(xq_local(2) - y_grid, dx_local(2))
                     do ix = ix0 - support, ix0 + support
                         x_grid = x0_local(1) + real(ix - (g_local + 1), rk) * dx_local(1)
-                        wx = delta_interpolation(xq_local(1) - x_grid, dx_local(1))
+                        wx = deltaInterpolationKernel(xq_local(1) - x_grid, dx_local(1))
                         interpolate_probe_tensor = interpolate_probe_tensor + wx * wy * wz * f(ix, iy, iz)
                     enddo
                 enddo

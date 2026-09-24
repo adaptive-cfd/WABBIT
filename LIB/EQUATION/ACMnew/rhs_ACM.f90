@@ -222,8 +222,11 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
-            params_acm%mean_flow = params_acm%mean_flow / get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
+            ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+            ! Coordinates are still counted from the original origin, i.e., [0,0,0] in the un-cropped domain. That
+            ! means if cropping is used, the grid might not contain the origin anymore. Then, the volume of the cropped
+            ! computational changes and is no longer product(domain_size). 
+            params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domainSizeCropped(1:params_acm%dim) )
             params_acm%dissipation = params_acm%enstrophy * params_acm%nu
         endif
 
@@ -1752,8 +1755,9 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     ! --------------------------------------------------------------------------
     if (params_acm%HIT_linear_forcing) then
         G_gain = params_acm%HIT_gain
-        ! volume depends on the cropping of the domain, so we have to take care of that
-        e_kin_set = params_acm%HIT_energy * get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
+        ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+        ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+        e_kin_set = params_acm%HIT_energy * product(params_acm%domainSizeCropped(1:params_acm%dim))
         t_l_inf = 1.0_rk ! sqrt(nu / epsilon), should be adapted to by setting gain
         ! forcing after Bassene konstant energy (2016)
         A_forcing = (params_acm%dissipation - G_gain * (params_acm%e_kin - e_kin_set) / t_l_inf) / (2.0*params_acm%e_kin)

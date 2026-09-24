@@ -45,6 +45,9 @@ subroutine post_prune_tree(params)
 
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     ! just to get some memory:
     params%number_blocks = 20 + N1 / params%number_procs
     params%domain_size = domain

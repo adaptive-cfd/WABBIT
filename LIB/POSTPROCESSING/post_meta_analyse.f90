@@ -62,6 +62,9 @@ subroutine post_meta_analyse(params)
     call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
 
     ! unused so just fill any value
     params%order_discretization = "FD_2nd_central"

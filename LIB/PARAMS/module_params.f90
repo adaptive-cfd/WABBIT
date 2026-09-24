@@ -140,7 +140,7 @@ module module_params
         ! -------------------------------------------------------------------------------------
         character(len=cshort) :: physics_type="not-initialized"
         character(len=cshort) :: PDE_type="not-initialized"
-        real(kind=rk) :: domain_size(3)=0.0_rk
+        real(kind=rk) :: domain_size(3)=0.0_rk, domainSizeCropped(3)=1.0_rk
         real(kind=rk) :: domain_cropping_min(3)=0.0_rk
         real(kind=rk) :: domain_cropping_max(3)=1.0_rk
         integer(kind=ik) :: dim=2 ! can be 2 or 3

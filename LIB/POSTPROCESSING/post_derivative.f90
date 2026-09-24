@@ -67,6 +67,9 @@ subroutine post_derivative(params)
     call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     call get_command_argument(3, der_dim)
     call get_command_argument(4, der_order)
     call get_command_argument(5, order)

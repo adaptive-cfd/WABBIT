@@ -104,12 +104,16 @@ subroutine adaption_test(params)
      call check_file_exists ( params%input_files(j) )
      if (params%rank==0) write(*,*) "Reading list of files from "//params%input_files(j)
   enddo
+
   !-----------------------------------------------------------------------------
   ! read in the file, loop over lines
   !-----------------------------------------------------------------------------
   do j = 1, n_components
       call read_attributes(params%input_files(j), lgt_n_tmp, time, iteration, params%domain_size, &
                        params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+
+      ! no cropping is used by default, but the variable is not set automatically
+      params%domainSizeCropped = params%domain_size
   end do
 
   number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize

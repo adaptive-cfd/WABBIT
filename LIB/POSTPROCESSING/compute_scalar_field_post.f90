@@ -66,6 +66,9 @@ subroutine compute_scalar_field_post(params)
     call read_attributes(file_fld, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     call get_command_argument(3, order)
 
     ! decide which order for discretization and predictor is used. Note predictor

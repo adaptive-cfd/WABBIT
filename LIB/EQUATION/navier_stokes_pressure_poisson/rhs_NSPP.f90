@@ -232,7 +232,11 @@ subroutine RHS_NSPP( time, u, g, x0, dx, rhs, mask, stage, n_domain, discretizat
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%e_kin, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%enstrophy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_nspp%mean_flow = params_nspp%mean_flow / get_active_domain_length(params_nspp%domain_size, params_nspp%domain_cropping_min, params_nspp%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
+
+            ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+            ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+            params_nspp%mean_flow = params_nspp%mean_flow / product(params_nspp%domainSizeCropped(1:params_nspp%dim))
+
             params_nspp%dissipation = params_nspp%enstrophy * params_nspp%nu
         endif
 
@@ -605,8 +609,9 @@ subroutine RHS_NSPP_Velocity(g, Bs, dx, x0, phi, order_discretization, time, rhs
     ! =========================================================================
     if (params_nspp%HIT_linear_forcing) then
         G_gain = params_nspp%HIT_gain
-        ! volume depends on the cropping of the domain, so we have to take care of that
-        e_kin_set = params_nspp%HIT_energy * get_active_domain_length(params_nspp%domain_size, params_nspp%domain_cropping_min, params_nspp%domain_cropping_max, dir=merge('xy', 'xyz', params_nspp%dim==3))
+        ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+        ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+        e_kin_set = params_nspp%HIT_energy * product(params_nspp%domainSizeCropped(1:params_nspp%dim))
         t_l_inf = 1.0_rk  ! sqrt(nu/epsilon), adjusted via gain
         
         ! Compute forcing amplitude: A = (epsilon - G*(E-E_target)/t_l) / (2*E)

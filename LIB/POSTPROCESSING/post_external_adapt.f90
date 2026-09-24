@@ -45,6 +45,9 @@ subroutine external_adapt(params)
     call check_file_exists(trim(file_in))
     call read_attributes(file_in, lgt_n(1), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
         periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
     params%Jmin = 0
 
     call get_cmd_arg( "--wavelet", params%wavelet, default="CDF40" )

@@ -68,6 +68,9 @@ subroutine mult_mask(params)
     call read_attributes(fname_input, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, &
     params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     if (params%rank==0) then
         if (operation == "--mult-mask" .or. operation == "--mult-mask-inverse") then
             write(*,*) "------------------------------------------------------------------"

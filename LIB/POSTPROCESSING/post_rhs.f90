@@ -60,6 +60,9 @@ subroutine post_rhs(params)
     call get_command_argument(3, files(1))
     call read_attributes(files(1), lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
     ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)
     deallocate(params%butcher_tableau)

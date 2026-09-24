@@ -27,7 +27,7 @@ module module_convdiff_new
   ! and the like. only visible here.
   type :: type_paramsb
     real(kind=rk) :: CFL, T_end, T_swirl, CFL_nu=0.094, u_const=0.0_rk, gamma, tau
-    real(kind=rk) :: domain_size(3)=0.0_rk, domain_cropping_min(3)=0.0_rk, domain_cropping_max(3)=1.0_rk, w0(3)=0.0_rk
+    real(kind=rk) :: domain_size(3)=0.0_rk, domain_cropping_min(3)=0.0_rk, domain_cropping_max(3)=1.0_rk, w0(3)=0.0_rk, domainSizeCropped(3)=1.0_rk
     real(kind=rk), allocatable, dimension(:) :: nu, u0x,u0y,u0z,phi_boundary, scalar_integral, scalar_max
     real(kind=rk), allocatable, dimension(:,:) :: blob_width,x0,y0,z0
     integer(kind=ik) :: dim, N_scalars, N_fields_saved, Nblobs

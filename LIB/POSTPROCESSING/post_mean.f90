@@ -50,6 +50,9 @@ subroutine post_mean(params)
     call read_attributes(fname, lgt_n(tree_ID), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
+
     params%n_eqn = 1
     params%g = 3_ik
     params%order_predictor = "multiresolution_4th"

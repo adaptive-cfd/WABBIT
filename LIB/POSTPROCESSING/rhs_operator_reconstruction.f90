@@ -77,6 +77,8 @@ subroutine rhs_operator_reconstruction(params)
     call read_attributes(file, Nlgtn, time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
 
     params%Jmax = tc_length + 2
     params%forest_size = 10

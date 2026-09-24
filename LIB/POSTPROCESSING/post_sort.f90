@@ -49,6 +49,9 @@ subroutine post_sort(params)
 
     call read_attributes(fname, N, time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
+
     params%number_blocks = ceiling(1.1_rk * dble(N) / dble(params%number_procs)) ! just to get some memory in case not provided, extra space for load balancing
 
     params%Jmin = 0

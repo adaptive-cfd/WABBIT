@@ -77,6 +77,8 @@ subroutine post_wavelet_transform(params)
     call read_attributes(fname_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
 
     params%Jmin = 0
     params%Jmax = tc_length

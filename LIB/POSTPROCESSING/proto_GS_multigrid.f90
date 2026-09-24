@@ -98,6 +98,9 @@ subroutine proto_GS_multigrid(params)
     call read_attributes(file_b, lgt_n(tree_ID), time, it, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     ! ! odd BS test - but that doesn't work so great for now
     ! BS(1:params%dim) = Bs(1:params%dim) + 1
 

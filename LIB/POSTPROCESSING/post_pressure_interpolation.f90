@@ -103,6 +103,10 @@ subroutine post_pressure_interpolation(params)
 
     call read_attributes(pressure_filename, n_blocks, time, iteration, domain, Bs, tc_length, dim, &
          periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
+
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     ! reset the grid: all blocks are inactive and empty
     ! call reset_tree(params, .true., tree_ID)
 

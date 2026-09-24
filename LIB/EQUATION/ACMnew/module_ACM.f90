@@ -32,7 +32,7 @@ module module_acm
   INITIALIZE_ASCII_FILES_ACM
   !**********************************************************************************************
 
-! how many different parts of the mask can be distinguished at max
+  ! how many different parts of the mask can be distinguished at max
   integer(kind=ik) :: ncolors=8
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -91,7 +91,7 @@ module module_acm
     logical :: read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
-    real(kind=rk), dimension(3) :: domain_size=0.0_rk, domain_cropping_min=0.0_rk, domain_cropping_max=1.0_rk
+    real(kind=rk), dimension(3) :: domain_size=0.0_rk, domain_cropping_min=0.0_rk, domain_cropping_max=1.0_rk, domainSizeCropped=1.0_rk
     character(len=clong) :: inicond="", discretization=""
 
     ! VPM section
@@ -169,7 +169,7 @@ contains
     real(kind=rk), allocatable :: buffer_array(:,:)
 
     type(inifile) :: FILE
-    integer :: Neqn, i, insect_id
+    integer :: Neqn, i, insect_id, dim
     character(len=clong) :: SECTION
     logical :: section_exists
 
@@ -199,11 +199,23 @@ contains
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_acm%dim, 2 )
-    call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    dim = params_acm%dim
+
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+    
+    ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+    ! Coordinates are still counted from the original origin, i.e., [0,0,0] in the un-cropped domain. That
+    ! means if cropping is used, the grid might not contain the origin anymore. The the volume of the cropped
+    ! computational changes and is no longer product(domain_size). 
     params_acm%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params_acm%domain_cropping_min(1:params_acm%dim), params_acm%domain_cropping_min(1:params_acm%dim) )
+    call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params_acm%domain_cropping_min(1:dim), params_acm%domain_cropping_min(1:dim) )
+    
     params_acm%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params_acm%domain_cropping_max(1:params_acm%dim), params_acm%domain_cropping_max(1:params_acm%dim) )
+    call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params_acm%domain_cropping_max(1:dim), params_acm%domain_cropping_max(1:dim) )
+
+    ! For convenience, store the length of the cropped domain. Used to compute the volume of the cropped domain.
+    params_acm%domainSizeCropped = 1.0_rk
+    params_acm%domainSizeCropped(1:dim) = params_acm%domain_size(1:dim) * (params_acm%domain_cropping_max(1:dim) - params_acm%domain_cropping_min(1:dim))
 
     params_acm%periodic_BC = .true.
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_acm%periodic_BC, params_acm%periodic_BC )
@@ -433,7 +445,7 @@ contains
     endif
 
     ! set defaults
-    if (params_acm%dim==3) then
+    if (params_acm%dim == 3) then
       params_acm%Bs=(/17,17,17/)
     else
       params_acm%Bs=(/17,17,1/)
@@ -446,9 +458,9 @@ contains
     endif
 
     ! uniqueGrid modification
-    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
+    ddx(1:dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:dim) / real(params_acm%Bs(1:dim), kind=rk))
 
-    dx_min = minval( ddx(1:params_acm%dim) )
+    dx_min = minval( ddx(1:dim) )
     ! uniqueGrid modification
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
 
@@ -460,7 +472,7 @@ contains
                 params_acm%smoothing_safety(i) = 1.0_rk * params_acm%smoothing_width(i)
             case ("hester")
                 params_acm%smoothing_width(i) = sqrt(params_acm%nu * params_acm%C_eta)
-                params_acm%smoothing_safety(i) = max(5.0_rk * params_acm%smoothing_width(i), 2*maxval( ddx(1:params_acm%dim) ))
+                params_acm%smoothing_safety(i) = max(5.0_rk * params_acm%smoothing_width(i), 2*maxval( ddx(1:dim) ))
             case("discontinuous", "dis")
                 params_acm%smoothing_width(i) = dx_min * params_acm%C_smooth
                 params_acm%smoothing_safety(i) = 3.0_rk * params_acm%smoothing_width(i)

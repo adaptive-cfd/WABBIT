@@ -108,6 +108,9 @@ subroutine compute_vorticity_post(params)
     call read_attributes(file_ux, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
+
     if (params%dim == 3) then
         call get_command_argument(4, file_uz)
         call check_file_exists(trim(file_uz))

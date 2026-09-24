@@ -48,10 +48,12 @@ subroutine operator_reconstruction(params)
     call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-
+    
     params%Jmax = tc_length+2 ! to allow refinement
     params%n_eqn = 2
     params%domain_size = domain
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
     allocate(params%symmetry_vector_component(1:params%n_eqn))

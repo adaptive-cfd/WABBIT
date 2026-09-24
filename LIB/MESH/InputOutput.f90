@@ -705,7 +705,7 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     endif
 
     ! in case domain_cropping_min or domain_cropping_max is set, we need to crop the domain
-    if (any(params%domain_cropping_min(:) > 0.0_rk) .or. any(params%domain_cropping_max(:) < params%domain_size(:))) then
+    if (any(params%domain_cropping_min(:) > 0.0_rk) .or. any(params%domain_cropping_max(:) < 1.0_rk)) then
         ! check if Jmin is too small for the domain slice - we then assume it cannot be cut
         if (params%Jmin < minActiveLevel_tree(tree_ID, use_active_list=.false.)) then
             call abort(240929, "This input data is too coarse for the specified domain slice. It would be cropped in the middle of a block, which is currently not supported.")
@@ -1041,6 +1041,9 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
         params%N_fields_saved = N_files
         params%Bs = Bs
         params%domain_size = domain
+
+        ! no cropping is used by default, but the variable is not set automatically
+        params%domainSizeCropped = params%domain_size
 
         ! we have to allocate grid if this routine is called for the first time
         call allocate_forest(params, hvy_block)

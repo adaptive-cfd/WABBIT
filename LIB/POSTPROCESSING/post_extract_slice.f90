@@ -80,6 +80,9 @@ subroutine post_extract_slice(params)
     call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     params%dim = dim
     params%Bs = Bs
     params%Jmax = tc_length

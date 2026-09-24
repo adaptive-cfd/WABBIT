@@ -370,7 +370,7 @@ subroutine ini_domain(params, FILE )
    !> params structure of WABBIT
    type(type_params),intent(inout)  :: params
 
-   integer :: i
+   integer(kind=ik) :: i, dim
 
    if (params%rank==0) then
       write(*,*)
@@ -387,10 +387,16 @@ subroutine ini_domain(params, FILE )
       & Try dim=2 or dim=3 ")
    endif
 
+   dim = params%dim
+
    params%domain_size=(/ 1.0_rk, 1.0_rk, 0.0_rk /) !default
    call read_param_mpi(FILE, 'Domain', 'domain_size', params%domain_size(1:params%dim), &
       params%domain_size(1:params%dim) )
-   
+
+   ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+   ! Coordinates are still counted from the original origin, i.e., [0,0,0] in the un-cropped domain. That
+   ! means if cropping is used, the grid might not contain the origin anymore. The the volume of the cropped
+   ! computational changes and is no longer product(domain_size).
    params%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
    call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params%domain_cropping_min(1:params%dim), params%domain_cropping_min(1:params%dim) )
    if ( any(params%domain_cropping_min(1:params%dim) < 0.0_rk) .or. any(params%domain_cropping_min(1:params%dim) >= 1.0_rk) ) then
@@ -402,6 +408,10 @@ subroutine ini_domain(params, FILE )
    if ( any(params%domain_cropping_max(1:params%dim) - params%domain_cropping_min(1:params%dim) <= 0.0_rk) .or. any(params%domain_cropping_max(1:params%dim) > 1.0_rk) ) then
       call abort(92841123, "Get your crowbar: the arrays for domain_cropping_max are outside the valid range [domain_cropping_min, 1].")
    endif
+
+   ! For convenience, store the length of the cropped domain. Used to compute the volume of the cropped domain.
+   params%domainSizeCropped = 1.0_rk
+   params%domainSizeCropped(1:dim) = params%domain_size(1:dim) * (params%domain_cropping_max(1:dim) - params%domain_cropping_min(1:dim))
 
    params%periodic_BC = .true.
    call read_param_mpi(FILE, 'Domain', 'periodic_BC', params%periodic_BC, params%periodic_BC )

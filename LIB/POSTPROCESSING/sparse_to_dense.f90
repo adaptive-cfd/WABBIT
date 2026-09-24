@@ -81,6 +81,9 @@ subroutine sparse_to_dense(params)
     call read_attributes(file_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, &
     params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     Nb_file = lgt_n(tree_ID)
 
     if (len_trim(file_out)==0) then

@@ -404,16 +404,26 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! mean flow (in entire domain)
         ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%mean_flow, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-        params_acm%mean_flow = params_acm%mean_flow / get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
+        ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+        ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+        params_acm%mean_flow = params_acm%mean_flow / product(params_acm%domainSizeCropped(1:params_acm%dim) )
 
         if (params_acm%use_channel_forcing) then
             ! mean flow but only in fluid domain
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%meanflow_channel, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
 			! analytically compute the volume of our channel (no numerical integration required, simple multiplication)
-            ! This is the known channel height times the active area
-            V_channel = (params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)*get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir='xz')
+            ! This is the known channel height times the active area.
+            ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+            ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+            ! NOTE: in the case without cropping, domain == domain_cropped
+            V_channel = (params_acm%domain_size(2)-2.0_rk*params_acm%h_channel)*params_acm%domainSizeCropped(1)*params_acm%domainSizeCropped(3)
             params_acm%meanflow_channel = params_acm%meanflow_channel / V_channel
+
+            if ( maxval( abs(params_acm%domain_size - params_acm%domainSizeCropped) ) > 1.0e-10_rk ) then
+                call abort(20260924, "Before using the channel flow with cropped domains, we must verify the mask function !! -TE") 
+            endif
+
         endif
 
         if (params_acm%penalization .or. params_acm%use_sponge) then
@@ -481,7 +491,11 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         if (params_acm%time_statistics) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_mean, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_acm%time_statistics_mean = params_acm%time_statistics_mean / get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
+
+            ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+            ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+            params_acm%time_statistics_mean = params_acm%time_statistics_mean / product(params_acm%domainSizeCropped(1:params_acm%dim))
+            
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_maxabs, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         endif
 
@@ -636,12 +650,19 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
 
             ! turbulent statistics - these are normed by the volume, which depends on the cropping of the domain!
             if (params_acm%nu*params_acm%enstrophy > 0.0_rk .and. params_acm%HIT_linear_forcing) then
-                ! dissipation = 2*params_acm%nu*params_acm%enstrophy/product(params_acm%domain_size(1:params_acm%dim))
-                dissipation = params_acm%dissipation/get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
-                u_RMS = sqrt(2.0_rk*params_acm%e_kin/get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))/3.0_rk)
-                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, params_acm%e_kin/get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xy', 'xyz', params_acm%dim==3))
-                    (params_acm%nu**3.0_rk / dissipation)**0.25_rk, sqrt(params_acm%nu/dissipation), (params_acm%nu*dissipation)**0.25_rk, &
-                    sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/))
+                ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+                ! Then, the volume of the cropped computational changes and is no longer product(domain). 
+                dissipation = params_acm%dissipation / product(params_acm%domainSizeCropped(1:params_acm%dim))
+                
+		u_RMS = sqrt( (2.0_rk/3.0_rk) * params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)))
+
+                call append_t_file( 'turbulent_statistics.t', (/time, dissipation, &
+                     params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)), &
+                     (params_acm%nu**3.0_rk / dissipation)**0.25_rk, &
+                     sqrt(params_acm%nu/dissipation), &
+                     (params_acm%nu*dissipation)**0.25_rk, &
+                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation), &
+                     sqrt(15.0_rk*params_acm%nu*u_RMS**2/dissipation)*u_RMS/params_acm%nu/) )
             endif
 
             ! time statistics

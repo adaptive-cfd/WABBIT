@@ -78,6 +78,9 @@ subroutine post_filter(params)
     call read_attributes(file_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = domain
+
     if (filter_type(1:3) == "CDF") then
         ! we need to set everything up to "_" as wavelet
         params%wavelet = filter_type(1:index(filter_type,"_")-1)

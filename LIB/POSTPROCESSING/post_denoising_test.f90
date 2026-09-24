@@ -72,6 +72,9 @@ subroutine post_denoising_test(params)
     call read_attributes(file_in, lgt_n(tree_ID_flow), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
+
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet
     params%g = -1

@@ -173,8 +173,9 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         ! Mean is a special case, we need to divide by the volume
         elseif (which_norm == "Mean") then
             if (any(norm_case_ID/10 == (/0, 4/))) then
-                ! volume depends on the cropping of the domain, so we have to take care of that
-                norm(:) = norm(:) / get_active_domain_length(params%domain_size, params%domain_cropping_min, params%domain_cropping_max, dir=merge('xy', 'xyz', params%dim==3))
+                ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+                ! Then, the volume of the cropped computational changes and is no longer product(domain).
+                norm(:) = norm(:) / product(params%domainSizeCropped(1:params%dim))
             else
                 call MPI_ALLREDUCE(MPI_IN_PLACE, volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
                 norm(:) = norm(:) / volume
@@ -240,9 +241,9 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         do p = 1, n_eqn
             ! we integrate over the full leaf layer, this is the domain size so we do not have to call MPI_ALLREDUCE for the volume integral
             if (any(norm_case_ID/10 == (/0, 4/))) then
-                ! volume depends on the cropping of the domain, so we have to take care of that
-                norm(p) = norm(p) / get_active_domain_length(params%domain_size, params%domain_cropping_min, params%domain_cropping_max, dir=merge('xy', 'xyz', params%dim==3))
-            ! we compute only a part of it, so we compute the actual integral of the volume
+                ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+                ! Then, the volume of the cropped computational changes and is no longer product(domain).
+                norm(p) = norm(p) / product(params%domainSizeCropped(1:params%dim))
             else
                 call MPI_ALLREDUCE(MPI_IN_PLACE, volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
                 norm(p) = norm(p) / volume
@@ -311,9 +312,9 @@ subroutine componentWiseNorm_tree(params, hvy_block, tree_ID, which_norm, norm, 
         do p = 1, n_eqn
             ! we integrate over the full leaf layer, this is the domain size so we do not have to call MPI_ALLREDUCE for the volume integral
             if (any(norm_case_ID/10 == (/0, 4/))) then
-                ! volume depends on the cropping of the domain, so we have to take care of that
-                norm(p) = norm(p) / get_active_domain_length(params%domain_size, params%domain_cropping_min, params%domain_cropping_max, dir=merge('xy', 'xyz', params%dim==3))
-            ! we compute only a part of it, so we compute the actual integral of the volume
+                ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+                ! Then, the volume of the cropped computational changes and is no longer product(domain).
+                norm(p) = norm(p) / product(params%domainSizeCropped(1:params%dim))
             else
                 call MPI_ALLREDUCE(MPI_IN_PLACE, volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
                 norm(p) = norm(p) / volume

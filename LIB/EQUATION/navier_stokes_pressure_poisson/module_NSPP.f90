@@ -86,7 +86,7 @@ module module_nspp
     logical :: read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
-    real(kind=rk), dimension(3) :: domain_size=0.0_rk, domain_cropping_min=0.0_rk, domain_cropping_max=1.0_rk
+    real(kind=rk), dimension(3) :: domain_size=0.0_rk, domain_cropping_min=0.0_rk, domain_cropping_max=1.0_rk, domainSizeCropped=1.0_rk
     character(len=clong) :: inicond="", discretization=""
 
     ! VPM section
@@ -163,7 +163,7 @@ contains
     logical :: section_exists
 
     type(inifile) :: FILE
-    integer :: Neqn, i, insect_id
+    integer :: Neqn, i, insect_id, dim
 
     N_mask_components = 0
     ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
@@ -192,11 +192,25 @@ contains
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_nspp%dim, 2 )
+    dim = params_nspp%dim
+
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_nspp%domain_size(1:params_nspp%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
+
+    ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
+    ! Coordinates are still counted from the original origin, i.e., [0,0,0] in the un-cropped domain. That
+    ! means if cropping is used, the grid might not contain the origin anymore. The the volume of the cropped
+    ! computational changes and is no longer product(domain_size). 
     params_nspp%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
     call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params_nspp%domain_cropping_min(1:params_nspp%dim), params_nspp%domain_cropping_min(1:params_nspp%dim) )
+    
     params_nspp%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
     call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params_nspp%domain_cropping_max(1:params_nspp%dim), params_nspp%domain_cropping_max(1:params_nspp%dim) )
+
+    ! For convenience, store the length of the cropped domain. Used to compute the volume of the cropped domain.
+    params_nspp%domainSizeCropped = 1.0_rk
+    params_nspp%domainSizeCropped(1:dim) = params_nspp%domain_size(1:dim) * (params_nspp%domain_cropping_max(1:dim) - params_nspp%domain_cropping_min(1:dim))
+
+
     params_nspp%periodic_BC = .true.
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_nspp%periodic_BC, params_nspp%periodic_BC )
 

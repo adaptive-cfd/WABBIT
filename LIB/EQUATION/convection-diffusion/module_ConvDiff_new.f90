@@ -3,6 +3,7 @@
 module module_convdiff_new
 
   use module_globals
+  use module_helpers
   ! ini file parser module, used to read parameters. note: in principle, you can also
   ! just use any reader you feel comfortable with, as long as you can read the parameters
   ! from a file.

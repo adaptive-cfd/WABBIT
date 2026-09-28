@@ -73,8 +73,10 @@ module module_acm
     logical :: use_passive_scalar = .false., use_active_buoyancy_scalar = .false., symmetric_buoyancy = .false.
     integer(kind=ik) :: N_scalars = 0
     real(kind=rk), allocatable :: schmidt_numbers(:), rayleigh_numbers(:), x0source(:), y0source(:), &
-    z0source(:), scalar_Ceta(:), widthsource(:)
+    z0source(:), scalar_Ceta(:), widthsource(:), valuesource(:)
     character(len=cshort), allocatable :: scalar_inicond(:), scalar_source_type(:)
+    ! mean and maximum absolute value of each passive scalar, integrated/measured over the domain
+    real(kind=rk), allocatable :: scalar_mean(:), scalar_maxabs(:)
     ! when computing passive scalars, we require derivatives of the mask function, which
     ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
     ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
@@ -397,12 +399,16 @@ contains
         allocate( params_acm%z0source(1:params_acm%N_scalars) )
         allocate( params_acm%widthsource(1:params_acm%N_scalars) )
         allocate( params_acm%scalar_Ceta(1:params_acm%N_scalars) )
+        allocate( params_acm%valuesource(1:params_acm%N_scalars) )
 
         allocate( params_acm%scalar_inicond(1:params_acm%N_scalars) )
         allocate( params_acm%scalar_source_type(1:params_acm%N_scalars) )
+        allocate( params_acm%scalar_mean(1:params_acm%N_scalars) )
+        allocate( params_acm%scalar_maxabs(1:params_acm%N_scalars) )
 
         params_acm%scalar_inicond = "dummy"
         params_acm%scalar_source_type = "dummy"
+        params_acm%valuesource = 1.0_rk
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'Sc', params_acm%schmidt_numbers )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'Ra', params_acm%rayleigh_numbers )
@@ -410,6 +416,7 @@ contains
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'y0source', params_acm%y0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'z0source', params_acm%z0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'widthsource', params_acm%widthsource )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'valuesource', params_acm%valuesource, params_acm%valuesource )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'C_eta', params_acm%scalar_Ceta)
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_acm%scalar_inicond, params_acm%scalar_inicond )
@@ -833,6 +840,10 @@ contains
       if (params_acm%time_statistics) then
         call init_t_file('time_statistics_mean.t', overwrite)
         call init_t_file('time_statistics_maxabs.t', overwrite)
+      endif
+      if (params_acm%use_passive_scalar) then
+        call init_t_file('scalar_mean.t', overwrite)
+        call init_t_file('scalar_maxabs.t', overwrite)
       endif
       if (params_acm%penalization .or. params_acm%use_sponge) then
         call init_t_file('forces.t', overwrite, (/ "           time", "   sum_forces_X", "   sum_forces_Y", "   sum_forces_Z"/))

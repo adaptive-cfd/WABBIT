@@ -131,6 +131,10 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
             params_nspp%time_statistics_mean = 0.0_rk
             params_nspp%time_statistics_maxabs = 0.0_rk
         endif
+        if (params_nspp%use_passive_scalar) then
+            params_nspp%scalar_mean = 0.0_rk
+            params_nspp%scalar_maxabs = 0.0_rk
+        endif
 
         dx_min = 90.0e9_rk
 
@@ -387,6 +391,14 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
             enddo
         endif
 
+        ! mean and maximum absolute value of each passive scalar
+        if (params_nspp%use_passive_scalar) then
+            do k = 1, params_nspp%N_scalars
+                params_nspp%scalar_mean(k) = params_nspp%scalar_mean(k) + dV * sum( u(x1:x2, y1:y2, z1:z2, params_nspp%dim+1+k) )
+                params_nspp%scalar_maxabs(k) = max( params_nspp%scalar_maxabs(k), maxval(abs(u(x1:x2, y1:y2, z1:z2, params_nspp%dim+1+k))) )
+            enddo
+        endif
+
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
@@ -474,6 +486,14 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
             params_nspp%time_statistics_mean = params_nspp%time_statistics_mean / product(params_nspp%domainSizeCropped(1:dim))
 
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%time_statistics_maxabs, params_nspp%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        endif
+
+        ! passive scalar statistics
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
+        if (params_nspp%use_passive_scalar) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%scalar_mean, params_nspp%N_scalars, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            params_nspp%scalar_mean = params_nspp%scalar_mean / product(params_nspp%domainSizeCropped(1:dim))
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%scalar_maxabs, params_nspp%N_scalars, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         endif
 
         umag = params_nspp%umag
@@ -634,6 +654,12 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
             if (params_nspp%time_statistics) then
                 call append_t_file( 'time_statistics_mean.t', (/time, params_nspp%time_statistics_mean/) )
                 call append_t_file( 'time_statistics_maxabs.t', (/time, params_nspp%time_statistics_maxabs/) )
+            endif
+
+            ! passive scalar statistics
+            if (params_nspp%use_passive_scalar) then
+                call append_t_file( 'scalar_mean.t', (/time, params_nspp%scalar_mean/) )
+                call append_t_file( 'scalar_maxabs.t', (/time, params_nspp%scalar_maxabs/) )
             endif
 
             ! this file is to simply keep track of simulations, should they be restarted with different parameters.

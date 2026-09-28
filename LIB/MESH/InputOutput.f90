@@ -691,23 +691,10 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! be synced. However, the light data has to.
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
-    ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
-    ! this code block checks this and temporally lowers Jmin, so that we can actually find all neighbours and do the refinement
-    level_min = minActiveLevel_tree(tree_ID, use_active_list=.false.)
-    if (level_min < params%Jmin) then
-        if (params%rank==0) then
-            write(*, '(A, i0, A, i0, A)') "READING: Minimum level of input data L=", level_min, " < Jmin=", params%Jmin, '. Refining input data to Jmin.'
-        endif
-        Jmin_set = params%Jmin
-        params%Jmin = level_min
-    else
-        Jmin_set = -1
-    endif
-
-    ! in case domain_cropping_min or domain_cropping_max is set, we need to crop the domain
+    ! in case domain_cropping_min or domain_cropping_max is set, we may need to crop the domain
     if (any(params%domain_cropping_min(:) > 0.0_rk) .or. any(params%domain_cropping_max(:) < 1.0_rk)) then
-        ! check if Jmin is too small for the domain slice - we then assume it cannot be cut
-        if (params%Jmin < minActiveLevel_tree(tree_ID, use_active_list=.false.)) then
+        ! check if Jmin of the data is too small for the domain slice - we then assume it cannot be cut
+        if (minActiveLevel_tree(tree_ID, use_active_list=.false.) < params%Jmin) then
             call abort(240929, "This input data is too coarse for the specified domain slice. It would be cropped in the middle of a block, which is currently not supported.")
         endif
 
@@ -721,6 +708,19 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
                 lgt_block( lgt_id, : ) = -1
             endif
         enddo
+    endif
+
+    ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
+    ! this code block checks this and temporally lowers Jmin, so that we can actually find all neighbours and do the refinement
+    level_min = minActiveLevel_tree(tree_ID, use_active_list=.false.)
+    if (level_min < params%Jmin) then
+        if (params%rank==0) then
+            write(*, '(A, i0, A, i0, A)') "READING: Minimum level of input data L=", level_min, " < Jmin=", params%Jmin, '. Refining input data to Jmin.'
+        endif
+        Jmin_set = params%Jmin
+        params%Jmin = level_min
+    else
+        Jmin_set = -1
     endif
 
     ! it is good practice that this routine returns a working forest, i.e., all meta

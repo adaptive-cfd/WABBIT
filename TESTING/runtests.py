@@ -181,6 +181,19 @@ tests = [
         "groups": ["acm", "adaptive", "cylinder"], "input_files": ["PARAMS_flowPastCylinder.ini"],
         "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
 
+    # Passive scalar tests
+    # Passive-scalar transport coupled to ACM: source/sink advection past a cylinder (Neumann),
+    # diffusion away from a cylinder (Dirichlet), and a scalar blob in a Taylor-Green vortex.
+    {"name": "flowPastCylinderSourceSink", "type": "simulation", "root_folder": "acm/passiveScalar", "wavelet": 44, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder", "passiveScalar"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+    {"name": "flowPastCylinderDirichletDiffusion", "type": "simulation", "root_folder": "acm/passiveScalar", "wavelet": 44, "dim": 2,
+        "groups": ["acm", "adaptive", "cylinder", "passiveScalar"], "input_files": ["PARAMS_flowPastCylinder.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_flowPastCylinder.ini --memory={memory}"]},
+    {"name": "taylorGreenScalarBlob", "type": "simulation", "root_folder": "acm/passiveScalar", "wavelet": 40, "dim": 3,
+        "groups": ["acm", "taylorGreen", "equi", "passiveScalar"], "input_files": ["*.ini"],
+        "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_taylor_green.ini --memory={memory}"]},
+
     # Three vortices tests
     # Test vortex interaction simulations with different finite difference orders (FD2, FD4, FD6)
     # and both equispaced and adaptive meshes.

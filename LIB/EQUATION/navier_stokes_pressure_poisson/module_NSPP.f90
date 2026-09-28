@@ -68,8 +68,10 @@ module module_nspp
     logical :: use_passive_scalar = .false., use_active_buoyancy_scalar = .false., symmetric_buoyancy = .false.
     integer(kind=ik) :: N_scalars = 0
     real(kind=rk), allocatable :: schmidt_numbers(:), rayleigh_numbers(:), x0source(:), y0source(:), &
-    z0source(:), scalar_Ceta(:), widthsource(:)
+    z0source(:), scalar_Ceta(:), widthsource(:), valuesource(:)
     character(len=cshort), allocatable :: scalar_inicond(:), scalar_source_type(:)
+    ! mean and maximum absolute value of each passive scalar, integrated/measured over the domain
+    real(kind=rk), allocatable :: scalar_mean(:), scalar_maxabs(:)
     ! when computing passive scalars, we require derivatives of the mask function, which
     ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
     ! module task so the NSPP module cannot do it. Note it has to be done only if scalars are used.
@@ -386,12 +388,16 @@ contains
         allocate( params_nspp%z0source(1:params_nspp%N_scalars) )
         allocate( params_nspp%widthsource(1:params_nspp%N_scalars) )
         allocate( params_nspp%scalar_Ceta(1:params_nspp%N_scalars) )
+        allocate( params_nspp%valuesource(1:params_nspp%N_scalars) )
 
         allocate( params_nspp%scalar_inicond(1:params_nspp%N_scalars) )
         allocate( params_nspp%scalar_source_type(1:params_nspp%N_scalars) )
+        allocate( params_nspp%scalar_mean(1:params_nspp%N_scalars) )
+        allocate( params_nspp%scalar_maxabs(1:params_nspp%N_scalars) )
 
         params_nspp%scalar_inicond = "dummy"
         params_nspp%scalar_source_type = "dummy"
+        params_nspp%valuesource = 1.0_rk
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'Sc', params_nspp%schmidt_numbers )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'Ra', params_nspp%rayleigh_numbers )
@@ -399,6 +405,7 @@ contains
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'y0source', params_nspp%y0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'z0source', params_nspp%z0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'widthsource', params_nspp%widthsource )
+        call read_param_mpi( FILE, 'ConvectionDiffusion', 'valuesource', params_nspp%valuesource, params_nspp%valuesource )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'C_eta', params_nspp%scalar_Ceta)
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_nspp%scalar_inicond, params_nspp%scalar_inicond )
@@ -809,6 +816,10 @@ contains
       if (params_nspp%time_statistics) then
         call init_t_file('time_statistics_mean.t', overwrite)
         call init_t_file('time_statistics_maxabs.t', overwrite)
+      endif
+      if (params_nspp%use_passive_scalar) then
+        call init_t_file('scalar_mean.t', overwrite)
+        call init_t_file('scalar_maxabs.t', overwrite)
       endif
       if (params_nspp%penalization .or. params_nspp%use_sponge) then
         call init_t_file('forces.t', overwrite, (/ "           time", "   sum_forces_X", "   sum_forces_Y", "   sum_forces_Z"/))

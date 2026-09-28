@@ -515,7 +515,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
         ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         if (params_acm%use_passive_scalar) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%scalar_mean, params_acm%N_scalars, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_acm%scalar_mean = params_acm%scalar_mean / get_active_domain_length(params_acm%domain_size, params_acm%domain_cropping_min, params_acm%domain_cropping_max, dir=merge('xyz', 'xy ', params_acm%dim==3))
+            params_acm%scalar_mean = params_acm%scalar_mean / product(params_acm%domainSizeCropped(1:params_acm%dim))
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%scalar_maxabs, params_acm%N_scalars, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         endif
 
@@ -674,7 +674,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! Then, the volume of the cropped computational changes and is no longer product(domain). 
                 dissipation = params_acm%dissipation / product(params_acm%domainSizeCropped(1:params_acm%dim))
                 
-		u_RMS = sqrt( (2.0_rk/3.0_rk) * params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)))
+		        u_RMS = sqrt( (2.0_rk/3.0_rk) * params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)))
 
                 call append_t_file( 'turbulent_statistics.t', (/time, dissipation, &
                      params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)), &

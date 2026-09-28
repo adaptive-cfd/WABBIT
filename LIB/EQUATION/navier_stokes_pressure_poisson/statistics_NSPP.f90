@@ -492,7 +492,7 @@ subroutine STATISTICS_NSPP( time, dt, u, g, x0, dx, stage, work, mask )
         ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
         if (params_nspp%use_passive_scalar) then
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%scalar_mean, params_nspp%N_scalars, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-            params_nspp%scalar_mean = params_nspp%scalar_mean / get_active_domain_length(params_nspp%domain_size, params_nspp%domain_cropping_min, params_nspp%domain_cropping_max, dir=merge('xyz', 'xy ', params_nspp%dim==3))
+            params_nspp%scalar_mean = params_nspp%scalar_mean / product(params_nspp%domainSizeCropped(1:dim))
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_nspp%scalar_maxabs, params_nspp%N_scalars, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         endif
 

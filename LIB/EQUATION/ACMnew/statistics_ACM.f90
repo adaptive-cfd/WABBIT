@@ -131,6 +131,10 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%time_statistics_mean = 0.0_rk
             params_acm%time_statistics_maxabs = 0.0_rk
         endif
+        if (params_acm%use_passive_scalar) then
+            params_acm%scalar_mean = 0.0_rk
+            params_acm%scalar_maxabs = 0.0_rk
+        endif
 
         dx_min = 90.0e9_rk
 
@@ -395,6 +399,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             enddo
         endif
 
+        ! mean and maximum absolute value of each passive scalar
+        if (params_acm%use_passive_scalar) then
+            do k = 1, params_acm%N_scalars
+                params_acm%scalar_mean(k) = params_acm%scalar_mean(k) + dV * sum( u(x1:x2, y1:y2, z1:z2, params_acm%dim+1+k) )
+                params_acm%scalar_maxabs(k) = max( params_acm%scalar_maxabs(k), maxval(abs(u(x1:x2, y1:y2, z1:z2, params_acm%dim+1+k))) )
+            enddo
+        endif
+
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
@@ -497,6 +509,14 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             params_acm%time_statistics_mean = params_acm%time_statistics_mean / product(params_acm%domainSizeCropped(1:params_acm%dim))
             
             call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%time_statistics_maxabs, params_acm%n_time_statistics, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+        endif
+
+        ! passive scalar statistics
+        ! mean depends on volume depends on the cropping of the domain, so we have to take care of that
+        if (params_acm%use_passive_scalar) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%scalar_mean, params_acm%N_scalars, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
+            params_acm%scalar_mean = params_acm%scalar_mean / product(params_acm%domainSizeCropped(1:params_acm%dim))
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%scalar_maxabs, params_acm%N_scalars, MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
         endif
 
         umag = params_acm%umag
@@ -654,7 +674,7 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
                 ! Then, the volume of the cropped computational changes and is no longer product(domain). 
                 dissipation = params_acm%dissipation / product(params_acm%domainSizeCropped(1:params_acm%dim))
                 
-		u_RMS = sqrt( (2.0_rk/3.0_rk) * params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)))
+		        u_RMS = sqrt( (2.0_rk/3.0_rk) * params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)))
 
                 call append_t_file( 'turbulent_statistics.t', (/time, dissipation, &
                      params_acm%e_kin / product(params_acm%domainSizeCropped(1:params_acm%dim)), &
@@ -669,6 +689,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             if (params_acm%time_statistics) then
                 call append_t_file( 'time_statistics_mean.t', (/time, params_acm%time_statistics_mean/) )
                 call append_t_file( 'time_statistics_maxabs.t', (/time, params_acm%time_statistics_maxabs/) )
+            endif
+
+            ! passive scalar statistics
+            if (params_acm%use_passive_scalar) then
+                call append_t_file( 'scalar_mean.t', (/time, params_acm%scalar_mean/) )
+                call append_t_file( 'scalar_maxabs.t', (/time, params_acm%scalar_maxabs/) )
             endif
 
             ! this file is to simply keep track of simulations, should they be restarted with different parameters.

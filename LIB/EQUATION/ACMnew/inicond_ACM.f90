@@ -615,6 +615,26 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
             select case (trim(standardize_string(params_acm%scalar_inicond(iscalar))))
             case ("empty", "none", "zero")
                 u(:,:,:,params_acm%dim + 1 + iscalar) = 0.0_rk
+            case ("one", "const")
+                u(:,:,:,params_acm%dim + 1 + iscalar) = 1.0_rk
+            case ("blob", "gaussian")
+                ! gaussian blob centered at (x0source,y0source,z0source) with width "widthsource",
+                ! re-using the same per-scalar location/width parameters as the "gaussian" source term.
+                do iz = 1, Bs(3)+2*g
+                    if (params_acm%dim == 3) then
+                        z = (x0(3) + dble(iz-g-1)*dx(3) - params_acm%z0source(iscalar))**2
+                    else
+                        z = 0.0_rk
+                    endif
+                    do iy = 1, Bs(2)+2*g
+                        y = (x0(2) + dble(iy-g-1)*dx(2) - params_acm%y0source(iscalar))**2
+                        do ix = 1, Bs(1)+2*g
+                            x = (x0(1) + dble(ix-g-1)*dx(1) - params_acm%x0source(iscalar))**2
+
+                            u(ix,iy,iz,params_acm%dim + 1 + iscalar) = dexp( -(x+y+z) / (params_acm%widthsource(iscalar)**2) )
+                        end do
+                    end do
+                end do
             case ("kadoch2012")
                 if (params_acm%dim == 2) then
                     do iy = 1, Bs(2)+2*g
@@ -713,7 +733,7 @@ subroutine INICOND_ACM( time, u, g, x0, dx, n_domain )
                     call abort(0409193, "Scalar inicond RTI is only for 3D")
                 endif
             case default
-                call abort(0409192, "Unkown scalar inicond")
+                call abort(0409192, "Unkown scalar inicond " //trim(adjustl(params_acm%scalar_inicond(iscalar))))
             end select
         enddo
     endif

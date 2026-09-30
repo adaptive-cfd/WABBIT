@@ -6,6 +6,34 @@
 !-------------------------------------------------------------------------------
 
 !-------------------------------------------------------------------------------
+!> Exact signed distance to a 2D cavity (domain border with thickness).
+!!!
+!!! Inputs:
+!!! - `p` query point
+!!! - `domain_size` size of the computational domain
+!!! - `h_cavity` thickness of the cavity (distance from border)
+!!!
+!!! Return value:
+!!! - signed dist with dist<0 inside the cavity (within h_cavity of the border)
+!!!
+!!! Notes:
+!!! - The cavity is the region within h_cavity distance from the domain boundaries.
+!!! - Distance is negative inside the cavity, positive outside.
+function signed_distance_cavity_2D(p, domain_size, h_cavity) result(dist)
+    use module_globals, only: rk
+    implicit none
+    real(kind=rk), intent(in) :: p(1:2), domain_size(1:2), h_cavity
+    real(kind=rk) :: dist
+    real(kind=rk) :: d_min
+
+    ! Compute minimum distance to any of the 4 boundaries
+    d_min = min(p(1), domain_size(1) - p(1), p(2), domain_size(2) - p(2))
+    ! Signed distance: POSITIVE inside cavity (d_min < h_cavity), NEGATIVE outside
+    dist = h_cavity - d_min
+end function signed_distance_cavity_2D
+
+
+!-------------------------------------------------------------------------------
 !> Exact euclidean signed distance to a (filled) 2D circle.
 !!
 !! Inputs:

@@ -99,6 +99,9 @@ subroutine dense_to_sparse(params)
     call read_attributes(params%input_files(1), lgt_n_tmp, time, iteration, params%domain_size, &
     params%Bs,params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
+    ! no cropping is used by default, but the variable is not set automatically
+    params%domainSizeCropped = params%domain_size
+
     do i = 1, params%n_eqn
         file_in = params%input_files(i)
         call check_file_exists(trim(file_in))

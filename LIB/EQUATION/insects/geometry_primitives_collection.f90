@@ -102,6 +102,15 @@ subroutine init_primitives_collection(center, scale, color_set, string, file, i_
         geom_array(i_collection)%geometric_type(i_geom) = trim(adjustl(collection_string(i_geom,1)(1:i_pos-1)))
         line_parameters = str_replace_text(str_replace_text(collection_string(i_geom,1)(i_pos+1:),",","."),";",",")
         select case (geom_array(i_collection)%geometric_type(i_geom))
+        case ("cavity")
+            ! cavity: domain_size(1:3), h_cavity
+            ! domain_size is the ACTUAL domain size (NOT scaled or shifted)
+            ! h_cavity is scaled by the scale factor
+            read(line_parameters,*) geom_array(i_collection)%geometric_data(i_geom,1:4)
+            ! Store domain_size as-is (NOT scaled) in slots 1-3
+            ! Store h_cavity (NOT scaled) in slot 4
+            geom_array(i_collection)%geometric_data(i_geom,1:3) = geom_array(i_collection)%geometric_data(i_geom,1:3)
+            geom_array(i_collection)%geometric_data(i_geom,4) = geom_array(i_collection)%geometric_data(i_geom,4)
         case ("sphere")
             ! sphere: center(1:3), radius
             read(line_parameters,*) geom_array(i_collection)%geometric_data(i_geom,1:4)
@@ -178,6 +187,10 @@ subroutine init_primitives_collection(center, scale, color_set, string, file, i_
             geom_array(i_collection)%geometric_boundingbox(i_geom,2) = maxval(geom_array(i_collection)%geometric_data(i_geom,1:6:2))  ! max of x-coordinates of vertices
             geom_array(i_collection)%geometric_boundingbox(i_geom,3) = minval(geom_array(i_collection)%geometric_data(i_geom,2:6:2))  ! min of y-coordinates of vertices
             geom_array(i_collection)%geometric_boundingbox(i_geom,4) = maxval(geom_array(i_collection)%geometric_data(i_geom,2:6:2))  ! max of y-coordinates of vertices
+        case ("cavity")
+            ! cavity: the bounding box is the entire domain (cavity affects borders)
+            geom_array(i_collection)%geometric_boundingbox(i_geom,1:3) = 0.0_rk  ! min corner
+            geom_array(i_collection)%geometric_boundingbox(i_geom,4:6) = geom_array(i_collection)%geometric_data(i_geom,1:3)  ! max corner = domain_size
         end select
     end do
 
@@ -236,6 +249,8 @@ subroutine draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int, s
             call draw_rectangle(mask(:,:,1,1),mask(:,:,1,5), x0(1:2), dx(1:2), g, geom_array(i_collection)%geometric_data(i_geom,1:2), geom_array(i_collection)%geometric_data(i_geom,3:4), geom_array(i_collection)%geometric_data(i_geom,5), color_set=geom_array(i_collection)%color_set, smoothing_type_int=smoothing_type_int, smoothing_width=smoothing_width, smoothing_safety=smoothing_safety, bounding_box=geom_array(i_collection)%geometric_boundingbox(i_geom,:))
         case ("triangle")
             call draw_triangle(mask(:,:,1,1),mask(:,:,1,5), x0(1:2), dx(1:2), g, geom_array(i_collection)%geometric_data(i_geom,1:2), geom_array(i_collection)%geometric_data(i_geom,3:4), geom_array(i_collection)%geometric_data(i_geom,5:6), color_set=geom_array(i_collection)%color_set, smoothing_type_int=smoothing_type_int, smoothing_width=smoothing_width, smoothing_safety=smoothing_safety, bounding_box=geom_array(i_collection)%geometric_boundingbox(i_geom,:))
+        case ("cavity")
+            call draw_cavity(mask(:,:,:,1),mask(:,:,:,5), x0, dx, g, geom_array(i_collection)%geometric_data(i_geom,1:3), geom_array(i_collection)%geometric_data(i_geom,4), color_set=geom_array(i_collection)%color_set, smoothing_type_int=smoothing_type_int, smoothing_width=smoothing_width, smoothing_safety=smoothing_safety, bounding_box=geom_array(i_collection)%geometric_boundingbox(i_geom,:))
         end select
     end do
 

@@ -112,10 +112,11 @@ subroutine adaption_test(params)
       call read_attributes(params%input_files(j), lgt_n_tmp, time, iteration, params%domain_size, &
                        params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-      ! no cropping is used by default, but the variable is not set automatically
-      params%domainSizeCropped = params%domain_size
   end do
-
+  
+  ! no cropping is used by default, but the variable is not set automatically
+  params%domainSizeCropped = params%domain_size
+                      
   number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
   allocate(params%threshold_state_vector_component(params%n_eqn))
   params%threshold_state_vector_component(1:params%n_eqn)=1

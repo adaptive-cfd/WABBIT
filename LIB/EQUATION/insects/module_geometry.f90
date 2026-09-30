@@ -10,7 +10,11 @@ module module_geometry
     PRIVATE
 
     ! functions
-    PUBLIC :: signed_distance_triangle_2D, signed_distance_circle_2D, signed_distance_rectangle_2D, signed_distance_sphere_3D, signed_distance_cylinder_3D, signed_distance_cylinder_rounded_3D, draw_sphere, draw_cylinder, draw_cylinder_rounded, draw_circle, draw_rectangle, draw_triangle, init_primitives_collection, draw_primitives_collection, primitives_collection_geometry_indicator
+    PUBLIC :: signed_distance_triangle_2D, signed_distance_circle_2D, signed_distance_rectangle_2D, signed_distance_sphere_3D, &
+signed_distance_cylinder_3D, signed_distance_cylinder_rounded_3D, &
+signed_distance_cavity_2D, signed_distance_cavity_3D, draw_sphere, draw_cylinder, draw_cylinder_rounded, &
+draw_circle, draw_rectangle, draw_triangle, draw_cavity, init_primitives_collection, &
+draw_primitives_collection, primitives_collection_geometry_indicator
 
     ! for 2d wing section optimization
     type :: primitives_collection
@@ -549,5 +553,91 @@ subroutine draw_triangle(mask, color, x0, dx, g, vertex1, vertex2, vertex3, colo
     end do; end do
 
 end subroutine draw_triangle
+
+
+!---------------------------------------
+!> Draw a cavity (domain border with thickness) using the exact SDF
+!!!
+!!! This is a pointwise implementation that loops over all grid points in the bounding box of the cavity and applies the mask function based on the signed distance to the domain borders.
+!!!
+!!! Inputs:
+!!! - `x0`, `dx`, `g` origin and spacing, ghost point size of the block
+!!! - `domain_size` size of the computational domain
+!!! - `h_cavity` thickness of the cavity (distance from border)
+!!! - `color_set` which color to set in the mask
+!!! - `smoothing_type_int`, `smoothing_width`, `smoothing_safety` parameters for the step function
+!!! - `bounding_box` optional pre-computed bounding box for the geometry
+!!!
+!!! Outputs:
+!!! - `mask`, `color` updated with the geometry
+subroutine draw_cavity(mask, color, x0, dx, g, domain_size, h_cavity, color_set, smoothing_type_int, smoothing_width, smoothing_safety, bounding_box, x0_indices)
+    use module_globals
+
+    implicit none
+
+    !> mask and color term for every grid point of this block
+    real(kind=rk), dimension(:,:,:), intent(out)     :: mask, color
+    !> spacing and origin of block, being located at position g+1 in the mask array
+    real(kind=rk), intent(in) :: x0(1:3), dx(1:3)
+    !> grid information
+    integer(kind=ik), intent(in) :: g
+    real(kind=rk), dimension(3), intent(in) :: domain_size  !< domain size
+    real(kind=rk), intent(in) :: h_cavity                !< cavity thickness
+    integer(kind=ik), intent(in) :: color_set               !< which color to set the mask
+    integer(kind=ik), intent(in) :: smoothing_type_int     !< which mask do we use?
+    real(kind=rk), intent(in) :: smoothing_width       !< width of smoothing region
+    real(kind=rk), optional, intent(in) :: smoothing_safety      !< safety margin for smoothing
+    real(kind=rk),optional,intent(in) :: bounding_box(1:6)
+    integer, optional, intent(in) :: x0_indices(1:3)  !< For WABBIT, x0 is defined at the first interior point g+1, for FLUSI / insect draw functions, it is usually at index 1, so we can provide here the indices of x0, defaults to WABBIT formulation
+
+    ! auxiliary variables
+    real(kind=rk)  :: xyz(1:3), dist, safety, tmp
+    integer, dimension(1:3) :: lbounds, ubounds
+    integer(kind=ik) :: iz, ix, iy, Nsafety, bound_min(1:3), bound_max(1:3), x0_offset(1:3)
+
+    ! set default value for x0_indices
+    x0_offset = g+1
+    if (present(x0_indices)) x0_offset = x0_indices
+
+    ! Mask array is not resetted, as we may have other objects in the vicinity
+
+    ! safety for smoothing function
+    safety = 3.0_rk * smoothing_width
+    if (present(smoothing_safety)) safety = smoothing_safety
+    Nsafety = ceiling(safety / minval(dx))
+
+    ! bounds of the current patch of data
+    ! Note: the cavity has no bounding box - it is cheap to compute and it spans the whol
+    ! domain.
+    lbounds = g+1
+    ubounds = (/size(mask,1), size(mask,2), size(mask,3)/) -g+1
+
+
+    do iz = lbounds(3), ubounds(3)
+        xyz(3) = dble(iz-x0_offset(3)) * dx(3) + x0(3)
+
+        do iy = lbounds(2), ubounds(2)
+            xyz(2) = dble(iy-x0_offset(2)) * dx(2) + x0(2)
+
+            do ix = lbounds(1), ubounds(1)
+                xyz(1) = dble(ix-x0_offset(1)) * dx(1) + x0(1)
+
+                ! distance from domain borders (cavity)
+                dist = -signed_distance_cavity_3D( xyz, domain_size, h_cavity )
+
+
+                ! apply mask function
+                tmp = step(dist, 0.0_rk, smoothing_width, safety, smoothing_type_int)
+                if (tmp >= mask(ix,iy,iz)) then
+                    mask(ix,iy,iz) = tmp    ! mask function
+                    color(ix,iy,iz) = real(color_set, kind=rk) ! color
+                endif
+                
+            end do
+        end do
+    end do
+
+end subroutine draw_cavity
+
 
 end module module_geometry

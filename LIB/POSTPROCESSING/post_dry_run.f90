@@ -362,6 +362,8 @@ subroutine post_dry_run(params)
         do while (io_error==0)
             read (14,'(A)',iostat=io_error) fname
 
+            if (io_error > 0) exit
+
             ! read in the file
             call readHDF5vct_tree( (/fname/), params, hvy_mask, tree_ID_flow, time=time)
 
@@ -387,12 +389,12 @@ subroutine post_dry_run(params)
 
             if (save_color) then
                 write( fname,'(a, "_", a, ".h5")') "color", trim(adjustl(timestr(time)))
-                call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
+                call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=.false.)
             endif
 
             if (save_sponge) then
                 write( fname,'(a, "_", a, ".h5")') "sponge", trim(adjustl(timestr(time)))
-                call saveHDF5_tree(fname, time, -1_ik, 6, params, hvy_mask, tree_ID_flow, no_sync=pruned)
+                call saveHDF5_tree(fname, time, -1_ik, 6, params, hvy_mask, tree_ID_flow, no_sync=.false.)
             endif
         enddo
         close (14)

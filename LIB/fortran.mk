@@ -23,7 +23,9 @@ MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_t
 	module_insects.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90\
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90\
-	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 module_NSPP.f90 module_geometry.f90 # module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
+	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 module_NSPP.f90 module_geometry.f90\
+	module_wing_deformation.f90\
+	generic_functions_module.f90# Jonas module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -45,7 +47,7 @@ HDF_SOURCE = $(HDF_ROOT)
 endif
 
 # to print the version number at each run. version number == git hash ID of current commit
-GIT_HASH := $(shell git rev-parse HEAD 2>/dev/null || echo "no git found")
+GIT_HASH := $(shell git rev-parse HEAD)
 BUILD_DATE := $(shell date)
 
 #Place of Sparse BLAS objects
@@ -80,13 +82,13 @@ FFLAGS += -O3  # optimization flag
 FFLAGS += -Wuninitialized -Wall -Wextra -Wconversion -fimplicit-none -pedantic
 FFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-dummy-argument # -Wno-unused-function
 # error-catching flags
-FFLAGS += -fbounds-check -fbacktrace -ffpe-trap=zero,invalid # -fsanitize=address,leak
+FFLAGS += -fbounds-check -fbacktrace -ffpe-trap=zero,invalid
 FFLAGS += -finit-local-zero -finit-real=snan -finit-integer=-99999
 # debugging flags
 FFLAGS += -g3 -g -ggdb
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_ROOT)/lib64 -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
 LDFLAGS += $(SB_LIB) -lz
 FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
 # for GNU/gfortran, use -D for example: "PRAGMAS=-DTEST" will turn "#ifdef TEST" to true in the code
@@ -98,7 +100,7 @@ endif
 # enable / disable FFT depending on the module
 ifdef FFT_ROOT
 FFLAGS += -I$(FFT_ROOT)/include
-LDFLAGS += -L$(FFT_ROOT)/lib -L$(FFT_ROOT)/lib64 -lfftw3
+LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3
 PRAGMAS += -DFFT_ROOT
 endif
 ifdef MKLROOT
@@ -137,7 +139,7 @@ FFLAGS += -module $(OBJDIR) # specify directory for modules.
 LDFLAGS = -L/usr/X11/lib/ -lX11 #-L/usr/lib64/lapack -llapack
 # HDF_ROOT is set in environment. NOTE: it is an TNT@Tu-berlin oddity that libraries are compiled
 # to lib64/ and not lib/ like on all other systems. As a workaround, we use BOTH as linkdirs here.
-LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_ROOT)/lib64 -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
+LDFLAGS += $(HDF5_FLAGS) -L$(HDF_ROOT)/lib -L$(HDF_SOURCE)/fortran/src/.libs -L$(HDF_SOURCE)/fortran/src -lhdf5_fortran -lhdf5
 LDFLAGS += $(SB_LIB) -lz
 FFLAGS += -I$(HDF_ROOT)/include $(SB_INCL) -I$(HDF_SOURCE)/fortran/src $(SB_INCL)
 # for intel, use -D for example: PRAGMAS=-DIFORT will turn #ifdef IFORT to true in the code
@@ -148,7 +150,7 @@ PRAGMAS += -DDEV
 endif
 # enable / disable FFT depending on the module
 ifdef FFT_ROOT
-LDFLAGS += -L$(FFT_ROOT)/lib -L$(FFT_ROOT)/lib64 -lfftw3
+LDFLAGS += -L$(FFT_ROOT)/lib -lfftw3
 PRAGMAS += -DFFT_ROOT
 FFLAGS += -I$(FFT_ROOT)/include
 endif
@@ -217,10 +219,15 @@ $(OBJDIR)/module_bridge.o: module_bridge.f90
 $(OBJDIR)/module_insects_integration_flusi_wabbit.o: module_insects_integration_flusi_wabbit.f90  $(OBJDIR)/module_globals.o \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
-
+	
+$(OBJDIR)/module_wing_deformation.o: module_wing_deformation.f90 \
+	$(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser_mpi.o 
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+	
 $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o $(OBJDIR)/module_geometry.o \
-	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 \
-	wings_motion.f90 insect_init_clean.f90 \
+	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 wing_deformation_init.f90\
+	wings_motion.f90 insect_init_clean.f90 $(OBJDIR)/module_wing_deformation.o \
 	kineloader.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
@@ -274,11 +281,11 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o  $(OBJDIR)/module_wing_deformation.o 
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 time_statistics_convdiff.f90 \
-	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_params.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_t_files.o
+	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_params.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_t_files.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_NSPP.o: module_NSPP.f90 rhs_NSPP.f90 create_mask.f90 save_data_NSPP.f90 \
@@ -343,7 +350,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
 	remove_nonperiodic_neighbors.f90 forest.f90 setInitialCondition_tree.f90 securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90 \
-	multigrid_vcycle.f90 poisson_operations.f90 probes.f90 pointInBlock_block.f90 interpolatePointCloud_tree.f90
+	multigrid_vcycle.f90 poisson_operations.f90 probes.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \
@@ -372,9 +379,16 @@ $(OBJDIR)/module_saving.o: module_saving.f90 \
 	 $(OBJDIR)/module_operators.o save_data.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
+$(OBJDIR)/module_post_dry_run.o: module_post_dry_run.f90  \
+	$(OBJDIR)/module_wing_deformation.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
 $(OBJDIR)/module_MOR.o: module_MOR.f90  \
 	$(OBJDIR)/module_globals.o $(OBJDIR)/module_ini_files_parser.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_params.o \
 	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_forestMetaData.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/generic_functions_module.o: generic_functions_module.f90 $(OBJDIR)/module_globals.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

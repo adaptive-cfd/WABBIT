@@ -23,7 +23,7 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
     integer(kind=ik) :: k, Jmax, max_blocks, ierr                               ! local variables
     ! chance for block refinement, random number
     real(kind=rk) :: ref_chance, r, max_grid_density, current_grid_density
-    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level, ref_status
+    integer(kind=ik) :: hvy_id, lgt_id, Bs(1:3), g, tags, level, ref_status, k_n, lgtID_neighbor, level_neighbor
     real(kind=rk) :: mask_max, mask_min, x0(1:3), dx(1:3)
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -43,6 +43,45 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
     !! (which is not the case in block coarsening), it may even entrail other blocks in
     !! its vicinity to be refined as well.
     select case (indicator)
+    case ("refine-interfaces")
+
+        ! reset refinement status to "stay"
+        do k = 1, lgt_n(tree_ID)
+           lgt_block(lgt_active(k, tree_ID), IDX_REFINE_STS) = 0
+        enddo
+
+        ! each CPU decides for its blocks if they're refined or not
+        do k = 1, hvy_n(tree_ID)
+            ! hvy_id of the block we're looking at
+            hvy_id = hvy_active(k, tree_ID)
+            ! light id of this block
+            call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+            ! level of this block
+            level = lgt_block( lgt_id, IDX_MESH_LVL)
+
+
+            ! check if this block is to be modified
+            do k_n = 1, size(hvy_neighbor, 2)
+                ! neighbor exists ?
+                if ( hvy_neighbor(hvy_id, k_n) /= -1 ) then
+                    ! neighbor light data id
+                    lgtID_neighbor = hvy_neighbor( hvy_id, k_n )
+                    level_neighbor = lgt_block( lgtID_neighbor, IDX_MESH_LVL )
+
+                    ! neighbor is finer - flag for refinement
+                    if ((level_neighbor > level)) then
+                        lgt_block(lgt_id, IDX_REFINE_STS) = +1 ! REFINE
+                        exit
+                    endif
+                endif
+            enddo
+            
+        enddo
+
+        ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.
+        ! therefore we have to sync the lgt data
+        call synchronize_lgt_data( params, refinement_status_only=.true. )
+
     case ("mask-threshold")
         !(((((((((((((((((((((((((((((((((((())))))))))))))))))))))))))))))))))))
         ! this criterion uses the first component (and ONLY the first one) of the given data

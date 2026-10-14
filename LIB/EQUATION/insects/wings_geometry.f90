@@ -1,4 +1,3 @@
-
 ! the new routine (2/2019) creates the wings (if both wings are used, maybe just one is)
 ! and their solid body velocity field us. Note that us contains both contributions from
 ! body and wing motion.
@@ -15,6 +14,10 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect)
   integer :: ix, iy, iz
   real(kind=rk), dimension(1:3) :: x_glob, x_body, v_tmp
   integer(kind=2) :: c
+
+
+  logical :: point_found = .false.
+  real(kind=rk) :: debugging_tolerance = 1e-4
 
   if (size(mask) /= size(mask_color) .or. size(us,4) /= 3) then
     write(*,*) "mask:", shape(mask), "mask_color:", shape(mask_color), "us:", shape(us)
@@ -113,7 +116,8 @@ subroutine draw_insect_wings(time, xx0, ddx, mask, mask_color, us, Insect)
     enddo
   enddo
 
-end subroutine
+
+end subroutine draw_insect_wings
 
 
 
@@ -135,8 +139,8 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID,
 
   select case(Insect%Wings(wingID)%WingShape)
   case ("rectangular")
-      call draw_wing_rectangular(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, &
-      M_b2w,x_pivot_b, rot_rel_wing_w)
+        call draw_wing_rectangular(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, &
+            M_b2w,x_pivot_b, rot_rel_wing_w)
 
   case ("suzuki_butterfly")
       call draw_wing_rectangular_suzuki_butterfly(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, &
@@ -201,7 +205,7 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   character(len=1), intent(in) :: side
 
   integer :: ix,iy,iz,j
-  real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), xa(1:3), xb(1:3)
+  real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), xa(1:3), xb(1:3), x_mat(1:3)
   real(kind=rk) :: R, R0, R_tmp, zz0
   real(kind=rk) :: y_tmp, x_tmp, z_tmp, s, t, D
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta, wsign
@@ -236,7 +240,20 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
               ! disabled
               ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
               x_body = matmul(M_g2b,x)
-              x_wing = matmul(M_b2w,x_body-x_pivot_b)
+
+            ! extend the wing by a material coordinate. 
+            ! to keep the nomenclature of the variables, we redefine the rigid wing coordinates as material coordinates, where x^w = x^mat for a rigid body.
+
+              x_mat = matmul(M_b2w,x_body-x_pivot_b)
+              x_wing = x_mat
+
+              ! check for wing rigidity. If this is not the case, map the material coordinates to wing coordinates.
+              ! In the case of a rigid wing, no deflection -> x_mat = x_wing
+
+                if (.not. Insect%Wings(wingID)%rigid) then
+                    call displace_coords(Insect%time, x_wing, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                end if
+            
 
               ! bounding box check: does this point lie within the bounding box? Note Insect%wing_bounding_box
               ! is set in SET_WING_BOUNDING_BOX_FOURIER
@@ -313,6 +330,13 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                               v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
                               v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
                               v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
+
+                                ! calculate the velocity component through the deformation, in WING coordinates.
+
+                                if (.not. Insect%Wings(wingID)%rigid) then
+                                    call add_deformation_velocity(Insect%time, x_mat, v_tmp, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                                end if
 
                               ! note we set this only if it is a part of the wing
                               ! us is now in body system (note M_b2w contains the stroke plane)
@@ -649,10 +673,10 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
     real(kind=rk),intent(in)::M_g2b(1:3,1:3),M_b2w(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
 
     integer :: ix,iy,iz
-    real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3)
+    real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3), x_mat(1:3)
     real(kind=rk) :: R, R0, R_tmp
-    real(kind=rk) :: y_tmp, x_tmp, z_tmp, y_left, y_right
-    real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
+    real(kind=rk) :: y_tmp, x_tmp, z_tmp, y_left, y_right, side
+    real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot, SDF(1:3), L
 
     ! wing shape (determine between which x-values (x_bot, x_top) the wing is
     ! these values depend on the spanwise direction (which is y)
@@ -674,9 +698,21 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                 ! if (periodic_insect) x = periodize_coordinate(x, (/xl,yl,zl/))
 
                 x_body = matmul(M_g2b,x)
-                x_wing = matmul(M_b2w,x_body-x_pivot_b)
 
-                ! spanwise length:
+                ! extend the wing by a deformation coordinate. 
+                ! to keep the nomenclature of the variables, we redefine the rigid wing coordinates as material coordinates, where x^w = x^mat for a rigid body.
+                x_mat = matmul(M_b2w,x_body-x_pivot_b)
+                x_wing = x_mat
+
+
+              ! check for wing rigidity. If this is not the case, map the material coordinates to wing coordinates.
+              ! In the case of a rigid wing, no deflection -> x_mat = x_wing
+
+                if (.not. Insect%Wings(wingID)%rigid) then
+                    call displace_coords(Insect%time, x_wing, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                end if
+
+                ! spanwise length
                 if ((x_wing(2)>=y_left-Insect%safety).and.(x_wing(2)<=y_right+Insect%safety)) then
                     ! thickness: (note left and right wing have a different orientation of the z-axis
                     ! but this does not matter since this is the same.
@@ -703,6 +739,7 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
 
                             mask_tmp = z_tmp*y_tmp*x_tmp
 
+
                             if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0_rk)) then
                                 mask(ix,iy,iz) = mask_tmp
                                 mask_color(ix,iy,iz) = color_wing
@@ -713,10 +750,19 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                                 ! the main routine Draw_Insect
                                 !------------------------------------------------
 
-                                ! v_tmp is wing in wing reference frame
+                                ! the first calculation of v_tmp relates to the velocity of the the undeformed reference frame. This is because the additional velocity 
+                                ! through the change in deformation angle is accounted for in add_deformation_velocity().
+                                ! Since we've already calculated the displacement and added it to the wing coordinates, additional velocity components in the wing reference frame relative to the body are implicitly accounted for.
+
                                 v_tmp(1) = rot_rel_wing_w(2)*x_wing(3)-rot_rel_wing_w(3)*x_wing(2)
                                 v_tmp(2) = rot_rel_wing_w(3)*x_wing(1)-rot_rel_wing_w(1)*x_wing(3)
                                 v_tmp(3) = rot_rel_wing_w(1)*x_wing(2)-rot_rel_wing_w(2)*x_wing(1)
+
+                                ! calculate the velocity component through the deformation
+
+                                if (.not. Insect%Wings(wingID)%rigid) then
+                                    call add_deformation_velocity(Insect%time, x_mat, v_tmp, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                                end if
 
                                 ! note we set this only if it is a part of the wing
                                 us(ix,iy,iz,1:3) = matmul(transpose(M_b2w), v_tmp)
@@ -725,6 +771,18 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                         endif
                     endif
                 endif
+
+                !!! DEBUGGING
+                !SDF(1) = max(-x_wing(1) + x_bot,  x_wing(1) - x_top)
+                !SDF(2) = max(-x_wing(2) + y_left, x_wing(2) - y_right)
+                !SDF(3) = dabs(x_wing(3)) - (0.5_rk * Insect%Wings(wingID)%WingThickness)
+
+                !mask(ix, iy, iz) = sqrt(max(SDF(1), 0.0_rk)**2 + &
+                !            max(SDF(2), 0.0_rk)**2 + &
+                !            max(SDF(3), 0.0_rk)**2) + min(max(SDF(1), max(SDF(2), SDF(3))), 0.0_rk)
+
+                !!! DEBUGGING
+
             enddo
         enddo
     enddo
@@ -1097,8 +1155,8 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
     integer(kind=ik) :: xmin, xmax, ymin, ymax, zmin, zmax
     integer(kind=ik) :: xmin_seg, xmax_seg, ymin_seg, ymax_seg, zmin_seg, zmax_seg
     real(kind=rk) :: x, y, z
-    real(kind=rk) :: x_g(1:3), x_b(1:3), x_w(1:3)
-    real(kind=rk) :: corner_w(1:3), corner_b(1:3), corner_g(1:3)
+    real(kind=rk) :: x_g(1:3), x_b(1:3), x_w(1:3), x_mat(1:3)
+    real(kind=rk) :: corner_mat(1:3), corner_w(1:3), corner_b(1:3), corner_g(1:3), corner_temp(1:3)
     real(kind=rk) :: M_w2b(1:3,1:3), M_b2g(1:3,1:3)
     real(kind=rk) :: band_width
     real(kind=rk) :: wingbox_w(1:6), x_wingbox_w(1:2), y_wingbox_w(1:2), z_wingbox_w(1:2)
@@ -1181,7 +1239,18 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
         do j = 1, 2
             do i = 1, 2
                 ! corner
-                corner_w = (/x_wingbox_w(i), y_wingbox_w(j), z_wingbox_w(k)/)
+                corner_mat = (/x_wingbox_w(i), y_wingbox_w(j), z_wingbox_w(k)/)
+                corner_w = corner_mat
+
+                ! First, check for wing rigidity. If the deformation angle distrbution is monotonic (which will be the case for our linear twist distribution), 
+                ! then the maxima/minima must lie on the corners (in material coordinates!) of the box.
+                ! to find the bounding box, we therefore need to find the position of the corners and describe them in MATERIAL coordinates,
+                ! since our original wingbox is also described in non-deformed coords.
+
+                if (.not. Insect%Wings(wingID)%rigid) then
+                    call undisplace_coords(Insect%time, corner_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                end if
+
                 ! wing -> body
                 corner_b = x_pivot_b + matmul(M_w2b, corner_w)
                 ! body -> global
@@ -1189,7 +1258,7 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
                 ! Global axis-aligned box around the tilted wing box
                 wingbox_g_min = min(wingbox_g_min, corner_g)
-                wingbox_g_max = max(wingbox_g_max, corner_g)            
+                wingbox_g_max = max(wingbox_g_max, corner_g)     
             enddo
         enddo
     enddo
@@ -1259,7 +1328,7 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
         x_segmentbox_w = (/segmentbox_w(1), segmentbox_w(2)/)
         y_segmentbox_w = (/segmentbox_w(3), segmentbox_w(4)/)
-        z_segmentbox_w = (/segmentbox_w(5), segmentbox_w(6)/)
+        z_segmentbox_w = (/segmentbox_w(5), segmentbox_w(6)/)  
 
         ! we are saving global coordinates of the bounding box with each values wingbox_g_min(3) - x,y,z
         segmentbox_g_min = 999.d9
@@ -1270,7 +1339,14 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
             do j = 1, 2
                 do i = 1, 2
                     ! corner
-                    corner_w = (/x_segmentbox_w(i), y_segmentbox_w(j), z_segmentbox_w(k)/)
+                    corner_mat = (/x_segmentbox_w(i), y_segmentbox_w(j), z_segmentbox_w(k)/)
+
+                    corner_w = corner_mat
+
+                    if (.not. Insect%Wings(wingID)%rigid) then
+                        call undisplace_coords(Insect%time, corner_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                    end if
+
                     ! wing -> body
                     corner_b = x_pivot_b + matmul(M_w2b, corner_w)
                     ! body -> global
@@ -1331,18 +1407,31 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                     x_b = matmul(M_g2b, x_g - Insect%xc_body_g)
 
                     ! body -> wing
-                    x_w = matmul(M_b2w, x_b - x_pivot_b)
+                    x_mat = matmul(M_b2w, x_b - x_pivot_b)
+                    x_w = x_mat
+
+
+                                      
+                    ! Assuming more or less monotously increasing wing deformation, i.e. the maximum and minimum displacement are at the edges of the bounding box (A bold assumption): 
+                    ! displace the coordinates of the segment box. We need to add the deformation here to avoid clipping a particularly bendy wing.
+
+                    if (.not. Insect%Wings(wingID)%rigid) then
+                        call displace_coords(Insect%time, x_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                    endif
 
                     ! Extra local check.
                     ! The global bounding box is only a coarse box around a rotated box.
                     ! This check removes points that are inside the global box
                     ! but outside the actual local segment box
-                    if (x_w(1) < segmentbox_w(1)) cycle
-                    if (x_w(1) > segmentbox_w(2)) cycle
-                    if (x_w(2) < segmentbox_w(3)) cycle
-                    if (x_w(2) > segmentbox_w(4)) cycle
-                    if (x_w(3) < segmentbox_w(5)) cycle
-                    if (x_w(3) > segmentbox_w(6)) cycle
+
+                    if (Insect%Wings(wingID)%rigid) then
+                        if (x_mat(1) < segmentbox_w(1)) cycle
+                        if (x_mat(1) > segmentbox_w(2)) cycle
+                        if (x_mat(2) < segmentbox_w(3)) cycle
+                        if (x_mat(2) > segmentbox_w(4)) cycle
+                        if (x_mat(3) < segmentbox_w(5)) cycle
+                        if (x_mat(3) > segmentbox_w(6)) cycle
+                    end if
 
                     ! 2D distance in the wing plane.
                     ! Only x_w/y_w are used here.
@@ -1382,6 +1471,17 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                 x_b = matmul(M_g2b, x_g - Insect%xc_body_g)
                 ! body -> wing
                 x_w = matmul(M_b2w, x_b - x_pivot_b)
+
+                ! extend the wing by a material coordinate. 
+                ! to keep the nomenclature of the variables, we redefine the rigid wing coordinates as material coordinates, where x^w = x^mat for a rigid body.
+
+                x_mat = x_w
+
+                ! displace the coordinates based on the deformation model and whether the wing is actually rigid. if this isn't called, x_mat stays x_w and nothing happens.
+
+                if (.not. Insect%Wings(wingID)%rigid) then
+                    call displace_coords(Insect%time, x_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                endif
 
                 ! inside the global box but outside the true local wing box.
                 if (x_w(1) < wingbox_w(1)) cycle
@@ -1451,9 +1551,19 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                     mask(ix,iy,iz) = mask_value
                     mask_color(ix,iy,iz) = color_wing
 
+                    ! the first calculation of v_tmp relates to the velocity of the the undeformed reference frame. This is because the additional velocity 
+                    ! through the change in deformation angle is accounted for in add_deformation_velocity().
+                    ! Since we've already calculated the displacement and added it to the wing coordinates, additional velocity components in the wing reference frame relative to the body are implicitly accounted for.
+
                     v_tmp(1) = rot_rel_wing_w(2)*x_w(3)-rot_rel_wing_w(3)*x_w(2)
                     v_tmp(2) = rot_rel_wing_w(3)*x_w(1)-rot_rel_wing_w(1)*x_w(3)
                     v_tmp(3) = rot_rel_wing_w(1)*x_w(2)-rot_rel_wing_w(2)*x_w(1)
+
+                    ! calculate the velocity component through the deformation
+
+                    if (.not. Insect%Wings(wingID)%rigid) then
+                        call add_deformation_velocity(Insect%time, x_mat, v_tmp, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                    end if
 
                     us(ix,iy,iz,1:3) = matmul(transpose(M_b2w), v_tmp)
                 endif
@@ -1558,7 +1668,7 @@ end function point_in_polygon_2D
 !-------------------------------------------------------------------------------
 real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
     implicit none
-    integer(kind=ik) :: i,j, n_radius, j1, j2
+    integer :: i,j, n_radius
     real(kind=rk) :: R0, theta2, dphi, area
     type(diptera),intent(inout)::Insect
     real(kind=rk), intent(in) :: theta
@@ -1570,7 +1680,6 @@ real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
     dphi = (2.0_rk*pi) / (dble(n_radius-1))
 
 
-    !-------------------------------------------------------------------------------------
     ! evaluate the entire R(theta) once with very fine resolution, so when
     ! calling it for the second time we only need linear interpolation.
     !
@@ -1605,20 +1714,16 @@ real(kind=rk) function Radius_Fourier( theta, Insect, wingID )
             Insect%Wings(wingID)%R0_table(j) = R0
         enddo
         ! call this setup only once.
-        ! Note: was not merged into Setup_WingShape because the hard-coded Fouier coefficients make that complicated
+        ! Note: was not merged into Setup_WingShape because the hard-coded Fouier coefficients render that complicated
         Insect%Wings(wingID)%wings_radius_table_ready = .true.
         ! for debugging
         if (root) write(*,*) "Radius Fourier: pre-computation done. ", maxval(Insect%Wings(wingID)%R0_table), minval(Insect%Wings(wingID)%R0_table)
     endif
 
-    !-------------------------------------------------------------------------------------
-    ! linear interpolation, if already preprocessed the R(theta) table - that is faster than 
-    ! evaluating the Fourier series.
-    j1 = floor( theta / dphi ) + 1 ! note one-based indexing
-    j2 = j1 + 1
-    if (j2 > n_radius) j2 = 1 ! periodization
-    Radius_Fourier = Insect%Wings(wingID)%R0_table(j1) + ((theta-real(j1-1,kind=rk)*dphi) / dphi) &
-    * (Insect%Wings(wingID)%R0_table(j2) - Insect%Wings(wingID)%R0_table(j1))
+    ! linear interpolation, if already stored the radius
+    j = floor( theta / dphi ) + 1
+    Radius_Fourier = Insect%Wings(wingID)%R0_table(j) + ((theta-real(j-1,kind=rk)*dphi) / dphi) &
+    * (Insect%Wings(wingID)%R0_table(j+1) - Insect%Wings(wingID)%R0_table(j))
 end function
 
 
@@ -2595,7 +2700,9 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
 
     RR0 = R0 + safety
 
-
+    do ix = 1, 4
+        if (.not. Insect%Wings(ix)%rigid) call abort(21072603, "oops! wiggly bristles still need to be implemented...")
+    end do
     !---------------------------------------------------------------------------
     ! transform coordinates to global system. they are defined in the wing system
     !---------------------------------------------------------------------------

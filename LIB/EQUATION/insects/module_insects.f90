@@ -5,6 +5,7 @@ module module_insects
    use module_t_files
    use module_stl_file_reader
    use module_geometry
+   use module_wing_deformation
 
    implicit none
 
@@ -158,6 +159,12 @@ module module_insects
       ! rotation matrices for the various coordinate system for the insect
       real(kind=rk),dimension(1:3,1:3) :: M_b2w
 
+      ! define the rigidity of the wing using a deformation model
+
+      type(deformation_model) :: deformation
+      logical :: rigid = .true.
+
+
    end type
 
    ! **********************************************************************************************
@@ -168,7 +175,6 @@ module module_insects
 
       ! most variables are hidden here, because they are wing-specific
       ! (yes, I know that diptera have only two wings.)
-      ! Wings: 1=left 2=right 3=left hind 4=right hind
       type(wing_type) :: Wings(1:4)
 
       !-------------------------------------------------------------
@@ -617,6 +623,7 @@ contains
 
       ! this is a debug test, which succeeded.
       !call check_if_us_is_derivative_of_position_wingtip(time, Insect)
+
    end subroutine Draw_Insect
 
    !-------------------------------------------------------------------------------
@@ -636,17 +643,13 @@ contains
       block_extent = dx * real(BS, kind=rk)
       xend = x0 + block_extent
 
-      ! if there is a body, then check if the body center is contained in the block
-      if (trim(standardize_string(Insects(insect_id)%BodyType)) /= 'nobody') then
-         ! check if body center is contained - it is located around xc_body_g
-         if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
-            geometry_in_block = .true.
-         endif
+      ! check if body center is contained - it is located around xc_body_g
+      if (all( (Insects(insect_id)%xc_body_g(:) >= x0(:)) .and. all(Insects(insect_id)%xc_body_g(:) <= xend(:)) )) then
+         geometry_in_block = .true.
       endif
 
       ! Check if wing is contained - this is tricky, as we usually only have the pivot point (which often outside the wing) and complex shapes
       ! so for now, I skip this and hope that (fingers cross), resolving the body is enough to draw the wings as well
-      ! The case of no body is usually for validation purposes, so we accept that any user (looking at you, Thomas) ensures that it is sufficiently resolved
 
    end subroutine insect_geometry_indicator
 

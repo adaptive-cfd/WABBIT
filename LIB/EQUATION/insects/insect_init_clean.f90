@@ -39,13 +39,14 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     integer, optional, intent(in) :: N_ghost_nodes
     !
     logical, optional, intent(in) :: periodic
+
     !> default colors for the insect geometries, in case they are not set in the ini file. This is useful to avoid color conflicts with the user defined geometries, which are colored from 0 to n_geometries-1.
     !! The default is to set the insect colors to start right after n_geometries and be unique for all parts (body, left wing, right wing, left wing 2, right wing 2, geometry / full insect) and individual insects.
     integer, optional, intent(in) :: colors_default(6)
 
     type(inifile) :: PARAMS
-    real(kind=rk) :: defaultvec(1:3), defaultvec5(5)
-    character(len=clong) :: DoF_string, dummystr
+    real(kind=rk) :: defaultvec(1:3), defaultvec5(5), alpha_tip, alpha_root, reversalPhase, NReversals,nt_frac
+    character(len=clong) :: DoF_string, dummystr, filenameL, filenameR, filenameL2, filenameR2
     integer :: j, tmp, mpirank, mpicode, ntri
     integer(kind=2) :: wingID
     logical :: section_exists
@@ -118,7 +119,60 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     call read_param_mpi(PARAMS, SECTION, "RightWing", Insect%Wings(2)%used, .true.)
     call read_param_mpi(PARAMS, SECTION, "LeftWing2", Insect%Wings(3)%used, .false.)
     call read_param_mpi(PARAMS, SECTION, "RightWing2", Insect%Wings(4)%used, .false.)
-    
+
+    ! which wings are rigid?
+
+    call read_param_mpi(PARAMS, SECTION, "LeftWingRigid", Insect%Wings(1)%rigid, .true.)
+    call read_param_mpi(PARAMS, SECTION, "RightWingRigid", Insect%Wings(2)%rigid, .true.)
+    call read_param_mpi(PARAMS, SECTION, "LeftWing2Rigid", Insect%Wings(3)%rigid, .true.)
+    call read_param_mpi(PARAMS, SECTION, "RightWing2Rigid", Insect%Wings(4)%rigid, .true.)
+
+    do wingID=1,4
+        call read_param_mpi(PARAMS, SECTION, 'modelName', Insect%Wings(wingID)%deformation%model_name, "lin_sin")
+        call read_param_mpi(PARAMS, SECTION, 'offsetDalpha', Insect%Wings(wingID)%deformation%D_alpha_0, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'slopeDalpha', Insect%Wings(wingID)%deformation%D_alpha_slope, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'ai', Insect%Wings(wingID)%deformation%ai_D_alpha, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'bi', Insect%Wings(wingID)%deformation%bi_D_alpha, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'omega', Insect%Wings(wingID)%deformation%omega, 0.0_rk)
+
+
+        call read_param_mpi(PARAMS, SECTION, 'timeCoefficients', defaultvec5, (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/))
+        call read_param_mpi(PARAMS, SECTION, 'timeFunction', Insect%Wings(wingID)%deformation%A_tilde%function_name, "sin")
+        !search for parameters for the linearAlpha model (temporal)
+        call read_param_mpi(PARAMS, SECTION, 'NReversals', NReversals, -1e5_rk)
+        call read_param_mpi(PARAMS, SECTION, 'reversalPhase', reversalPhase, -1e5_rk)
+
+        Insect%Wings(wingID)%deformation%A_tilde%coeffs = defaultvec5
+
+        call read_param_mpi(PARAMS, SECTION, 'spatialCoefficients', defaultvec5, (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/))
+        !search for parameters for the linearAlpha model (spatial)
+        call read_param_mpi(PARAMS, SECTION, 'alphaTip', alpha_tip, -1e5_rk)
+        call read_param_mpi(PARAMS, SECTION, 'alphaRoot', alpha_root, -1e5_rk)
+        Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs = defaultvec5
+        call read_param_mpi(PARAMS, SECTION, 'spatialFunction', Insect%Wings(wingID)%deformation%D_alpha_tilde%function_name, "polynomial")
+        call read_param_mpi(PARAMS, SECTION, 'negativeTwistFraction', nt_frac, -1e5_rk)
+
+
+        call read_param_mpi(PARAMS, SECTION, 'flexionLineAngle', Insect%Wings(wingID)%deformation%flexion_angle, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'flexionLinePivot', defaultvec, (/0.0_rk, 0.0_rk, 0.0_rk/))
+        Insect%Wings(wingID)%deformation%pivot_flexion = defaultvec
+
+        if ((alpha_tip/=-1e5_rk) .and. (alpha_root/=-1e5_rk) .and. (NReversals/=-1e5_rk) .and. (reversalPhase/=-1e5_rk)) then
+
+            Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs(1) = alpha_root
+            Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs(2) = alpha_tip
+            Insect%Wings(wingID)%deformation%A_tilde%coeffs(2)  = NReversals
+            Insect%Wings(wingID)%deformation%A_tilde%coeffs(3)  = reversalPhase
+            Insect%Wings(wingID)%deformation%A_tilde%coeffs(4)  = nt_frac
+
+        end if
+
+        call break_down_into_simple_model(Insect%Wings(wingID)%deformation)
+
+
+
+    end do
+
     ! determine whether the second pair of wings is present
     ! This variable is used to control output files.
     Insect%second_wing_pair = .false.
@@ -127,7 +181,6 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     endif
 
     ! store the sides for each wing - done only once for the rest of the code
-    ! Wings: 1=left 2=right 3=left hind 4=right hind
     Insect%Wings(1)%side = "L"
     Insect%Wings(2)%side = "R"
     Insect%Wings(3)%side = "L"

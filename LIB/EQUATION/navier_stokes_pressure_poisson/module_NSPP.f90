@@ -827,14 +827,15 @@ contains
 
         ! max/min for usolid
         do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_max"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_max"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_max"
-        enddo
-        do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_min"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_min"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_min"
+            ! Max headers
+            write(headers((i_color-1)*3 + 2), "(A,I0.3,A)") "color", i_color, ":ux_solid_max"
+            write(headers((i_color-1)*3 + 3), "(A,I0.3,A)") "color", i_color, ":uy_solid_max"
+            write(headers((i_color-1)*3 + 4), "(A,I0.3,A)") "color", i_color, ":uz_solid_max"
+
+            ! Min headers (offset by 3*ncolors)
+            write(headers(3*ncolors + (i_color-1)*3 + 2), "(A,I0.3,A)") "color", i_color, ":ux_solid_min"
+            write(headers(3*ncolors + (i_color-1)*3 + 3), "(A,I0.3,A)") "color", i_color, ":uy_solid_min"
+            write(headers(3*ncolors + (i_color-1)*3 + 4), "(A,I0.3,A)") "color", i_color, ":uz_solid_min"
         enddo
         call init_t_file('usolid_color.t', overwrite, headers(1:6*ncolors+1) )
 
@@ -845,6 +846,7 @@ contains
             write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":force_Z"
         enddo
         call init_t_file('forces_color.t', overwrite, headers(1:3*ncolors+1) )
+
         do i_color = 1, ncolors
             write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":moment_X"
             write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":moment_Y"

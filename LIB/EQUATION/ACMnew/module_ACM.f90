@@ -851,16 +851,17 @@ contains
 
         ! max/min for usolid
         do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_max"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_max"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_max"
+            ! Max headers
+            write(headers((i_color-1)*3 + 2), "(A,I0.3,A)") "color", i_color, ":ux_solid_max"
+            write(headers((i_color-1)*3 + 3), "(A,I0.3,A)") "color", i_color, ":uy_solid_max"
+            write(headers((i_color-1)*3 + 4), "(A,I0.3,A)") "color", i_color, ":uz_solid_max"
+
+            ! Min headers (offset by 3*ncolors)
+            write(headers(3*ncolors + (i_color-1)*3 + 2), "(A,I0.3,A)") "color", i_color, ":ux_solid_min"
+            write(headers(3*ncolors + (i_color-1)*3 + 3), "(A,I0.3,A)") "color", i_color, ":uy_solid_min"
+            write(headers(3*ncolors + (i_color-1)*3 + 4), "(A,I0.3,A)") "color", i_color, ":uz_solid_min"
         enddo
-        do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_min"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_min"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_min"
-        enddo
-        call init_t_file('usolid_color.t', overwrite, headers(1:6*ncolors+1) )
+        call init_t_file('usolid_color.t', overwrite, headers(1:6*ncolors+1))
 
         ! Initialization of header for different colors. Format: color1:force_g_x -> the g is to remind us that those are in the global system
         do i_color = 1, ncolors

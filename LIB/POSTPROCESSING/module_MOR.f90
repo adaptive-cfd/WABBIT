@@ -289,10 +289,7 @@ contains
 
         end do
 
-        ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-        ! Then, the volume of the cropped computational changes and is no longer product(domain). 
-        Volume = product(params%domainSizeCropped(1:params%dim))
-
+        Volume = product(params%domain_size(1:params%dim))
         ! V is the matrix of eigenvectors
         if (Volume>0.0_rk) then
             a_coefs = a_coefs / Volume
@@ -1077,10 +1074,7 @@ contains
         rank = params%rank
         Bs= params%Bs
         g = params%g
-        ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-        ! Then, the volume of the cropped computational changes and is no longer product(domain). 
-        Volume = product(params%domainSizeCropped(1:params%dim))
-
+        Volume = product(params%domain_size(1:params%dim))
         L2norm = 0.0_rk
         ! Loop over the active hvy_data
         do tree_ID =1, N_snapshots
@@ -1133,10 +1127,7 @@ contains
         t_elapse = MPI_wtime()
         N_snapshots = size(C,1)
         rank = params%rank
-        ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-        ! Then, the volume of the cropped computational changes and is no longer product(domain). 
-        Volume = product(params%domainSizeCropped(1:params%dim))
-
+        Volume = product(params%domain_size(1:params%dim))
         ! We loop over all snapshots X_i, i=1,...,N to calculate the values of the symmetric
         ! covariance matrix C_{j,i} = C_{i,j} = <X_i, X_j>
         do tree_ID1 = 1, N_snapshots
@@ -1863,10 +1854,7 @@ contains
                 enddo
             enddo
 
-            ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-            ! Then, the volume of the cropped computational changes and is no longer product(domain). 
-            Volume = product(params%domainSizeCropped(1:params%dim))
-
+            Volume = product(params%domain_size(1:params%dim))
             ! V is the matrix of eigenvectors
             a_coefs = a_coefs / Volume
 

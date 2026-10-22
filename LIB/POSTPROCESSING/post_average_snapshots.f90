@@ -15,9 +15,9 @@ subroutine post_average_snapshots(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=chuge) :: fname_ini, fname2, fname_out
+    character(len=cshort) :: fname_ini, fname2, fname_out
 
-    character(len=chuge), allocatable     :: fname_in(:)
+    character(len=cshort), allocatable     :: fname_in(:)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
@@ -61,7 +61,6 @@ subroutine post_average_snapshots(params)
         if ( i == 1 ) then
             call read_attributes(fname_in(i), Nblocks(1), time, iteration, &
             params%domain_size, params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-            
         endif
         call read_attributes(fname_in(i), Nblocks(i), time, iteration, &
         domain, bs, level, dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
@@ -75,9 +74,6 @@ subroutine post_average_snapshots(params)
 
     ! read name of output file:
     call get_command_argument(Nargs, fname_out)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
 
 
     params%number_blocks = (N_snapshots+1)*maxval(Nblocks) ! just to get some memory:

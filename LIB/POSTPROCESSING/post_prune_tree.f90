@@ -13,7 +13,7 @@ subroutine post_prune_tree(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=chuge) :: fname_ini, fname1, fname_out
+    character(len=cshort) :: fname_ini, fname1, fname_out
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_tmp(:, :, :, :, :)
@@ -44,9 +44,6 @@ subroutine post_prune_tree(params)
     call get_command_argument(3, fname_out)
 
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     ! just to get some memory:
     params%number_blocks = 20 + N1 / params%number_procs

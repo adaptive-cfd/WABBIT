@@ -13,7 +13,7 @@ subroutine compute_scalar_field_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: file_fld, operator
+    character(len=cshort)              :: file_fld, operator
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3)     :: Bs
@@ -22,7 +22,7 @@ subroutine compute_scalar_field_post(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvy_id
 
-    character(len=chuge)              :: fname
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -65,9 +65,6 @@ subroutine compute_scalar_field_post(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_fld, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     call get_command_argument(3, order)
 

@@ -11,7 +11,7 @@ subroutine post_dump_neighbors(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)      :: file, operator
+    character(len=cshort)      :: file, operator
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, tc_length
     integer(kind=ik), dimension(3) :: Bs
@@ -55,8 +55,6 @@ subroutine post_dump_neighbors(params)
     call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     ! unused so just fill any value
     params%order_discretization = "FD_2nd_central"

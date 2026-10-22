@@ -10,7 +10,7 @@ subroutine operator_reconstruction(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=chuge) :: file, infile
+    character(len=cshort) :: file, infile
     real(kind=rk) :: time, x, y, dx_fine, u_dx, u_dxdx, dx_inv, val, x2, y2, nu, x_in, y_in, sign
     integer(kind=ik) :: iteration, k, lgt_id, tc_length, iblock, ix, iy, &
     g, iz, a1, b1, a2, b2, level, j
@@ -24,7 +24,7 @@ subroutine operator_reconstruction(params)
 
     integer(kind=ik)                   :: tree_ID=1, hvy_id, g1,g2, npoints=0, g3
 
-    character(len=chuge)              :: fname
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -48,12 +48,10 @@ subroutine operator_reconstruction(params)
     call read_attributes(file, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-    
+
     params%Jmax = tc_length+2 ! to allow refinement
     params%n_eqn = 2
     params%domain_size = domain
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
     params%Bs = Bs
     allocate(params%butcher_tableau(1,1))
     allocate(params%symmetry_vector_component(1:params%n_eqn))

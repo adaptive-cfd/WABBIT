@@ -34,7 +34,7 @@ module module_wing_deformation
         real(kind=rk) :: flexion_angle
         real(kind=rk) :: pivot_flexion(1:3)
 
-
+        ! compensate for 
 
         ! maybe program a fourier series later
 
@@ -284,6 +284,7 @@ module module_wing_deformation
         if (model_inv%D_alpha_tilde%function_name == "polynomial") then
             model_inv%D_alpha_tilde%coeffs = -model_inv%D_alpha_tilde%coeffs
             model_inv%pivot_flexion = -model_inv%pivot_flexion
+            model_inv%flexion_angle = -model_inv%flexion_angle
         else
             call abort(42424, "inverse not implemented yet...")
         end if

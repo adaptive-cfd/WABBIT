@@ -47,7 +47,7 @@ module module_nspp
     real(kind=rk) :: dx_min = -1.0_rk
     ! Forces for the different colors
     ! These are computed and used only in statistics output
-    real(kind=rk), allocatable :: force_color(:,:), moment_color(:,:), usolid_max_color(:,:), usolid_min_color(:,:)
+    real(kind=rk), allocatable :: force_color(:,:), moment_color(:,:)
     logical :: penalization, compute_flow=.true.
     ! sponge term:
     logical :: use_sponge = .false.
@@ -65,13 +65,11 @@ module module_nspp
     real(kind=rk), allocatable :: mask_volume(:)
     real(kind=rk) :: meanflow_channel(1:3) = 0.0_rk
 
-    logical :: use_passive_scalar = .false., use_active_buoyancy_scalar = .false., symmetric_buoyancy = .false.
+    logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0
-    real(kind=rk), allocatable :: schmidt_numbers(:), rayleigh_numbers(:), x0source(:), y0source(:), &
-    z0source(:), scalar_Ceta(:), widthsource(:), valuesource(:)
+    real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
+    z0source(:), scalar_Ceta(:), widthsource(:)
     character(len=cshort), allocatable :: scalar_inicond(:), scalar_source_type(:)
-    ! mean and maximum absolute value of each passive scalar, integrated/measured over the domain
-    real(kind=rk), allocatable :: scalar_mean(:), scalar_maxabs(:)
     ! when computing passive scalars, we require derivatives of the mask function, which
     ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
     ! module task so the NSPP module cannot do it. Note it has to be done only if scalars are used.
@@ -88,15 +86,14 @@ module module_nspp
     logical :: read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
-    real(kind=rk), dimension(3) :: domain_size=0.0_rk, domain_cropping_min=0.0_rk, domain_cropping_max=1.0_rk, domainSizeCropped=1.0_rk
+    real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=clong) :: inicond="", discretization=""
 
     ! VPM section
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3), freq, h_channel
     integer(kind=ik) :: n_geometries = 1
     character(len=clong) :: geometry_legacy="", geometry_string=""
-    character(len=clong), allocatable :: geometries(:)
-    character(len=chuge), allocatable :: geometry_files(:)
+    character(len=clong), allocatable :: geometries(:), geometry_files(:)
     integer(kind=ik), allocatable :: geometry_colors(:)
     character(len=cshort) :: sponge_type=""
     character(len=cshort) :: coarsening_indicator=""
@@ -153,7 +150,7 @@ contains
     integer(kind=ik) :: mpicode, nx_max, n_entries
     real(kind=rk) :: dx_min, dt_min_vpm, dt_min_nu
     character(len=cshort) :: Bs_str, Bs_conc
-    character(len=maxcolumns) :: input_files
+    character(len=400) :: input_files
     character(len=12) :: timestamp
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: ddx
@@ -165,7 +162,7 @@ contains
     logical :: section_exists
 
     type(inifile) :: FILE
-    integer :: Neqn, i, insect_id, dim
+    integer :: Neqn, i, insect_id
 
     N_mask_components = 0
     ! WABBIT decides how many ghost nodes we have (because the versions >=2024 determine G 
@@ -194,25 +191,7 @@ contains
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_nspp%dim, 2 )
-    dim = params_nspp%dim
-
     call read_param_mpi(FILE, 'Domain', 'domain_size', params_nspp%domain_size(1:params_nspp%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-
-    ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-    ! Coordinates are still counted from the original origin, i.e., [0,0,0] in the un-cropped domain. That
-    ! means if cropping is used, the grid might not contain the origin anymore. The the volume of the cropped
-    ! computational changes and is no longer product(domain_size). 
-    params_nspp%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params_nspp%domain_cropping_min(1:params_nspp%dim), params_nspp%domain_cropping_min(1:params_nspp%dim) )
-    
-    params_nspp%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params_nspp%domain_cropping_max(1:params_nspp%dim), params_nspp%domain_cropping_max(1:params_nspp%dim) )
-
-    ! For convenience, store the length of the cropped domain. Used to compute the volume of the cropped domain.
-    params_nspp%domainSizeCropped = 1.0_rk
-    params_nspp%domainSizeCropped(1:dim) = params_nspp%domain_size(1:dim) * (params_nspp%domain_cropping_max(1:dim) - params_nspp%domain_cropping_min(1:dim))
-
-
     params_nspp%periodic_BC = .true.
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_nspp%periodic_BC, params_nspp%periodic_BC )
 
@@ -246,7 +225,7 @@ contains
     call read_param_mpi(FILE, 'Physics', 'read_from_files', params_nspp%read_from_files, .false.)
     ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
     if (params_nspp%read_from_files) then
-        ! read in all files as one string (so no check for file existence), then hack-extract the timestamp from the last entry, which is used for insect_init
+        ! read in all files as one string (so no check for file existence), then hack-extract the timestamp, which is used for initialize_insect
         call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "")
         timestamp = input_files( scan(input_files,'_', back=.true.)+1:scan(input_files,'.h5', back=.true.)-3)
         read(timestamp,*) params_nspp%start_time
@@ -376,36 +355,27 @@ contains
 
     ! passive scalars
     call read_param_mpi(FILE, 'NSPP', 'use_passive_scalar', params_nspp%use_passive_scalar, .false.)
-    call read_param_mpi(FILE, 'ACM-new', 'use_active_buoyancy_scalar', params_nspp%use_active_buoyancy_scalar, .false.)
-    if (params_nspp%use_active_buoyancy_scalar) params_nspp%use_passive_scalar = .true.
     if (params_nspp%use_passive_scalar) then
         call read_param_mpi(FILE, 'ConvectionDiffusion', 'N_scalars', params_nspp%N_scalars, 1)
 
         allocate( params_nspp%schmidt_numbers(1:params_nspp%N_scalars) )
-        allocate( params_nspp%rayleigh_numbers(1:params_nspp%N_scalars) )
         allocate( params_nspp%x0source(1:params_nspp%N_scalars) )
         allocate( params_nspp%y0source(1:params_nspp%N_scalars) )
         allocate( params_nspp%z0source(1:params_nspp%N_scalars) )
         allocate( params_nspp%widthsource(1:params_nspp%N_scalars) )
         allocate( params_nspp%scalar_Ceta(1:params_nspp%N_scalars) )
-        allocate( params_nspp%valuesource(1:params_nspp%N_scalars) )
 
         allocate( params_nspp%scalar_inicond(1:params_nspp%N_scalars) )
         allocate( params_nspp%scalar_source_type(1:params_nspp%N_scalars) )
-        allocate( params_nspp%scalar_mean(1:params_nspp%N_scalars) )
-        allocate( params_nspp%scalar_maxabs(1:params_nspp%N_scalars) )
 
         params_nspp%scalar_inicond = "dummy"
         params_nspp%scalar_source_type = "dummy"
-        params_nspp%valuesource = 1.0_rk
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'Sc', params_nspp%schmidt_numbers )
-        call read_param_mpi( FILE, 'ConvectionDiffusion', 'Ra', params_nspp%rayleigh_numbers )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'x0source', params_nspp%x0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'y0source', params_nspp%y0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'z0source', params_nspp%z0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'widthsource', params_nspp%widthsource )
-        call read_param_mpi( FILE, 'ConvectionDiffusion', 'valuesource', params_nspp%valuesource, params_nspp%valuesource )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'C_eta', params_nspp%scalar_Ceta)
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_nspp%scalar_inicond, params_nspp%scalar_inicond )
@@ -616,7 +586,7 @@ contains
     enddo
 
     ! now initialze force arrays for colors at last, because we know how many colors we have
-    allocate( params_nspp%force_color(1:3, 1:ncolors), params_nspp%moment_color(1:3, 1:ncolors), params_nspp%mask_volume(1:ncolors), params_nspp%usolid_max_color(1:3, 1:ncolors), params_nspp%usolid_min_color(1:3, 1:ncolors) )
+    allocate( params_nspp%force_color(1:3, 1:ncolors), params_nspp%moment_color(1:3, 1:ncolors), params_nspp%mask_volume(1:ncolors) )
 
     call clean_ini_file_mpi( FILE )
 
@@ -817,26 +787,9 @@ contains
         call init_t_file('time_statistics_mean.t', overwrite)
         call init_t_file('time_statistics_maxabs.t', overwrite)
       endif
-      if (params_nspp%use_passive_scalar) then
-        call init_t_file('scalar_mean.t', overwrite)
-        call init_t_file('scalar_maxabs.t', overwrite)
-      endif
       if (params_nspp%penalization .or. params_nspp%use_sponge) then
         call init_t_file('forces.t', overwrite, (/ "           time", "   sum_forces_X", "   sum_forces_Y", "   sum_forces_Z"/))
         call init_t_file('moments.t', overwrite, (/ "           time", "  sum_moments_X", "  sum_moments_Y", "  sum_moments_Z"/))
-
-        ! max/min for usolid
-        do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_max"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_max"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_max"
-        enddo
-        do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_min"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_min"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_min"
-        enddo
-        call init_t_file('usolid_color.t', overwrite, headers(1:6*ncolors+1) )
 
         ! dynamic initialziation of force array so that it makes sense
         do i_color = 1, ncolors

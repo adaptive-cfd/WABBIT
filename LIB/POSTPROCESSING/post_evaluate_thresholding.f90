@@ -11,7 +11,7 @@ subroutine post_evaluate_thresholding(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: fname, indicator, operator, order
+    character(len=cshort)              :: fname, indicator, operator, order
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
@@ -89,15 +89,11 @@ subroutine post_evaluate_thresholding(params)
     call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
-    
+
     params%Jmax = tc_length
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
     params%Bs = Bs
     params%threshold_mask = .false.
     params%force_maxlevel_dealiasing = .false.

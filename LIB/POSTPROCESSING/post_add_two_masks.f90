@@ -13,7 +13,7 @@ subroutine post_add_two_masks(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=chuge) :: mode, fname1, fname2, fname_out, args
+    character(len=clong) :: mode, fname1, fname2, fname_out, args
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
     real(kind=rk), allocatable         :: hvy_work(:, :, :, :, :, :)
@@ -74,9 +74,6 @@ subroutine post_add_two_masks(params)
 
     call read_attributes(fname1, N1, time, iteration, domain, params%Bs, tc_length1, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
     call read_attributes(fname2, N2, time, iteration, domain, params%Bs, tc_length2, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     if (strings_are_similar(mode, "--test-operations")) then
         params%number_blocks = ceiling(5.0*dble(max(N1,N2)) / dble(params%number_procs)) ! just to get some memory in case not provided, in theory we don't know how much we need

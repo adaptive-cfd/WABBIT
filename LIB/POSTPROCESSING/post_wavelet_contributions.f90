@@ -11,7 +11,7 @@ subroutine post_wavelet_contributions(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: fname_in, fname_out
+    character(len=cshort)              :: fname_in, fname_out
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgt_ID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
@@ -106,9 +106,6 @@ subroutine post_wavelet_contributions(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(fname_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
     
     ! Check box parameters: for each dimension, use either extent or end (not both)
     ! but allow mixing across dimensions

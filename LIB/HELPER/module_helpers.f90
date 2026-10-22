@@ -9,11 +9,9 @@ module module_helpers
     interface step_cosine
         module procedure step_cosine2, step_cosine3, step_cosine4
     end interface
-    
     interface step_hester
         module procedure step_hester3, step_hester4
     end interface
-
     interface step_disc
         module procedure step_disc2, step_disc4
     end interface
@@ -33,6 +31,7 @@ module module_helpers
     integer, parameter :: STEP_METHOD_COSINE = 1
     integer, parameter :: STEP_METHOD_HESTER = 2
     integer, parameter :: STEP_METHOD_DISC   = 3
+    integer, parameter :: STEP_METHOD_NONE   = 4
 
 contains
 
@@ -51,7 +50,7 @@ contains
     ! + \dfrac{1}{16}\arcsin\!\bigl(\sqrt{2(|\xi|-2)}\bigr), & 1.5 \leq |\xi| \leq 2.5, \\[6pt]
     ! 0, & 2.5 \leq |\xi|.
     ! \end{cases}$$
-    real (kind=rk) function deltaInterpolationKernel(x,dx1)
+    real (kind=rk) function delta_interpolation(x,dx1)
         ! use vars
         real(kind=rk), intent(in) :: x, dx1
         real(kind=rk) :: r
@@ -62,28 +61,28 @@ contains
         r = abs(x/dx1)
 
         if (r<0.5_rk) then
-            deltaInterpolationKernel = (3.0_rk/8.0_rk)+(pi/32.0_rk)-0.250_rk*r**2
+            delta_interpolation = (3.0_rk/8.0_rk)+(pi/32.0_rk)-0.250_rk*r**2
         elseif ( (r>=0.50_rk) .and. (r<=1.50_rk)   ) then
-            deltaInterpolationKernel = 0.25_rk + (1.0_rk-r)/8.0_rk  *sqrt(-2.0_rk + 8.0_rk*r - 4.0_rk*r**2) -asin(sqrt(2.0_rk)*(r-1.0_rk))/8.0_rk
+            delta_interpolation = 0.25_rk + (1.0_rk-r)/8.0_rk  *sqrt(-2.0_rk + 8.0_rk*r - 4.0_rk*r**2) -asin(sqrt(2.0_rk)*(r-1.0_rk))/8.0_rk
         elseif ( (r>=1.5_rk) .and. (r<=2.5_rk)   ) then
-            deltaInterpolationKernel = (17.0_rk/16.0_rk) - (pi/64.0_rk) - (3.0_rk*r/4.0_rk) + ((r**2)/8.0_rk) + &
+            delta_interpolation = (17.0_rk/16.0_rk) - (pi/64.0_rk) - (3.0_rk*r/4.0_rk) + ((r**2)/8.0_rk) + &
                     (r-2.0_rk)*sqrt(-14.0_rk + 16.0_rk*r - 4.0_rk*r**2)/16.0_rk +asin(sqrt(2.0_rk)*(r-2.0_rk))/16.0_rk
         elseif ( (r>=2.5_rk)    ) then
-            deltaInterpolationKernel = 0.0_rk
+            delta_interpolation = 0.0_rk
         endif
     end function
 
-    ! linear function kernel for interpolation (a Hat function:  __/\__ )
-    real (kind=rk) function linearInterpolationKernel(x,dx1)
+    ! linear function for interpolation
+    real (kind=rk) function linear_interpolation(x,dx1)
         ! use vars
         real(kind=rk), intent(in) :: x, dx1
         real(kind=rk) :: r
         r = abs(x/dx1)
 
         if (r < 1.0_rk) then
-            linearInterpolationKernel = 1.0_rk - r
+            linear_interpolation = 1.0_rk - r
         else
-            linearInterpolationKernel = 0.0_rk
+            linear_interpolation = 0.0_rk
         endif
     end function
 
@@ -391,6 +390,8 @@ contains
                 step = step_hester4(x,t,h,safety)
             case (STEP_METHOD_DISC)
                 step = step_disc4(x,t,h,safety)
+            case (STEP_METHOD_NONE)
+                step = step_none(x,t,h,safety)
             case default
                 write(*,'("ERROR: method ",I0," not implemented for step function")') method
                 call abort(191919, "Invalid method for step function")
@@ -572,7 +573,16 @@ contains
         return
     end function step_disc4
 
+    !-------------------------------------------------------
+    ! for double-checking the output of the SDF: do NOT apply the mask function at all! return the SDF output.
+    !-------------------------------------------------------
+    real(kind=rk) function step_none(x, t, h, safety)
+        implicit none
+        real(kind=rk), intent(in) :: x, t, h, safety
 
+        step_none = x
+        
+    end function step_none
 
     !> \brief abort program if file does not exist
     subroutine check_file_exists(fname)
@@ -712,35 +722,6 @@ contains
 
         deallocate(seed)
     end subroutine
-
-
-    !-------------------------------------------------------------------------------
-    ! for a fraction of the type a=a_int/2^level, this function returns the level and the integer a
-    ! elemental so that I can call it with arrays
-    !-------------------------------------------------------------------------------
-    elemental subroutine get_demonitator_dyadic_level(a, level, a_int)
-        implicit none
-        real(kind=rk), intent(in) :: a
-        integer(kind=ik), intent(out) :: level, a_int
-        real(kind=rk) :: temp_a
-
-        temp_a = a
-        level = 0
-
-        ! Keep multiplying by 2 until temp_a is an integer
-        do while (abs(temp_a - nint(temp_a)) > 1.0e-12_rk)
-            temp_a = temp_a * 2.0_rk
-            level = level + 1
-            if (level > 60) then
-                ! this number does not have a representation of the form a/2^level
-                temp_a = 0.0_rk
-                level = -1
-                exit
-            endif
-        end do
-
-        a_int = nint(temp_a)
-    end subroutine get_demonitator_dyadic_level
 
 
     !-------------------------------------------------------------------------------
@@ -1042,7 +1023,7 @@ contains
         implicit none
         character(len=*), intent(in) :: name
         character(len=*), intent(in) :: default
-        character(len=*), intent(out) :: value
+        character(len=cshort), intent(out) :: value
 
         integer :: i, rank, ierr
         character(len=clong) :: args
@@ -1097,7 +1078,7 @@ contains
     subroutine get_cmd_arg_str_vct( name, value )
         implicit none
         character(len=*), intent(in) :: name
-        character(len=*), intent(out), ALLOCATABLE :: value(:)
+        character(len=cshort), intent(out), ALLOCATABLE :: value(:)
 
         integer :: i, rank, ierr, n, k
         character(len=600) :: args

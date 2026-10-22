@@ -12,7 +12,7 @@ subroutine post_denoising_test(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)  :: file_in, file_out, n_type
+    character(len=cshort)  :: file_in, file_out, n_type
     real(kind=rk)          :: n_s, n_f, n_i, signal_strength(1:1), r1, r2, t_den, std_est(1:1), time
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
@@ -71,9 +71,6 @@ subroutine post_denoising_test(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_in, lgt_n(tree_ID_flow), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
 
     ! initialize wavelet transform
     ! also, set number of ghost nodes params%G to minimal value for this wavelet

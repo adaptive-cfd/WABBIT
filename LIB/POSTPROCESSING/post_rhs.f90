@@ -11,8 +11,8 @@ subroutine post_rhs(params)
     implicit none
 
     type (type_params), intent(inout)  :: params
-    character(len=chuge)  :: fname_ini, dummy, fname
-    character(len=chuge), allocatable  :: files(:)
+    character(len=cshort)  :: fname_ini, dummy, fname
+    character(len=cshort), allocatable  :: files(:)
     real(kind=rk)          :: time
     integer(kind=ik)       :: iteration, k, lgt_id, tc_length, g
     integer(kind=ik), dimension(3) :: Bs
@@ -59,9 +59,6 @@ subroutine post_rhs(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call get_command_argument(3, files(1))
     call read_attributes(files(1), lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     ! in usual parameter files, RK4 (or some other RK) is used an requires a lot of memory
     ! here we do not need that, and hence pretent to use a basic scheme (EE1 maybe)

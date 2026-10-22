@@ -11,7 +11,7 @@ subroutine post_denoising(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)  :: file_in, file_out
+    character(len=cshort)  :: file_in, file_out
     real(kind=rk)          :: time, time_given, domain(1:3)
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
@@ -53,9 +53,6 @@ subroutine post_denoising(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(params%input_files(1), lgt_n(tree_ID_flow), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
 
     ! check if the other files are consistent with this one
     do k = 1, params%n_eqn

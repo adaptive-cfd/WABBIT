@@ -7,7 +7,7 @@ subroutine post_mean(params)
     use module_forestMetaData
 
     implicit none
-    character(len=chuge)                   :: fname, fname_out, option         !> name of the file
+    character(len=cshort)                   :: fname, fname_out, option         !> name of the file
     type (type_params), intent(inout)       :: params                           !> parameter struct
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :)
@@ -49,9 +49,6 @@ subroutine post_mean(params)
     ! add some parameters from the file
     call read_attributes(fname, lgt_n(tree_ID), time, iteration, params%domain_size, params%Bs, params%Jmax, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
 
     params%n_eqn = 1
     params%g = 3_ik

@@ -6,6 +6,7 @@ module module_acm
   use mpi
   use module_insects
   use module_t_files
+  use module_wing_deformation
 
   use module_globals
   ! ini file parser module, used to read parameters. note: in principle, you can also
@@ -32,7 +33,7 @@ module module_acm
   INITIALIZE_ASCII_FILES_ACM
   !**********************************************************************************************
 
-  ! how many different parts of the mask can be distinguished at max
+! how many different parts of the mask can be distinguished at max
   integer(kind=ik) :: ncolors=8
 
   ! user defined data structure for time independent parameters, settings, constants
@@ -48,7 +49,7 @@ module module_acm
     real(kind=rk) :: dx_min = -1.0_rk
     ! Forces for the different colors
     ! These are computed and used only in statistics output
-    real(kind=rk), allocatable :: force_color(:,:), moment_color(:,:), usolid_max_color(:,:), usolid_min_color(:,:)
+    real(kind=rk), allocatable :: force_color(:,:), moment_color(:,:)
     real(kind=rk) :: gamma_p
     logical :: penalization, compute_flow=.true.
     ! sponge term:
@@ -70,13 +71,11 @@ module module_acm
     real(kind=rk), allocatable :: mask_volume(:)
     real(kind=rk) :: meanflow_channel(1:3) = 0.0_rk
 
-    logical :: use_passive_scalar = .false., use_active_buoyancy_scalar = .false., symmetric_buoyancy = .false.
+    logical :: use_passive_scalar = .false.
     integer(kind=ik) :: N_scalars = 0
-    real(kind=rk), allocatable :: schmidt_numbers(:), rayleigh_numbers(:), x0source(:), y0source(:), &
-    z0source(:), scalar_Ceta(:), widthsource(:), valuesource(:)
+    real(kind=rk), allocatable :: schmidt_numbers(:), x0source(:), y0source(:), &
+    z0source(:), scalar_Ceta(:), widthsource(:)
     character(len=cshort), allocatable :: scalar_inicond(:), scalar_source_type(:)
-    ! mean and maximum absolute value of each passive scalar, integrated/measured over the domain
-    real(kind=rk), allocatable :: scalar_mean(:), scalar_maxabs(:)
     ! when computing passive scalars, we require derivatives of the mask function, which
     ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
     ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
@@ -93,15 +92,14 @@ module module_acm
     logical :: read_from_files = .false.
 
     integer(kind=ik) :: dim, N_fields_saved
-    real(kind=rk), dimension(3) :: domain_size=0.0_rk, domain_cropping_min=0.0_rk, domain_cropping_max=1.0_rk, domainSizeCropped=1.0_rk
+    real(kind=rk), dimension(3) :: domain_size=0.0_rk
     character(len=clong) :: inicond="", discretization=""
 
     ! VPM section
     real(kind=rk) :: x_cntr(1:3), u_cntr(1:3), R_cyl, length, thickness, u_mean_set(1:3), freq, h_channel
     integer(kind=ik) :: n_geometries = 1
     character(len=clong) :: geometry_legacy="", geometry_string=""
-    character(len=clong), allocatable :: geometries(:)
-    character(len=chuge), allocatable :: geometry_files(:)
+    character(len=clong), allocatable :: geometries(:), geometry_files(:)
     integer(kind=ik), allocatable :: geometry_colors(:)
     character(len=cshort) :: sponge_type=""
     character(len=cshort) :: p_eqn_model="acm"
@@ -125,13 +123,16 @@ module module_acm
 
     ! stuff for lamballais cylinder
     real(kind=rk) :: R0, R1, R2
-    character(len=chuge) :: file_usx, file_usy, file_usp
+    character(len=clong) :: file_usx, file_usy, file_usp
     character(len=cshort), allocatable :: smoothing_type(:)
     integer(kind=ik), allocatable :: smoothing_type_int(:)
     real(kind=rk), allocatable :: smoothing_width(:), smoothing_safety(:)
     real(kind=rk), allocatable :: u_lamballais(:,:,:)
 
     logical :: initialized = .false.
+
+
+    real(kind=rk) :: bananas
   end type type_params_acm
 
   ! parameters for this module. they should not be seen outside this physics module
@@ -161,7 +162,7 @@ contains
     integer(kind=ik) :: mpicode, nx_max, n_entries
     real(kind=rk) :: dx_min, dt_min_c0, dt_min_vpm, dt_min_nu
     character(len=cshort) :: Bs_str, Bs_conc
-    character(len=maxcolumns) :: input_files
+    character(len=400) :: input_files
     character(len=12) :: timestamp
     character(:), allocatable :: Bs_short
     real(kind=rk), dimension(3) :: ddx
@@ -171,7 +172,7 @@ contains
     real(kind=rk), allocatable :: buffer_array(:,:)
 
     type(inifile) :: FILE
-    integer :: Neqn, i, insect_id, dim
+    integer :: Neqn, i, insect_id
     character(len=clong) :: SECTION
     logical :: section_exists
 
@@ -201,24 +202,7 @@ contains
     call read_ini_file_mpi(FILE, filename, .true.)
 
     call read_param_mpi(FILE, 'Domain', 'dim', params_acm%dim, 2 )
-    dim = params_acm%dim
-
-    call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
-    
-    ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-    ! Coordinates are still counted from the original origin, i.e., [0,0,0] in the un-cropped domain. That
-    ! means if cropping is used, the grid might not contain the origin anymore. The the volume of the cropped
-    ! computational changes and is no longer product(domain_size). 
-    params_acm%domain_cropping_min=(/ 0.0_rk, 0.0_rk, 0.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_cropping_min', params_acm%domain_cropping_min(1:dim), params_acm%domain_cropping_min(1:dim) )
-    
-    params_acm%domain_cropping_max=(/ 1.0_rk, 1.0_rk, 1.0_rk /)
-    call read_param_mpi(FILE, 'Domain', 'domain_cropping_max', params_acm%domain_cropping_max(1:dim), params_acm%domain_cropping_max(1:dim) )
-
-    ! For convenience, store the length of the cropped domain. Used to compute the volume of the cropped domain.
-    params_acm%domainSizeCropped = 1.0_rk
-    params_acm%domainSizeCropped(1:dim) = params_acm%domain_size(1:dim) * (params_acm%domain_cropping_max(1:dim) - params_acm%domain_cropping_min(1:dim))
-
+    call read_param_mpi(FILE, 'Domain', 'domain_size', params_acm%domain_size(1:params_acm%dim), (/ 1.0_rk, 1.0_rk, 1.0_rk /) )
     params_acm%periodic_BC = .true.
     call read_param_mpi(FILE, 'Domain', 'periodic_BC', params_acm%periodic_BC, params_acm%periodic_BC )
 
@@ -256,7 +240,7 @@ contains
     call read_param_mpi(FILE, 'Physics', 'read_from_files', params_acm%read_from_files, .false.)
     ! free flight also requires the time at which we resume (the structure of wabbit main does no allow to pass it to this routine...)
     if (params_acm%read_from_files) then
-        ! read in all files as one string (so no check for file existence), then hack-extract the timestamp from the last entry, which is used for insect_init
+        ! read in all files as one string (so no check for file existence), then hack-extract the timestamp, which is used for initialize_insect
         call read_param_mpi(FILE, 'Physics', 'input_files', input_files, "")
         timestamp = input_files( scan(input_files,'_', back=.true.)+1:scan(input_files,'.h5', back=.true.)-3)
         read(timestamp,*) params_acm%start_time
@@ -349,6 +333,13 @@ contains
         end select
     enddo
 
+    ! find a variable called bananas :)
+
+    call read_param_mpi(FILE, 'VPM', 'bananas', params_acm%bananas, 0.0_rk)
+
+
+
+
     ! stuff for channel flow
     call read_param_mpi(FILE, 'ACM-new', 'use_channel_forcing', params_acm%use_channel_forcing, .false. )
     call read_param_mpi(FILE, 'ACM-new', 'u_mean_set', params_acm%u_mean_set, (/1.0_rk, 0.0_rk, 0.0_rk/) )
@@ -387,42 +378,32 @@ contains
 
     ! passive scalars
     call read_param_mpi(FILE, 'ACM-new', 'use_passive_scalar', params_acm%use_passive_scalar, .false.)
-    call read_param_mpi(FILE, 'ACM-new', 'use_active_buoyancy_scalar', params_acm%use_active_buoyancy_scalar, .false.)
-    if (params_acm%use_active_buoyancy_scalar) params_acm%use_passive_scalar = .true.
     if (params_acm%use_passive_scalar) then
         call read_param_mpi(FILE, 'ConvectionDiffusion', 'N_scalars', params_acm%N_scalars, 1)
 
         allocate( params_acm%schmidt_numbers(1:params_acm%N_scalars) )
-        allocate( params_acm%rayleigh_numbers(1:params_acm%N_scalars) )
         allocate( params_acm%x0source(1:params_acm%N_scalars) )
         allocate( params_acm%y0source(1:params_acm%N_scalars) )
         allocate( params_acm%z0source(1:params_acm%N_scalars) )
         allocate( params_acm%widthsource(1:params_acm%N_scalars) )
         allocate( params_acm%scalar_Ceta(1:params_acm%N_scalars) )
-        allocate( params_acm%valuesource(1:params_acm%N_scalars) )
 
         allocate( params_acm%scalar_inicond(1:params_acm%N_scalars) )
         allocate( params_acm%scalar_source_type(1:params_acm%N_scalars) )
-        allocate( params_acm%scalar_mean(1:params_acm%N_scalars) )
-        allocate( params_acm%scalar_maxabs(1:params_acm%N_scalars) )
 
         params_acm%scalar_inicond = "dummy"
         params_acm%scalar_source_type = "dummy"
-        params_acm%valuesource = 1.0_rk
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'Sc', params_acm%schmidt_numbers )
-        call read_param_mpi( FILE, 'ConvectionDiffusion', 'Ra', params_acm%rayleigh_numbers )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'x0source', params_acm%x0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'y0source', params_acm%y0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'z0source', params_acm%z0source )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'widthsource', params_acm%widthsource )
-        call read_param_mpi( FILE, 'ConvectionDiffusion', 'valuesource', params_acm%valuesource, params_acm%valuesource )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'C_eta', params_acm%scalar_Ceta)
 
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'inicond', params_acm%scalar_inicond, params_acm%scalar_inicond )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'source', params_acm%scalar_source_type, params_acm%scalar_source_type )
         call read_param_mpi( FILE, 'ConvectionDiffusion', 'scalar_BC_type', params_acm%scalar_BC_type, "neumann" )
-        call read_param_mpi( FILE, 'ConvectionDiffusion', 'symmetric_buoyancy', params_acm%symmetric_buoyancy, .false. )
 
         if (params_acm%use_sponge) then
             call read_param_mpi( FILE, 'ConvectionDiffusion', 'absorbing_sponge', params_acm%absorbing_sponge, .true. )
@@ -452,7 +433,7 @@ contains
     endif
 
     ! set defaults
-    if (params_acm%dim == 3) then
+    if (params_acm%dim==3) then
       params_acm%Bs=(/17,17,17/)
     else
       params_acm%Bs=(/17,17,1/)
@@ -465,9 +446,9 @@ contains
     endif
 
     ! uniqueGrid modification
-    ddx(1:dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:dim) / real(params_acm%Bs(1:dim), kind=rk))
+    ddx(1:params_acm%dim) = 2.0_rk**(-params_acm%Jmax) * (params_acm%domain_size(1:params_acm%dim) / real(params_acm%Bs(1:params_acm%dim), kind=rk))
 
-    dx_min = minval( ddx(1:dim) )
+    dx_min = minval( ddx(1:params_acm%dim) )
     ! uniqueGrid modification
     nx_max = maxval( (params_acm%Bs) * 2**(params_acm%Jmax) )
 
@@ -479,7 +460,7 @@ contains
                 params_acm%smoothing_safety(i) = 1.0_rk * params_acm%smoothing_width(i)
             case ("hester")
                 params_acm%smoothing_width(i) = sqrt(params_acm%nu * params_acm%C_eta)
-                params_acm%smoothing_safety(i) = max(5.0_rk * params_acm%smoothing_width(i), 2*maxval( ddx(1:dim) ))
+                params_acm%smoothing_safety(i) = max(5.0_rk * params_acm%smoothing_width(i), 2*maxval( ddx(1:params_acm%dim) ))
             case("discontinuous", "dis")
                 params_acm%smoothing_width(i) = dx_min * params_acm%C_smooth
                 params_acm%smoothing_safety(i) = 3.0_rk * params_acm%smoothing_width(i)
@@ -511,6 +492,9 @@ contains
     ! at most, we need 6 components: mask, usx, usy, usz, color, sponge
     ! in 2d, less arrays could be used, but its easier to just go ahead and use all of them.
     N_mask_components = 6
+
+
+    write(*,'("bananas=",g12.4)') params_acm%bananas
 
     if (params_acm%mpirank==0) then
       write(*,'(80("<"))')
@@ -632,7 +616,7 @@ contains
     enddo
 
     ! now initialze force arrays for colors at last, because we know how many colors we have
-    allocate( params_acm%force_color(1:3, 1:ncolors), params_acm%moment_color(1:3, 1:ncolors), params_acm%mask_volume(1:ncolors), params_acm%usolid_max_color(1:3, 1:ncolors), params_acm%usolid_min_color(1:3, 1:ncolors) )
+    allocate( params_acm%force_color(1:3, 1:ncolors), params_acm%moment_color(1:3, 1:ncolors), params_acm%mask_volume(1:ncolors) )
 
     call clean_ini_file_mpi( FILE )
 
@@ -841,26 +825,9 @@ contains
         call init_t_file('time_statistics_mean.t', overwrite)
         call init_t_file('time_statistics_maxabs.t', overwrite)
       endif
-      if (params_acm%use_passive_scalar) then
-        call init_t_file('scalar_mean.t', overwrite)
-        call init_t_file('scalar_maxabs.t', overwrite)
-      endif
       if (params_acm%penalization .or. params_acm%use_sponge) then
         call init_t_file('forces.t', overwrite, (/ "           time", "   sum_forces_X", "   sum_forces_Y", "   sum_forces_Z"/))
         call init_t_file('moments.t', overwrite, (/ "           time", "  sum_moments_X", "  sum_moments_Y", "  sum_moments_Z"/))
-
-        ! max/min for usolid
-        do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_max"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_max"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_max"
-        enddo
-        do i_color = 1, ncolors
-            write(headers((i_color-1)*3 + 2),"(A,i0.3,A)") "color", i_color, ":ux_solid_min"
-            write(headers((i_color-1)*3 + 3),"(A,i0.3,A)") "color", i_color, ":uy_solid_min"
-            write(headers((i_color-1)*3 + 4),"(A,i0.3,A)") "color", i_color, ":uz_solid_min"
-        enddo
-        call init_t_file('usolid_color.t', overwrite, headers(1:6*ncolors+1) )
 
         ! Initialization of header for different colors. Format: color1:force_g_x -> the g is to remind us that those are in the global system
         do i_color = 1, ncolors

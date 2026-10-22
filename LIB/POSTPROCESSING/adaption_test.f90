@@ -11,7 +11,7 @@ subroutine adaption_test(params)
   !--------------------------------------------
   type (type_params), intent(inout)  :: params
   !--------------------------------------------
-  character(len=chuge):: file_out, order, args
+  character(len=cshort):: file_out, order, args
   real(kind=rk), allocatable      :: error(:)
   integer(kind=ik), allocatable   :: Nb_adapt(:)
   character(len=cshort),allocatable   :: eps_str_list(:)
@@ -24,7 +24,7 @@ subroutine adaption_test(params)
   integer(kind=ik) :: j, n_components=1, lgt_n_tmp,Jmin, Jmax
   real(kind=rk) :: maxmem=-1.0_rk, eps=-1.0_rk, L2norm, Volume, t_elapse(2), time
   logical :: verbose = .false., save_all = .true., save_ref=.false., adaption_only=.false.
-  character(len=chuge) :: write_statement
+  character(len=clong) :: write_statement
   real(kind=rk), allocatable :: norm(:), norm_tmp(:)
 
   ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -104,19 +104,14 @@ subroutine adaption_test(params)
      call check_file_exists ( params%input_files(j) )
      if (params%rank==0) write(*,*) "Reading list of files from "//params%input_files(j)
   enddo
-
   !-----------------------------------------------------------------------------
   ! read in the file, loop over lines
   !-----------------------------------------------------------------------------
   do j = 1, n_components
       call read_attributes(params%input_files(j), lgt_n_tmp, time, iteration, params%domain_size, &
                        params%Bs, params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
   end do
-  
-  ! no cropping is used by default, but the variable is not set automatically
-  params%domainSizeCropped = params%domain_size
-                      
+
   number_dense_blocks = 2_ik**(dim*params%Jmax)*fsize
   allocate(params%threshold_state_vector_component(params%n_eqn))
   params%threshold_state_vector_component(1:params%n_eqn)=1

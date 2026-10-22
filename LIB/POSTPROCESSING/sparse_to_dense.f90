@@ -10,8 +10,8 @@ subroutine sparse_to_dense(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)  :: file_in
-    character(len=chuge)  :: file_out
+    character(len=cshort)  :: file_in
+    character(len=cshort)  :: file_out
     real(kind=rk)          :: time, time_given
     integer(kind=ik)       :: iteration
 
@@ -80,9 +80,6 @@ subroutine sparse_to_dense(params)
     call check_file_exists(trim(file_in))
     call read_attributes(file_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, &
     params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     Nb_file = lgt_n(tree_ID)
 

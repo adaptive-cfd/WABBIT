@@ -13,16 +13,16 @@ subroutine compute_vorticity_post(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: file_ux, file_uy, file_uz, operator
+    character(len=cshort)              :: file_ux, file_uy, file_uz, operator
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
-    character(len=chuge)                   :: order
+    character(len=cshort)                   :: order
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
 
-    character(len=chuge)              :: fname
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -107,9 +107,6 @@ subroutine compute_vorticity_post(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_ux, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
 
     if (params%dim == 3) then
         call get_command_argument(4, file_uz)

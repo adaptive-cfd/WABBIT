@@ -13,6 +13,7 @@ subroutine post_dry_run(params)
     ! to dump kinematics data.
     use module_insects
     use module_forestMetaData
+    use module_wing_deformation
 
     implicit none
 
@@ -23,10 +24,9 @@ subroutine post_dry_run(params)
 
     real(kind=rk), allocatable          :: hvy_mask(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     real(kind=rk)                       :: time             ! time loop variables
-    character(len=cshort)               :: headers(1:100)
-    character(len=chuge)                :: filename, fname, grid_list, dummy
+    character(len=cshort)               :: filename, fname, grid_list, headers(1:100), dummy
     integer(kind=ik) :: k, lgt_id, Bs(1:3), g, hvy_id, iter, Jmax, Jmin, Jmin_equi, Jnow, Nmask, io_error, lgt_n_old, lgt_n_new, iteration, ix, iy, iz, color
-    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume
+    real(kind=rk) :: x0(1:3), dx(1:3), time_start, time_final, mask_volume(1:100), sponge_volume, x_tip_def(3), us_tip_g(3)
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect
     type(inifile) :: FILE
 
@@ -197,6 +197,10 @@ subroutine post_dry_run(params)
     if (is_insect) call init_insect_data(overwrite=.true.)
     !-----------------------------------
 
+    call init_t_file( 'us_centreline_calc.t', overwrite=.true.)
+    call init_t_file( 'us_IP_tip_calc.t', overwrite=.true.)
+    call init_t_file( 'us_OOP_tip_calc.t', overwrite=.true.)
+
     if (grid_list == "none" ) then
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
         ! traditional mode: create the grid AND the mask, possibly with pruning.
@@ -317,6 +321,40 @@ subroutine post_dry_run(params)
                 call append_t_file( 'mask_volume.t', (/time, mask_volume(1:20)/) )
             endif
 
+            
+            x_tip_def = (/0.0_rk, 1.0_rk, 0.0_rk/)
+            us_tip_g = (/1.0_rk, 1.0_rk, 1.0_rk/)
+            call check_deformation_velocity(x_tip_def, us_tip_g, time,Insects(1)%M_g2b,Insects(1)%Wings(2)%M_b2w,&
+                                            Insects(1)%Wings(2)%x_pivot_b, Insects(1)%xc_body_g, &
+                                            Insects(1)%vc_body_g,  &
+                                            Insects(1)%Wings(2)%rot_rel_wing_w,Insects(1)%rot_body_b, &
+                                            Insects(1)%Wings(2)%deformation, &
+                                            Insects(1)%Wings(2)%side, Insects(1)%Wings(2)%rigid)    
+
+            call append_t_file( 'us_centreline_tip_calc.t', (/time, x_tip_def, us_tip_g/) )
+
+            x_tip_def = (/0.5_rk, 1.0_rk, 0.0_rk/)
+            call check_deformation_velocity(x_tip_def, us_tip_g, time,Insects(1)%M_g2b,Insects(1)%Wings(2)%M_b2w,&
+                                            Insects(1)%Wings(2)%x_pivot_b, Insects(1)%xc_body_g, &
+                                            Insects(1)%vc_body_g,  &
+                                            Insects(1)%Wings(2)%rot_rel_wing_w,Insects(1)%rot_body_b, &
+                                            Insects(1)%Wings(2)%deformation, &
+                                            Insects(1)%Wings(2)%side, Insects(1)%Wings(2)%rigid)    
+
+            call append_t_file( 'us_IP_tip_calc.t', (/time, x_tip_def, us_tip_g/) )
+
+
+            x_tip_def = (/0.5_rk, 1.0_rk, 0.01_rk/)
+            call check_deformation_velocity(x_tip_def, us_tip_g, time,Insects(1)%M_g2b,Insects(1)%Wings(2)%M_b2w,&
+                                            Insects(1)%Wings(2)%x_pivot_b, Insects(1)%xc_body_g, &
+                                            Insects(1)%vc_body_g,  &
+                                            Insects(1)%Wings(2)%rot_rel_wing_w,Insects(1)%rot_body_b, &
+                                            Insects(1)%Wings(2)%deformation, &
+                                            Insects(1)%Wings(2)%side, Insects(1)%Wings(2)%rigid)    
+
+            call append_t_file( 'us_OOP_tip_calc.t', (/time, x_tip_def, us_tip_g/) )
+
+
             ! before (possible) pruning, we sync the ghosts
             call sync_ghosts_tree( params, hvy_mask, tree_ID_flow )
 
@@ -362,8 +400,6 @@ subroutine post_dry_run(params)
         do while (io_error==0)
             read (14,'(A)',iostat=io_error) fname
 
-            if (io_error > 0) exit
-
             ! read in the file
             call readHDF5vct_tree( (/fname/), params, hvy_mask, tree_ID_flow, time=time)
 
@@ -389,12 +425,12 @@ subroutine post_dry_run(params)
 
             if (save_color) then
                 write( fname,'(a, "_", a, ".h5")') "color", trim(adjustl(timestr(time)))
-                call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+                call saveHDF5_tree(fname, time, -1_ik, 5, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
 
             if (save_sponge) then
                 write( fname,'(a, "_", a, ".h5")') "sponge", trim(adjustl(timestr(time)))
-                call saveHDF5_tree(fname, time, -1_ik, 6, params, hvy_mask, tree_ID_flow, no_sync=.false.)
+                call saveHDF5_tree(fname, time, -1_ik, 6, params, hvy_mask, tree_ID_flow, no_sync=pruned)
             endif
         enddo
         close (14)

@@ -72,8 +72,6 @@ subroutine keyvalues(fname, params)
     params%domain_size(1) = domain(1)
     params%domain_size(2) = domain(2)
     params%domain_size(3) = domain(3)
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
     ! make sure there is enough memory allocated
     params%number_blocks = 2*ceiling( real(lgt_n(tree_ID)) / real(params%number_procs) )
     ! actually unused, but initialization needs to be done
@@ -182,9 +180,7 @@ subroutine keyvalues(fname, params)
     call MPI_ALLREDUCE(MPI_IN_PLACE,val_mean,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
     call MPI_ALLREDUCE(MPI_IN_PLACE,val_grid,1,MPI_DOUBLE_PRECISION,MPI_SUM,WABBIT_COMM,mpicode)
 
-    ! Domain cropping. The computational domain can be cropped, i.e., we solve the PDE only in a portion of it.
-    ! Then, the volume of the cropped computational changes and is no longer product(domain).
-    val_mean = val_mean / product(params%domainSizeCropped(1:params%dim))
+    val_mean = val_mean / product(params%domain_size(1:params%dim))
 
     if (rank == 0) then
         open  (59, file=fname(1:index(fname,'.'))//'key', &

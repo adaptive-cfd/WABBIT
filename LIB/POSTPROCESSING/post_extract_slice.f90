@@ -19,7 +19,7 @@ subroutine post_extract_slice(params)
 
     implicit none
 
-    character(len=chuge)                       :: fname, fname_out
+    character(len=cshort)                       :: fname, fname_out
     type (type_params), intent(inout)       :: params
 
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :)
@@ -79,9 +79,6 @@ subroutine post_extract_slice(params)
     ! get some parameters from the file
     call read_attributes(fname, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     params%dim = dim
     params%Bs = Bs

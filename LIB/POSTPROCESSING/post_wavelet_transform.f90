@@ -11,7 +11,7 @@ subroutine post_wavelet_transform(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: fname_in, fname_out, operator
+    character(len=cshort)              :: fname_in, fname_out, operator
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgt_ID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
@@ -77,8 +77,6 @@ subroutine post_wavelet_transform(params)
     call read_attributes(fname_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
 
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     params%Jmin = 0
     params%Jmax = tc_length

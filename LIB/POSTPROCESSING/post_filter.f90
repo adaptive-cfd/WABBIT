@@ -14,7 +14,7 @@ subroutine post_filter(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: file_in, file_out, filter_type
+    character(len=cshort)              :: file_in, file_out, filter_type
     real(kind=rk)                      :: time
     integer(kind=ik)                   :: iteration, k, lgtID, tc_length, g
     integer(kind=ik), dimension(3)     :: Bs
@@ -23,7 +23,7 @@ subroutine post_filter(params)
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, hvyID
 
-    character(len=chuge)              :: fname
+    character(len=cshort)              :: fname
     real(kind=rk), dimension(3)        :: dx, x0
     integer(hid_t)                     :: file_id
     real(kind=rk), dimension(3)        :: domain
@@ -77,9 +77,6 @@ subroutine post_filter(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_in, lgt_n(tree_ID), time, iteration, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     if (filter_type(1:3) == "CDF") then
         ! we need to set everything up to "_" as wavelet

@@ -344,7 +344,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     integer(kind=ik) :: ubounds(2), lbounds(2), blocks_per_rank_list(0:params%number_procs-1)
     integer(kind=ik), dimension(4) :: ubounds3D, lbounds3D       ! offset variables
     integer(kind=ik), dimension(3) :: ubounds2D, lbounds2D
-    real(kind=rk) :: x0(1:3), dx(1:3)
     integer(kind=ik) :: free_hvy_id, free_lgt_id, my_hvy_n, version(1), datarank, Bs_file(1:3)=0
 
     logical          :: read_treecode_num, readRefStatus
@@ -691,25 +690,6 @@ subroutine readHDF5vct_tree(fnames, params, hvy_block, tree_ID, time, iteration,
     ! be synced. However, the light data has to.
     call synchronize_lgt_data( params, refinement_status_only=.false. )
 
-    ! in case domain_cropping_min or domain_cropping_max is set, we may need to crop the domain
-    if (any(params%domain_cropping_min(:) > 0.0_rk) .or. any(params%domain_cropping_max(:) < 1.0_rk)) then
-        ! check if Jmin of the data is too small for the domain slice - we then assume it cannot be cut
-        if (minActiveLevel_tree(tree_ID, use_active_list=.false.) < params%Jmin) then
-            call abort(240929, "This input data is too coarse for the specified domain slice. It would be cropped in the middle of a block, which is currently not supported.")
-        endif
-
-        ! we need active lists for lgt_n
-        call createActiveSortedLists_tree(params, tree_ID)
-        do k = 1, lgt_n(tree_ID)
-            lgt_ID = lgt_active(k, tree_ID)
-            ! get block spacing and origin for the geometry indicator
-            call get_block_spacing_origin( params, lgt_id, x0, dx )
-            if (any(x0(1:params%dim) < params%domain_cropping_min(1:params%dim) - 1.0e-14_rk) .or. any(x0(1:params%dim) + params%Bs(1:params%dim) * dx(1:params%dim) > params%domain_cropping_max(1:params%dim) + 1.0e-14_rk)) then
-                lgt_block( lgt_id, : ) = -1
-            endif
-        enddo
-    endif
-
     ! if the input data has smaller minimum level as JMin, we need to refine those blocks until they have the correct Jmin
     ! this code block checks this and temporally lowers Jmin, so that we can actually find all neighbours and do the refinement
     level_min = minActiveLevel_tree(tree_ID, use_active_list=.false.)
@@ -1041,9 +1021,6 @@ subroutine read_field2tree(params, fnames, N_files, tree_ID, hvy_block, verbosit
         params%N_fields_saved = N_files
         params%Bs = Bs
         params%domain_size = domain
-
-        ! no cropping is used by default, but the variable is not set automatically
-        params%domainSizeCropped = params%domain_size
 
         ! we have to allocate grid if this routine is called for the first time
         call allocate_forest(params, hvy_block)

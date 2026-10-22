@@ -38,14 +38,14 @@ subroutine proto_pressure_multigrid(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: file_ux, file_uy, file_uz, file_p
+    character(len=cshort)              :: file_ux, file_uy, file_uz, file_p
     real(kind=rk)                      :: dt, t, time
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, Bs(1:3)
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, Jmin, ic, nc, i_cycle, it, tc_length, mpierr, g(1:3)
 
-    character(len=chuge)              :: fname, cycle_type
+    character(len=cshort)              :: fname, cycle_type
     logical                            :: exist_p
     real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:9), volume
     integer(kind=tsize)                :: treecode
@@ -114,9 +114,6 @@ subroutine proto_pressure_multigrid(params)
     ! get some parameters from one of the files (they should be the same in all of them)
     call read_attributes(file_ux, lgt_n(tree_ID), time, it, domain, Bs, tc_length, params%dim, &
     periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = domain
 
     ! ! odd BS test - but that doesn't work so great for now
     ! BS(1:params%dim) = Bs(1:params%dim) + 1
@@ -400,14 +397,14 @@ subroutine proto_NSI_EE(params)
 
     !> parameter struct
     type (type_params), intent(inout)  :: params
-    character(len=chuge)              :: file_params
+    character(len=cshort)              :: file_params
     real(kind=rk)                      :: dt, time
     integer(kind=ik)                   :: k_block, lgt_ID, hvy_id, Bs(1:3), g(1:3), iteration, j, l
 
     real(kind=rk), allocatable         :: hvy_block(:, :, :, :, :), hvy_tmp(:, :, :, :, :), hvy_mask(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     integer(kind=ik)                   :: tree_ID=1, Jmin, ic, nc, i_cycle, it, tc_length, mpierr
 
-    character(len=chuge)              :: fname, order_disc_nonlinear, order_disc_pressure, order_laplacian
+    character(len=cshort)              :: fname, order_disc_nonlinear, order_disc_pressure, order_laplacian
     real(kind=rk)                      :: x0(1:3), dx(1:3), domain(1:3), norm(1:6), volume
     integer(kind=tsize)                :: treecode
     logical                            :: it_is_time_to_save_data=.false., overwrite, error_OOM, is_equidistant

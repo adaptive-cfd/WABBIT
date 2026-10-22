@@ -13,11 +13,11 @@ subroutine dense_to_sparse(params)
 
     !> parameter struct
     type (type_params), intent(inout)       :: params
-    character(len=chuge)                   :: indicator="threshold-state-vector", file_in, args
-    character(len=chuge)                   :: tail_string
+    character(len=cshort)                   :: indicator="threshold-state-vector", file_in, args
+    character(len=cshort)                   :: tail_string
     real(kind=rk)                           :: time, eps=-1.0_rk
     integer(kind=ik)                        :: iteration
-    character(len=chuge), allocatable      :: file_out(:)
+    character(len=cshort), allocatable      :: file_out(:)
     real(kind=rk), allocatable              :: hvy_block(:, :, :, :, :), hvy_work(:, :, :, :, :, :)
     real(kind=rk), allocatable              :: hvy_tmp(:, :, :, :, :)
     integer(kind=ik)                        :: level, k, tc_length, lgt_n_tmp
@@ -98,9 +98,6 @@ subroutine dense_to_sparse(params)
     !-------------------------------------------
     call read_attributes(params%input_files(1), lgt_n_tmp, time, iteration, params%domain_size, &
     params%Bs,params%Jmax, params%dim, periodic_BC=params%periodic_BC, symmetry_BC=params%symmetry_BC)
-
-    ! no cropping is used by default, but the variable is not set automatically
-    params%domainSizeCropped = params%domain_size
 
     do i = 1, params%n_eqn
         file_in = params%input_files(i)

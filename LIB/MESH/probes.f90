@@ -186,45 +186,14 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
     integer, save :: iu_local = -1  !< unit for writing probes on this rank; only rank 0 will have it, but we keep track of it to avoid reopening the file multiple times
     logical, save :: have_unit = .false.  !< whether this rank has a unit open for writing probes; only rank 0 will have it, but we keep track of it to avoid reopening the file multiple times
     integer(kind=ik), save :: write_counter = 0_ik  !< counts how many lines have been written since last flush, to control flushing frequency
-    integer(kind=ik) :: il, ip, iv, pt, n_points_total, nvars_batch  !< loop indices for probe lines, points and variables
+    integer(kind=ik) :: il, ip, iv  !< loop indices for probe lines, points and variables
     real(kind=rk), allocatable, save :: vals(:)  !< array with probe values, one-dimensionalized
-    real(kind=rk), allocatable, save :: xq_all(:,:)  !< query point coordinates for all probes and line points
-    real(kind=rk), allocatable, save :: fq(:,:)  !< interpolated values, one column per query point, sized for the largest variable batch
-    character(len=cshort) :: interpolationMethod
+    real(kind=rk) :: xq(3)  !< query point coordinates
     real(kind=rk) :: t0
+    integer(kind=ik) :: mpierr
     character(len=cshort) :: write_format
 
-    n_points_total = params%n_probes + sum(params%probe_line_npoints(1:params%n_probe_lines))
-
-    if (.not. allocated(vals)) allocate(vals(1:n_points_total * params%N_probe_variables))
-    if (.not. allocated(xq_all)) allocate(xq_all(1:3, 1:n_points_total))
-    if (.not. allocated(fq)) allocate(fq(1:size(hvy_tmp, 4), 1:n_points_total))
-
-    select case (params%probe_interpolation_order)
-    case (0)
-        interpolationMethod = "floor"
-    case (1)
-        interpolationMethod = "linear"
-    case (2)
-        interpolationMethod = "delta"
-    end select
-
-    ! assemble the query points once: first all single probes, then all line probes
-    ! (this order matches the layout of "vals" and thus of the probes.t output file)
-    xq_all = 0.0_rk
-    do ip = 1, params%n_probes
-        xq_all(1, ip) = params%probe_x(ip)
-        xq_all(2, ip) = params%probe_y(ip)
-        xq_all(3, ip) = params%probe_z(ip)
-    enddo
-    do il = 1, params%n_probe_lines
-        do ip = 1, params%probe_line_npoints(il)
-            pt = params%n_probes + sum(params%probe_line_npoints(1:il-1)) + ip
-            xq_all(1, pt) = params%probe_line_x1(il) + real(ip-1, rk) * (params%probe_line_x2(il) - params%probe_line_x1(il)) / real(params%probe_line_npoints(il)-1, rk)
-            xq_all(2, pt) = params%probe_line_y1(il) + real(ip-1, rk) * (params%probe_line_y2(il) - params%probe_line_y1(il)) / real(params%probe_line_npoints(il)-1, rk)
-            xq_all(3, pt) = params%probe_line_z1(il) + real(ip-1, rk) * (params%probe_line_z2(il) - params%probe_line_z1(il)) / real(params%probe_line_npoints(il)-1, rk)
-        enddo
-    enddo
+    if (.not. allocated(vals)) allocate(vals(1:params%n_probes * params%N_probe_variables + sum(params%probe_line_npoints(1:params%n_probe_lines)) * params%N_probe_variables))
 
     if (params%physics_type /= 'ACM-new' .and. params%physics_type /= 'NSPP') then
         call abort(2505206, 'Probes currently implemented for ACM-new and NSPP only')
@@ -276,22 +245,56 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
             call toc("probes_wrapper (sync)", 95, MPI_Wtime()-t0)
         endif
 
-        ! interpolate this batch of variables at all query points (probes + line points) at once.
-        ! Ghost nodes have already been synced above according to probe_interpolation_order, so
-        ! we can skip the (redundant) sync inside interpolatePointCloud_tree.
+        ! loop over all probe points
         t0 = MPI_Wtime()
+        do ip = 1, params%n_probes
+            xq = 0.0_rk
+            xq(1) = params%probe_x(ip)
+            xq(2) = params%probe_y(ip)
+            xq(3) = params%probe_z(ip)
 
-        nvars_batch = probe_var_E - probe_var_0 + 1
+            ! find a local block that contains the query point
+            do k = 1, hvy_n(tree_ID)
+                hvy_id = hvy_active(k, tree_ID)
+                call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                call get_block_spacing_origin(params, lgt_id, x0, dx)
 
-        call interpolatePointCloud_tree(params, hvy_tmp(:,:,:,1:nvars_batch,:), tree_ID, xq_all, fq(1:nvars_batch,:), interpolationMethod, sync=.false.)
+                if (point_in_block(params, xq, x0, dx)) then
+                    do iv = probe_var_0, probe_var_E
+                        vals((ip-1)*params%N_probe_variables + iv) = interpolate_probe_tensor(params, hvy_tmp(:,:,:,iv-probe_var_0+1,hvy_id), xq, x0, dx, params%probe_interpolation_order)
+                    enddo
+                    exit
+                endif
+            enddo
+        enddo
 
-        do pt = 1, n_points_total
-            do iv = probe_var_0, probe_var_E
-                vals((pt-1)*params%N_probe_variables + iv) = fq(iv-probe_var_0+1, pt)
+        ! loop over all line probe points
+        do il = 1, params%n_probe_lines
+            do ip = 1, params%probe_line_npoints(il)
+                xq = 0.0_rk
+                xq(1) = params%probe_line_x1(il) + real(ip-1, rk) * (params%probe_line_x2(il) - params%probe_line_x1(il)) / real(params%probe_line_npoints(il)-1, rk)
+                xq(2) = params%probe_line_y1(il) + real(ip-1, rk) * (params%probe_line_y2(il) - params%probe_line_y1(il)) / real(params%probe_line_npoints(il)-1, rk)
+                xq(3) = params%probe_line_z1(il) + real(ip-1, rk) * (params%probe_line_z2(il) - params%probe_line_z1(il)) / real(params%probe_line_npoints(il)-1, rk)
+
+                ! find a local block that contains the query point
+                do k = 1, hvy_n(tree_ID)
+                    hvy_id = hvy_active(k, tree_ID)
+                    call hvy2lgt(lgt_id, hvy_id, params%rank, params%number_blocks)
+                    call get_block_spacing_origin(params, lgt_id, x0, dx)
+
+                    if (point_in_block(params, xq, x0, dx)) then
+                        do iv = probe_var_0, probe_var_E
+                            vals((params%n_probes + sum(params%probe_line_npoints(1:il-1)) + ip-1)*params%N_probe_variables + iv) = &
+                                interpolate_probe_tensor(params, hvy_tmp(:,:,:,iv-probe_var_0+1,hvy_id), xq, x0, dx, params%probe_interpolation_order)
+                        enddo
+                        exit
+                    endif
+                enddo
             enddo
         enddo
     enddo
 
+    call MPI_Allreduce(MPI_IN_PLACE, vals, size(vals), MPI_REAL8, MPI_MAX, WABBIT_COMM, mpierr)
     call toc("probes_wrapper (probe interpolation)", 98, MPI_Wtime()-t0)
 
     if (params%rank == 0) then
@@ -308,5 +311,117 @@ subroutine probes_wrapper(time, params, hvy_block, hvy_tmp, hvy_mask, tree_ID)
         write_counter = write_counter + 1
         if (modulo(write_counter, flush_frequency) == 0) call flush(iu_local)
     endif
+
+contains
+
+    logical function point_in_block(params_local, xq_local, x0_local, dx_local)
+        implicit none
+        type(type_params), intent(in) :: params_local
+        real(kind=rk), intent(in) :: xq_local(3)
+        real(kind=rk), intent(in) :: x0_local(3)
+        real(kind=rk), intent(in) :: dx_local(3)
+
+        real(kind=rk) :: xmin, xmax
+        integer(kind=ik) :: d
+
+        point_in_block = .true.
+        do d = 1, params_local%dim
+            xmin = x0_local(d)
+            xmax = x0_local(d) + dx_local(d) * real(params_local%Bs(d), rk)
+            if (xq_local(d) < xmin - 1e-14_rk .or. xq_local(d) > xmax + 1e-14_rk) then
+                point_in_block = .false.
+                return
+            endif
+        enddo
+    end function point_in_block
+
+
+    real(kind=rk) function interpolate_probe_tensor(params_local, f, xq_local, x0_local, dx_local, p)
+        implicit none
+        type(type_params), intent(in) :: params_local   !< params
+        real(kind=rk), intent(in) :: f(:,:,:)           !< block data
+        real(kind=rk), intent(in) :: xq_local(3)        !< query point coordinates
+        real(kind=rk), intent(in) :: x0_local(3)        !< block origin coordinates
+        real(kind=rk), intent(in) :: dx_local(3)        !< block spacing
+        integer(kind=ik), intent(in) :: p               !< probe interpolation order: 0=floor-neighbor, 1=linear kernel, 2=delta kernel
+
+        integer(kind=ik) :: ix0, iy0, iz0
+        integer(kind=ik) :: ix, iy, iz
+        integer(kind=ik) :: support
+        integer(kind=ik) :: g_local
+        real(kind=rk) :: x_grid, y_grid, z_grid
+        real(kind=rk) :: wx, wy, wz
+
+        g_local = params_local%g
+
+        ! compute center point index as lower nearest point
+        ix0 = int(floor((xq_local(1) - x0_local(1)) / dx_local(1)), kind=ik) + g_local + 1
+        iy0 = int(floor((xq_local(2) - x0_local(2)) / dx_local(2)), kind=ik) + g_local + 1
+        if (params_local%dim == 3) then
+            iz0 = int(floor((xq_local(3) - x0_local(3)) / dx_local(3)), kind=ik) + g_local + 1
+        else
+            iz0 = 1
+        endif
+        interpolate_probe_tensor = 0.0_rk
+
+        select case (p)
+        case (0)
+            ! Floor-neighbor sampling: take the lower grid point in each active
+            ! direction. This avoids any need for ghost synchronization.
+            interpolate_probe_tensor = f(ix0, iy0, iz0)
+
+        case (1)
+            ! Compact linear interpolation. Each axis contributes a tent kernel
+            ! with support radius 1 grid spacing, so only the immediate neighbors
+            ! around the query point can contribute.
+            support = 1
+
+            do iz = iz0 - merge(0, support, params_local%dim==2), iz0 + merge(0, support, params_local%dim==2)
+                z_grid = x0_local(3) + real(iz - (g_local + 1), rk) * dx_local(3)
+                if (params_local%dim == 2) then
+                    wz = 1.0_rk
+                else
+                    wz = linear_interpolation(xq_local(3) - z_grid, dx_local(3))
+                endif
+                do iy = iy0 - support, iy0 + support
+                    y_grid = x0_local(2) + real(iy - (g_local + 1), rk) * dx_local(2)
+                    wy = linear_interpolation(xq_local(2) - y_grid, dx_local(2))
+                    do ix = ix0 - support, ix0 + support
+                        x_grid = x0_local(1) + real(ix - (g_local + 1), rk) * dx_local(1)
+                        wx = linear_interpolation(xq_local(1) - x_grid, dx_local(1))
+                        interpolate_probe_tensor = interpolate_probe_tensor + wx * wy * wz * f(ix, iy, iz)
+                    enddo
+                enddo
+            enddo
+
+        case (2)
+            ! Compact delta interpolation. This uses the smoother discrete delta
+            ! kernel with support radius 3 grid spacings, so we sum over a wider
+            ! tensor-product stencil than for linear interpolation.
+            support = 3
+
+            do iz = iz0 - merge(0, support, params_local%dim==2), iz0 + merge(0, support, params_local%dim==2)
+                z_grid = x0_local(3) + real(iz - (g_local + 1), rk) * dx_local(3)
+                if (params_local%dim == 2) then
+                    wz = 1.0_rk
+                else
+                    wz = delta_interpolation(xq_local(3) - z_grid, dx_local(3))
+                endif
+                do iy = iy0 - support, iy0 + support
+                    y_grid = x0_local(2) + real(iy - (g_local + 1), rk) * dx_local(2)
+                    wy = delta_interpolation(xq_local(2) - y_grid, dx_local(2))
+                    do ix = ix0 - support, ix0 + support
+                        x_grid = x0_local(1) + real(ix - (g_local + 1), rk) * dx_local(1)
+                        wx = delta_interpolation(xq_local(1) - x_grid, dx_local(1))
+                        interpolate_probe_tensor = interpolate_probe_tensor + wx * wy * wz * f(ix, iy, iz)
+                    enddo
+                enddo
+            enddo
+
+        case default
+            call abort(2505208, 'probe_interpolation_order must be 0, 1, or 2')
+        end select
+
+    end function interpolate_probe_tensor
 
 end subroutine probes_wrapper

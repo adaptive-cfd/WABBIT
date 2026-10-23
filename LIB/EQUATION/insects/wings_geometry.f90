@@ -1111,6 +1111,13 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
     real(kind=rk) :: d_seg, zmin_wing, zmax_wing
     real(kind=rk) :: phi_xy, phi_z, phi, mask_value, v_tmp(1:3)
     logical :: inside_polygon
+    logical, save :: dbg_done = .false.
+    real(kind=rk) :: D, A
+    
+    integer :: n_vis, n_box, n_poly, n_act, n_wr, n_nan
+        
+    
+    n_vis=0; n_box=0; n_poly=0; n_act=0; n_wr=0; n_nan=0
 
 
     if ((Insect%Wings(wingID)%WingShapeType) /= "polygon") call abort(01072601,"draw_wing_polygon called with non-polygon wing...")
@@ -1148,7 +1155,7 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
     Bs(2) = size(mask,2) - 2*g
     Bs(3) = size(mask,3) - 2*g
     n          = Insect%Wings(wingID)%n_polygon_points
-    band_width = Insect%safety + 1e-3
+    band_width = Insect%safety
 
     !if (Insect%Wings(wingID)%rigid) then 
     !    band_width = band_width + Insect%Wings(wingID)%WingThickness * 0.2
@@ -1186,16 +1193,18 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
     wingbox_g_max = -999.d9
 
     ! Loop over the 8 corners of the local WING bounding box
-    do k = 1, 2
-        do j = 1, 2
-            do i = 1, 2
+    do k = 0, 2
+        do j = 0, 8
+            do i = 0, 4
                 ! corner
-                corner_mat = (/x_wingbox_mat(i), y_wingbox_mat(j), z_wingbox_mat(k)/)
+                corner_mat = (/ wingbox_mat(1) + (wingbox_mat(2)-wingbox_mat(1))*dble(i)/4.0_rk, &
+                    wingbox_mat(3) + (wingbox_mat(4)-wingbox_mat(3))*dble(j)/8.0_rk, &
+                    wingbox_mat(5) + (wingbox_mat(6)-wingbox_mat(5))*dble(k)/2.0_rk /)
                 ! mat -> wing
                 corner_w = corner_mat
                 if (.not. Insect%Wings(wingID)%rigid) then
-                    call undisplace_coords(Insect%time, corner_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
-                end if                
+                    call material2wing(Insect%time, corner_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                end if               
                 ! wing -> body
                 corner_b = x_pivot_b + matmul(M_w2b, corner_w)
                 ! body -> global
@@ -1262,6 +1271,7 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
         p1 = Insect%Wings(wingID)%polygon_wings(idx_p1, 1:2)
         p2 = Insect%Wings(wingID)%polygon_wings(idx_p2, 1:2)
 
+
         ! cheap geometry check, building a second local bounding box around segment 
         ! to check wether or not the segment is important for the specific block
         segmentbox_mat(1) = min(p1(1), p2(1)) - band_width
@@ -1288,8 +1298,8 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                     ! mat -> wing
                     corner_w = corner_mat
                     if (.not. Insect%Wings(wingID)%rigid) then
-                        call undisplace_coords(Insect%time, corner_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
-                    end if                
+                        call material2wing(Insect%time, corner_w, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                    end if            
                     ! wing -> body
                     corner_b = x_pivot_b + matmul(M_w2b, corner_w)
                     ! body -> global
@@ -1301,7 +1311,6 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                 enddo
             enddo
         enddo
-
         ! index range on the current block
         xmin_seg = floor( (segmentbox_g_min(1) - xx0(1)) / ddx(1) )
         xmax_seg = ceiling( (segmentbox_g_max(1) - xx0(1)) / ddx(1) )
@@ -1351,23 +1360,25 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
                     ! body -> wing
                     x_w = matmul(M_b2w, x_b - x_pivot_b)
-                    ! wing -> mat
+                    ! wing -> mat. note that we copy the material coordinate to another wing coordinate. Don't let the subroutine name confuse you!
                     x_mat = x_w
-                    if (.not. Insect%Wings(wingID)%rigid) then
-                        call displace_coords(Insect%time, x_mat, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
-                    end if    
 
+                    if (.not. Insect%Wings(wingID)%rigid) then
+                        call wing2material(Insect%time, x_mat, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                    end if    
+                    n_vis = n_vis + 1
+                    if (any(x_mat /= x_mat)) n_nan = n_nan + 1
                     ! Extra local check.
                     ! The global bounding box is only a coarse box around a rotated box.
                     ! This check removes points that are inside the global box
                     ! but outside the actual local segment box
+
                     if (x_mat(1) < segmentbox_mat(1)) cycle
                     if (x_mat(1) > segmentbox_mat(2)) cycle
                     if (x_mat(2) < segmentbox_mat(3)) cycle
                     if (x_mat(2) > segmentbox_mat(4)) cycle
                     if (x_mat(3) < segmentbox_mat(5)) cycle
                     if (x_mat(3) > segmentbox_mat(6)) cycle
-
                     ! 2D distance in the wing plane.
                     ! Only x_w/y_w are used here.
                     d_seg = point_segment_distance_2D(x_mat(1:2), p1, p2)
@@ -1393,6 +1404,9 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
     zmin_wing = Insect%Wings(wingID)%wing_bounding_box(5)
     zmax_wing = Insect%Wings(wingID)%wing_bounding_box(6)
 
+
+
+
     do iz = zmin, zmax
         z = xx0(3) + dble(iz)*ddx(3)
         do iy = ymin, ymax
@@ -1400,17 +1414,19 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
             do ix = xmin, xmax
                 x = xx0(1) + dble(ix)*ddx(1)
 
-                ! global coordinates
+                ! global coordinates 
                 x_g = (/x,y,z/)
                 ! global -> body
                 x_b = matmul(M_g2b, x_g - Insect%xc_body_g)
-                ! body -> mat
+
+                ! body -> wing
                 x_w = matmul(M_b2w, x_b - x_pivot_b)
-                ! mat-> wing
+                ! wing -> mat. note that we copy the material coordinate to another wing coordinate. Don't let the subroutine name confuse you!
                 x_mat = x_w
+
                 if (.not. Insect%Wings(wingID)%rigid) then
-                    call displace_coords(Insect%time, x_mat, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
-                end if
+                    call wing2material(Insect%time, x_mat, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                end if  
 
                 ! inside the global box but outside the true local wing box.
                 if (x_mat(1) < wingbox_mat(1)) cycle
@@ -1420,9 +1436,11 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                 if (x_mat(3) < wingbox_mat(5)) cycle
                 if (x_mat(3) > wingbox_mat(6)) cycle
 
+                n_box = n_box + 1
+
                 ! Check whether the point is inside the 2D polygon in the wing plane
                 inside_polygon = point_in_polygon_2D(x_mat(1:2), Insect%Wings(wingID)%polygon_wings, n)
-
+                if (inside_polygon) n_poly = n_poly + 1
                 ! Case 1:
                 ! tmp_active = true
                 ! -> point was close enough to at least one polygon segment
@@ -1457,6 +1475,8 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
                 endif
 
+                if (tmp_active(ix,iy,iz)) n_act = n_act + 1
+
                 ! assuming constant thickness here - incase its not maybe loop
                 ! phi_z <= 0 inside the thickness interval
                 ! phi_z >  0 outside the thickness interval
@@ -1485,10 +1505,6 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                     v_tmp(2) = rot_rel_wing_w(3)*x_w(1)-rot_rel_wing_w(1)*x_w(3)
                     v_tmp(3) = rot_rel_wing_w(1)*x_w(2)-rot_rel_wing_w(2)*x_w(1)
 
-                    v_tmp(1) = rot_rel_wing_w(2)*x_w(3)-rot_rel_wing_w(3)*x_w(2)
-                    v_tmp(2) = rot_rel_wing_w(3)*x_w(1)-rot_rel_wing_w(1)*x_w(3)
-                    v_tmp(3) = rot_rel_wing_w(1)*x_w(2)-rot_rel_wing_w(2)*x_w(1)
-
                     ! calculate the velocity component through the deformation
 
                     if (.not. Insect%Wings(wingID)%rigid) then
@@ -1496,12 +1512,16 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                     end if
 
                     us(ix,iy,iz,1:3) = matmul(transpose(M_b2w), v_tmp)
+                    n_wr = n_wr + 1
 
                 endif
 
             enddo
         enddo
     enddo
+
+    !write(*,'("poly dbg wing",i2," rigid=",L1," window=",6i5," vis=",i8," nan=",i6," box=",i8," poly=",i8," act=",i8," wr=",i8)') &
+    ! wingID, Insect%Wings(wingID)%rigid, xmin,xmax,ymin,ymax,zmin,zmax, n_vis,n_nan,n_box,n_poly,n_act,n_wr
 
 end subroutine draw_wing_polygon
 

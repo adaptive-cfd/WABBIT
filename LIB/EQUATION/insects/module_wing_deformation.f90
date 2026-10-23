@@ -9,7 +9,7 @@ module module_wing_deformation
     ! that everything within the module is private unless explicitly marked public.""
     PRIVATE
 
-    PUBLIC :: displace_coords, add_deformation_velocity, check_deformation_velocity, break_down_into_simple_model, undisplace_coords
+    PUBLIC :: add_deformation_velocity, check_deformation_velocity, break_down_into_simple_model, material2wing, wing2material
     PUBLIC :: deformation_model
 
 
@@ -76,7 +76,7 @@ module module_wing_deformation
 
                 ! rescale so we can work with degrees
 
-                model%D_alpha_tilde%coeffs(2) = 2 * 3.141592654 * ((alpha_tip - alpha_root) / R) / 360.0_rk
+                model%D_alpha_tilde%coeffs(2) = 2 * 3.141592654_rk * ((alpha_tip - alpha_root) / R) / 360.0_rk
                 model%D_alpha_tilde%coeffs(1) = 2.0_rk * 3.141592654_rk * (alpha_root / R) / 360.0_rk
 
                 ! make sure no higher order terms sneak into our spatial distribution (the keyword is LINEAR alpha)
@@ -120,10 +120,14 @@ module module_wing_deformation
 
     end subroutine
 
-    subroutine displace_coords(time, x_wing, model, side)
+    subroutine wing2material(time, x_mat, model, side)
+
+        ! Map material coordinates inherent to the wing to their position in wing coordinates.
+        ! x_mat^(mat) -> x_mat^(w)
+
         type(deformation_model), intent(in) :: model
         real(kind=rk), intent(in) :: time
-        real(kind=rk), intent(inout) :: x_wing(1:3)
+        real(kind=rk), intent(inout) :: x_mat(1:3)
         character(len=1), intent(in) :: side
 
         real(kind=rk) :: A_tilde, D_alpha_tilde, dA_tilde_dt, dD_alpha_tilde_dy
@@ -131,53 +135,12 @@ module module_wing_deformation
         real(kind=rk) :: normalisation
         real(kind=rk) :: x_w, y_w, z_w, x_n, y_n, z_n
 
-        real(kind=rk) ::  x_c_mat_w(1:3), x_mat(1:3), e_n_mat_w(1:3), e_x_mat_w(1:3), e_y_mat_w(1:3), de_n_mat_w_dt(1:3), de_x_mat_w_dt(1:3), de_y_mat_w_dt(1:3), R_y(1:3, 1:3), dR_y_dalpha(1:3, 1:3), x_tmp(1:3), A_tmp(1:3, 1:3)
+        real(kind=rk) ::  x_c_mat_w(1:3), x_wing(1:3), e_n_mat_w(1:3), e_x_mat_w(1:3), e_y_mat_w(1:3), de_n_mat_w_dt(1:3), de_x_mat_w_dt(1:3), de_y_mat_w_dt(1:3), R_y(1:3, 1:3), dR_y_dalpha(1:3, 1:3), x_tmp(1:3), A_tmp(1:3, 1:3)
         ! is this wing on the left or right side ?
         select case (model%model_name)
-
-            case("lin_sin")
-
-                ! very simple: each crosssection of the midplane perpendicular to the spanwise coordinate is rotated by a an angle, 
-                ! which is a sinusoidal time function, and a linear function of the spanwise coordinate. 
-                ! NOT a volume-preserving transformation
-
-                x_w = x_wing(1)
-                y_w = x_wing(2)
-                z_w = x_wing(3)
-
-                ! these are used to describe spatial and temporal derivatives of the the angle function. 
-                ! Note that we assume a function of the form f(y, t) = A_tilde(t) * (D_alpha_slope * y + D_alpha_0). see the generic formulation for other angle distributions.
-
-                A_tilde = model%ai_D_alpha * sin(time * model%omega) + model%bi_D_alpha * cos(time * model%omega)
-
-                D_alpha = A_tilde * (model%D_alpha_slope * y_w+ model%D_alpha_0)
-
-                ! calculate the position of the midplane
-
-                x_wing(1) = cos(D_alpha)*x_w
-                x_wing(2) = y_w
-                x_wing(3) = sin(D_alpha)*x_w
-
-                ! calculate the surface normal
-
-                normalisation = 1 / sqrt((x_w * A_tilde * model%D_alpha_slope) ** 2 + 1)
-
-                ! normal vector entries
-
-                x_n = normalisation * sin(D_alpha)
-                y_n = normalisation * x_w * A_tilde * model%D_alpha_slope
-                z_n = - normalisation * cos(D_alpha)
-
-                ! subtract vertical displacement to return to the material COS 
-                ! (hence the sign, we want to return to the material coordinates for the SDF )
-
-                x_wing(1) = x_wing(1) - x_n * z_w
-                x_wing(2) = x_wing(2) - y_n * z_w
-                x_wing(3) = x_wing(3) - z_n * z_w
-                
             case("generic_angle_distribution")
 
-                x_tmp = x_wing
+                x_tmp = x_mat
 
                 ! translate these coordinates to the pivot of the flexion line, so we can align our rotation axis with the primary flexion line.
 
@@ -192,23 +155,21 @@ module module_wing_deformation
                 x_wing(2) = sin(model%flexion_angle) * x_tmp(1) + cos(model%flexion_angle) * x_tmp(2)
 
                 ! more generic case. Here, we assume that the angle distribution follows a prescribed function with a derivative along the y(mat) axis and a time derivative.
-                ! We define a material coordinate inherent to the wing, which describes a material point independent of deformation. This falls together with the wing coordinate in the rigid case.
-
-                x_mat = x_wing
-
+                ! We define a material coordinate inherent to the wing, which describes a material point independent of deformation. 
+                ! This falls together with the wing coordinate in the rigid case.
                 ! x_c_mat_w denotes the points that lie in the centreplane of the wing's material coordinates.
 
-                x_c_mat_w = x_mat
+                x_c_mat_w = x_wing
                 x_c_mat_w(3) = 0
 
-                ! calculate the deformation angle
+                ! calculate the deformation angle.
 
-                D_alpha_tilde = x_mat(2)
+                D_alpha_tilde = x_wing(2)
                 A_tilde = time
 
                 ! calculate derivatives
 
-                dD_alpha_tilde_dy = x_mat(2)
+                dD_alpha_tilde_dy = x_wing(2)
                 dA_tilde_dt = time
 
                 ! we call the time function and the spatial function, assuming that the angle distribution is a separable function of time and space
@@ -220,33 +181,34 @@ module module_wing_deformation
 
                 ! depending on the side, invert the deformation angle (we define the angle distribution based on the right wing!)
 
-                if (side=="R") then 
+                if (side == "R") then
                     D_alpha_tilde = -D_alpha_tilde
+                    dD_alpha_tilde_dy = -dD_alpha_tilde_dy
                 endif
 
                 D_alpha = D_alpha_tilde * A_tilde
 
                 ! factor to rescale our normal to 1
 
-                normalisation = 1 / sqrt((dD_alpha_tilde_dy * A_tilde) ** 2 * x_mat(1) ** 2 + 1)
+                normalisation = 1 / sqrt((dD_alpha_tilde_dy * A_tilde) ** 2 * x_wing(1) ** 2 + 1)
 
                 ! row wise calculation of the surface normal
 
                 e_n_mat_w(1) = normalisation * sin(D_alpha)
-                e_n_mat_w(2) = normalisation * (dD_alpha_tilde_dy * A_tilde) * x_mat(1)
+                e_n_mat_w(2) = normalisation * (dD_alpha_tilde_dy * A_tilde) * x_wing(1)
                 e_n_mat_w(3) = - normalisation * cos(D_alpha)
 
                 ! section-wise rotation around the flexion axis of the centreplane of the material coordinates
                 
-                x_c_mat_w(1) = cos(D_alpha)*x_mat(1)
-                x_c_mat_w(2) = x_mat(2)
-                x_c_mat_w(3) = sin(D_alpha)*x_mat(1)
+                x_c_mat_w(1) = cos(D_alpha)*x_wing(1)
+                x_c_mat_w(2) = x_wing(2)
+                x_c_mat_w(3) = sin(D_alpha)*x_wing(1)
 
                 ! By definition, the z coordinate is normal to the material x, y plane. Extrude normally to the centreplane, but describe this extrusion in the wing system
 
-                x_wing(1) = x_c_mat_w(1) - x_mat(3) * e_n_mat_w(1) 
-                x_wing(2) = x_c_mat_w(2) - x_mat(3) * e_n_mat_w(2) 
-                x_wing(3) = x_c_mat_w(3) - x_mat(3) * e_n_mat_w(3) 
+                x_wing(1) = x_c_mat_w(1) - x_wing(3) * e_n_mat_w(1) 
+                x_wing(2) = x_c_mat_w(2) - x_wing(3) * e_n_mat_w(2) 
+                x_wing(3) = x_c_mat_w(3) - x_wing(3) * e_n_mat_w(3) 
 
                 x_tmp = x_wing
 
@@ -260,53 +222,37 @@ module module_wing_deformation
                 x_wing(1) = x_wing(1) + model%pivot_flexion(1)
                 x_wing(2) = x_wing(2) + model%pivot_flexion(2)
                 x_wing(3) = x_wing(3) + model%pivot_flexion(3)
-
+                x_mat = x_wing
             case default
                 call abort(23673, "model not selected!")
-
         end select
-    end subroutine displace_coords
+    end subroutine wing2material
 
-    subroutine undisplace_coords(time, x_wing, model, side)
-        type(deformation_model), intent(in) :: model
-        real(kind=rk), intent(in) :: time
-        real(kind=rk), intent(inout) :: x_wing(1:3)
+    subroutine material2wing(time, x_mat, deformation, side)
+
+        ! Map material coordinates inherent to the wing to their position in wing coordinates. This is expensive and not exact, which is why we only use this to approximate the bonding box corners!
+        ! x_mat^(mat) -> x_mat^(w)
+
+        implicit none
+        real(kind=rk), intent(in)  :: time
+        real(kind=rk), intent(inout) :: x_mat(1:3)
+        real(kind=rk) :: x_w(1:3)
+        ! use the same type and intent as in your wing2material interface
+        type(deformation_model), intent(in) :: deformation
         character(len=1), intent(in) :: side
-
-        type(deformation_model) :: model_inv
-        real(kind=rk) :: x_target(1:3), m(1:3), fm(1:3)
+        real(kind=rk) :: xt(1:3), res(1:3)
         integer :: it
 
-        ! I called this the inverse, but all I'm doing is taking the negative angle distribution. This is enough for a rough estimate...
-
-        model_inv = model
-
-        if (model_inv%D_alpha_tilde%function_name == "polynomial") then
-            model_inv%D_alpha_tilde%coeffs = -model_inv%D_alpha_tilde%coeffs
-            model_inv%pivot_flexion = -model_inv%pivot_flexion
-            model_inv%flexion_angle = -model_inv%flexion_angle
-        else
-            call abort(42424, "inverse not implemented yet...")
-        end if
-
-        x_target = x_wing
-        m = x_target
-
-        ! calculate the approximate inverse of the mapping. 
-        ! This is and should only be used for rough estimations such as calculating the boundary box.
-        ! Perform the same twisting deformation, but using the negative angle.
-
-        call displace_coords(time, m, model_inv, side)       ! initial guess: reversed angle
-
-        ! iteratively correct for the y- shift
-
-        do it = 1, 5                                         ! correct the y-shift
-            fm = m
-            call displace_coords(time, fm, model, side)      ! forward map with the REAL model
-            m = m - (fm - x_target)
-        end do
-        x_wing = m
-    end subroutine
+        x_w = x_mat
+        do it = 1, 20
+            xt = x_w
+            call wing2material(time, xt, deformation, side)
+            res = xt - x_mat
+            if (maxval(abs(res)) < 1.0e-12_rk) exit
+            x_w = x_w - res
+        enddo
+        x_mat = x_w
+    end subroutine material2wing
 
 
     subroutine add_deformation_velocity(time, x_wing, u_s_w, model, side)
@@ -323,45 +269,6 @@ module module_wing_deformation
         real(kind=rk) ::  x_c_mat_w(1:3), x_mat(1:3), e_n_mat_w(1:3), e_x_mat_w(1:3), e_y_mat_w(1:3), de_n_mat_w_dt(1:3), de_x_mat_w_dt(1:3), de_y_mat_w_dt(1:3), R_y(1:3, 1:3), dR_y_dalpha(1:3, 1:3), x_tmp(1:3), A_tmp(1:3, 1:3)
 
         select case (model%model_name)
-
-            case("lin_sin")
-
-                A_tilde = model%ai_D_alpha * sin(time * model%omega) + model%bi_D_alpha * cos(time * model%omega)
-                A_tildedot = model%ai_D_alpha * model%omega * cos(time * model%omega) - model%bi_D_alpha * model%omega * sin(time * model%omega)
-
-                D_alpha = A_tilde * (model%D_alpha_slope * x_wing(2) + model%D_alpha_0)
-                D_alphadot = A_tildedot * (model%D_alpha_slope*x_wing(2) + model%D_alpha_0)
-
-                x_w = x_wing(1)
-                y_w = x_wing(2)
-                z_w = x_wing(3)
-
-                ! calculate the normalisation
-
-                normalisation = 1 / sqrt((x_w * A_tilde * model%D_alpha_slope) ** 2 + 1)
-                normalisationdot = -normalisation ** 3 * x_w ** 2 * A_tilde * A_tildedot *model%D_alpha_slope ** 2
-
-                ! vector normal to the mid plane
-                x_n = normalisation * sin(D_alpha)
-                y_n = normalisation * x_w * A_tilde * model%D_alpha_slope
-                z_n = - normalisation * cos(D_alpha)
-                
-                ! calculate the velocity component in the mid plane in the reference frame of the deformed wing. We still need to rotate back to our wing reference frame to obtain the correct components!
-
-                u_midplane(1) = - x_w * sin(D_alpha) * D_alphadot
-                u_midplane(2) = 0
-                u_midplane(3) = x_w * cos(D_alpha) * D_alphadot
-                
-
-                ! calculate the velocity component when the point is not in the midplane
-
-                u_displaced(1) = z_w * (-normalisationdot * sin(D_alpha) - normalisation * cos(D_alpha) * D_alphadot)
-                u_displaced(2) = z_w * (-x_w * normalisationdot *A_tilde * model%D_alpha_slope - x_w * normalisation *  A_tildedot *model%D_alpha_slope)
-                u_displaced(3) = z_w * ( normalisationdot * cos(D_alpha) + normalisation * sin(D_alpha) * D_alphadot)
-
-                u_s_w(1) = u_s_w(1) + (u_midplane(1) + u_displaced(1))
-                u_s_w(2) = u_s_w(2) + u_midplane(2) + u_displaced(2)
-                u_s_w(3) = u_s_w(3) + u_midplane(3) + u_displaced(3)
             
             case("generic_angle_distribution")
 
@@ -433,97 +340,79 @@ module module_wing_deformation
 
                 ! finally we can calculate the velocity. start by calculating the velocity of the material centre plane and then add the velocity component through the distance normal to the surface
 
-                u_s_w(1) = u_s_w(1) - x_c_mat_w(1) * sin(D_alpha) * &
-                        D_alpha_tilde * dA_tilde_dt &
-                        - x_mat(3) * de_n_mat_w_dt(1)
-                u_s_w(2) = u_s_w(2) - de_n_mat_w_dt(2) * x_mat(3)
-                u_s_w(3) = u_s_w(3) + x_c_mat_w(1) * cos(D_alpha) * &
-                        D_alpha_tilde * dA_tilde_dt &
-                        - x_mat(3) * de_n_mat_w_dt(3)
+                ! Calculate the velocity of the material centre plane
+                ! in the flexion-line frame.
 
-                        x_tmp = u_s_w
+                u_midplane(1) = -x_c_mat_w(1) * sin(D_alpha) * &
+                        D_alpha_tilde * dA_tilde_dt
 
-                ! add the velocity component from the flexion angle rotation.
+                u_midplane(2) = 0.0_rk
 
-                u_s_w(1) = cos(model%flexion_angle) * x_tmp(1) &
+                u_midplane(3) = x_c_mat_w(1) * cos(D_alpha) * &
+                        D_alpha_tilde * dA_tilde_dt
+
+                ! Add the velocity component due to the changing normal.
+
+                u_displaced(1) = u_midplane(1) - &
+                        x_mat(3) * de_n_mat_w_dt(1)
+
+                u_displaced(2) = u_midplane(2) - &
+                        x_mat(3) * de_n_mat_w_dt(2)
+
+                u_displaced(3) = u_midplane(3) - &
+                        x_mat(3) * de_n_mat_w_dt(3)
+
+                ! Rotate the deformation velocity back into the wing frame.
+                ! Do not rotate the existing u_s_w contribution again.
+
+                x_tmp = u_displaced
+
+                u_displaced(1) = cos(model%flexion_angle) * x_tmp(1) &
                         + sin(model%flexion_angle) * x_tmp(2)
 
-                u_s_w(2) = -sin(model%flexion_angle) * x_tmp(1) &
+                u_displaced(2) = -sin(model%flexion_angle) * x_tmp(1) &
                         + cos(model%flexion_angle) * x_tmp(2)
 
-                u_s_w(3) = x_tmp(3)
+                u_displaced(3) = x_tmp(3)
+
+                ! Add deformation velocity to the existing wing velocity.
+
+                u_s_w = u_s_w + u_displaced
                                 
                 end select
 
 
     end subroutine add_deformation_velocity
 
- 
 
-
-
-    subroutine check_deformation_velocity(x_tip_undef, us_tip_g, time,M_g2b,M_b2w,x_pivot_b, &
+    subroutine check_deformation_velocity(x_tip_w, us_tip_w, time,M_g2b,M_b2w,x_pivot_b, &
         xc_body_g, vc_body_g, rot_rel_wing_w,rot_body_b, model, side, rigid)
         real(kind=rk), intent(in) :: time
         real(kind=rk),intent(in)::M_g2b(1:3,1:3),M_b2w(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3),rot_body_b(1:3), xc_body_g(3), vc_body_g(3)
         type(deformation_model), intent(in) :: model
         character(len=1), intent(in) :: side
-        real(kind=rk),intent(inout)::x_tip_undef(3), us_tip_g(3)
+        real(kind=rk),intent(inout)::x_tip_w(3), us_tip_w(3)
         LOGICAL, intent(in) :: rigid
 
         real(kind=rk)::xd,yd,zd
         real(kind=rk)::c00,c10,c01,c11,c0,c1
-        integer :: ix,iy,iz, ik
+        integer :: ix,iy,iz
+        real(kind=rk) :: x_tip_mat(3), x_tip_b(3), x_tip_g(3), v_tmp(3), v_tmp_b(3)
 
-        real(kind=rk) :: x_tip_w(3), x_tip_b(3), x_tip_g(3), v_tmp(3), v_tmp_b(3)
-
-        x_tip_w = x_tip_undef
+        v_tmp = 0.0_rk
+        x_tip_mat = x_tip_w
 
         ! debugging purposes: Deform the wing coordinates and calculate the deformation velocity. 
 
         if (.not. rigid) then
-
-            call displace_coords(time, x_tip_w, model, side)
+            call wing2material(time, x_tip_mat, model, side)
         end if
-        !-----------------------------------------------------------------------------
-        ! now we extrcat how the us field is constructed
-
-        v_tmp(1) = rot_rel_wing_w(2)*x_tip_w(3)-rot_rel_wing_w(3)*x_tip_w(2)
-        v_tmp(2) = rot_rel_wing_w(3)*x_tip_w(1)-rot_rel_wing_w(1)*x_tip_w(3)
-        v_tmp(3) = rot_rel_wing_w(1)*x_tip_w(2)-rot_rel_wing_w(2)*x_tip_w(1)
+        
         if (.not. rigid) then
-
-            call add_deformation_velocity(time, x_tip_undef, v_tmp, model, side)
+            call add_deformation_velocity(time, x_tip_mat, v_tmp, model, side)
         end if
-
-
-        x_tip_b = matmul( transpose(M_b2w), x_tip_w) + x_pivot_b
-        x_tip_g = matmul( transpose(M_g2b), x_tip_b) + xc_body_g
-
-
-        v_tmp_b = matmul(transpose(M_b2w), v_tmp) ! in body system
-
-        ! translational part. we compute the rotational part in the body
-        ! reference frame, therefore, we must transform the body translation
-        ! velocity Insect%vc (which is in global coordinates) to the body frame
-        v_tmp = matmul(M_g2b,vc_body_g)
-
-        ! add solid body rotation to the translational velocity field. Note
-        ! that rot_body_b and x_body are in the body reference frame
-        v_tmp(1) = v_tmp(1) + rot_body_b(2)*x_tip_b(3)-rot_body_b(3)*x_tip_b(2)
-        v_tmp(2) = v_tmp(2) + rot_body_b(3)*x_tip_b(1)-rot_body_b(1)*x_tip_b(3)
-        v_tmp(3) = v_tmp(3) + rot_body_b(1)*x_tip_b(2)-rot_body_b(2)*x_tip_b(1)
-
-        ! the body motion is added to the wing motion, which is already in us
-        ! and they are also in the body refrence frame. However, us has to be
-        ! in the global reference frame, so M_b2g is applied
-        us_tip_g = matmul( transpose(M_g2b), v_tmp_b + v_tmp )
-
-        !open(14,file='debug_wing_udef.t',status='unknown',position='append')
-        !write (14,'(7(es15.8,1x))\n') time, x_tip_g, us_tip_g
-        !close(14)
-
-        x_tip_undef =x_tip_g
-    end subroutine
+        us_tip_w = v_tmp
+        x_tip_w =x_tip_mat
+    end subroutine check_deformation_velocity
 
 end module module_wing_deformation

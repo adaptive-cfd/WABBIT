@@ -471,6 +471,16 @@ contains
             Insect%body_superSTL_g(i, 22:24) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 22:24))
             Insect%body_superSTL_g(i, 25:27) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 25:27))
             Insect%body_superSTL_g(i, 28:30) = matmul(Insect%M_b2g, Insect%body_superSTL_b(i, 28:30))
+            ! centroid of triangle (used for bounding spheres):
+            Insect%body_superSTL_g(i, 31:33) = (Insect%body_superSTL_g(i, 1:3) &
+                                             +  Insect%body_superSTL_g(i, 4:6) &
+                                             +  Insect%body_superSTL_g(i, 7:9)) / 3.0_rk
+            ! triangle radius (scalar) (used for bounding spheres):
+            Insect%body_superSTL_g(i, 34) = maxval( (/ &
+                                            norm2_3d(Insect%body_superSTL_g(i, 1:3) - Insect%body_superSTL_g(i, 31:33)), &
+                                            norm2_3d(Insect%body_superSTL_g(i, 4:6) - Insect%body_superSTL_g(i, 31:33)), &
+                                            norm2_3d(Insect%body_superSTL_g(i, 7:9) - Insect%body_superSTL_g(i, 31:33)) /) )
+
          enddo
       endif
 

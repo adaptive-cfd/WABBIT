@@ -366,12 +366,12 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
 
             if (root) write(*,'("INSECTS: STL: file length is ntri=", i7 )') ntri
 
-            allocate( Insect%body_superSTL_b(1:ntri,1:30) )
-            allocate( Insect%body_superSTL_g(1:ntri,1:30) )
+            allocate( Insect%body_superSTL_b(1:ntri,1:34) )
+            allocate( Insect%body_superSTL_g(1:ntri,1:34) )
 
             ! No scaling or origin shift is applied: we assume you did that when generating
             ! the superSTL file. The data is thus understood in the body coordinate system.
-            call read_array_from_ascii_file_mpi(Insect%BodySuperSTLfile, Insect%body_superSTL_b, 0)
+            call read_array_from_ascii_file_mpi(Insect%BodySuperSTLfile, Insect%body_superSTL_b(:, 1:30), 0)
 
             if (root) write(*,'("INSECTS: STL: read from file...done! We are good to go.")')
         endif

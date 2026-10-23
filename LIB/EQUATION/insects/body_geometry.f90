@@ -1386,7 +1386,8 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
 
     real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal
     real(kind=rk), dimension(1:3) :: vertex2_normal, vertex3_normal, face_normal, edge1_normal, edge2_normal, edge3_normal
-    real(kind=rk) :: scale, origin(1:3), tmp, x, y, z
+    real(kind=rk), dimension(1:3) :: tri_center
+    real(kind=rk) :: scale, origin(1:3), tmp, x, y, z, tri_radius, dc2
     real(kind=rk) :: x_glob(1:3), x_body(1:3), signed_distance, shell_thickness, shell_thickness_safe
     character(len=clong) :: fname_stl
     logical :: informed = .false.
@@ -1462,8 +1463,11 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         edge1_normal   = Insect%body_superSTL_g(i, 22:24)
         edge2_normal   = Insect%body_superSTL_g(i, 25:27)
         edge3_normal   = Insect%body_superSTL_g(i, 28:30)
+        ! used for computational efficiency 
+        tri_center     = Insect%body_superSTL_g(i, 31:33)
+        tri_radius     = Insect%body_superSTL_g(i, 34)
 
-        ! compute bounding box
+
         xmin = floor( ( minval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) - safety
         ymin = floor( ( minval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) - safety
         zmin = floor( ( minval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) - safety
@@ -1494,11 +1498,19 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         ! computing the signed distance for each point on the block within the bounding box.
         ! bounding box may be empty.
         do iz = zmin, zmax
-            x_glob(3) = x0(3) + dble(iz)*dx(3)
+            x_glob(3) = x0(3) + real(iz,kind=rk) * dx(3)
             do iy = ymin, ymax
-                x_glob(2) = x0(2) + dble(iy)*dx(2)
+                x_glob(2) = x0(2) + real(iy,kind=rk) * dx(2)
                 do ix = xmin, xmax
-                    x_glob(1) = x0(1) + dble(ix)*dx(1)
+                    x_glob(1) = x0(1) + real(ix,kind=rk) * dx(1)
+
+                    ! the triangle lies within the spherical bounding box (bounding sphere), and therefore
+                    ! the distance d (point-triangle) satisfies d >= dc - R, whith dc = |p-tri_center|
+                    ! and R the "radius" = tri_radius.
+                    dc2 = (x_glob(1)-tri_center(1))**2 + (x_glob(2)-tri_center(2))**2 + (x_glob(3)-tri_center(3))**2
+                    tmp = abs(tmp_block(ix,iy,iz)) + tri_radius
+                    ! if dc2 > tmp**2, then evaluating pointTriangleDistance cannot yield an improvement, so skip it. 
+                    if ( dc2 >= tmp*tmp ) cycle
 
                     ! the distance to the current triangle:
                     tmp = pointTriangleDistance( vertex1, vertex2, vertex3, x_glob, face_normal, &
@@ -1517,9 +1529,10 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     ! ----------------------------------------------------------------
     ! signed distance to mask function
     ! ----------------------------------------------------------------
-    do iz = 0, size(mask,3)-1
-        do iy = 0, size(mask,2)-1
-            do ix = 0, size(mask,1)-1
+    do iz = g, size(mask,3)-1-g
+        do iy = g, size(mask,2)-1-g
+            do ix = g, size(mask,1)-1-g
+                ! signed dist is saved on tmp block:
                 signed_distance = tmp_block(ix,iy,iz)
 
                 ! revised version, 11/2022:

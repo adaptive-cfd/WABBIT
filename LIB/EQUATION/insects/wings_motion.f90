@@ -58,7 +58,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
   real(kind=rk) :: a_posi(1:4),b_posi(1:4),a_elev(1:4),b_elev(1:4),a_feth(1:4),b_feth(1:4)
   real(kind=rk) :: s,c,a0_phi
   real(kind=rk) :: phicdeg
-  real(kind=rk) :: alphacdeg, ttau
+  real(kind=rk) :: alphacdeg, ttau, twistOffset, twistOffset_dt
   integer :: i,mpicode
   character(len=clong) :: dummy
   type(inifile) :: kinefile
@@ -165,6 +165,13 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       call fseries_eval(time,phi,phi_dt, Insect%Wings(wingID)%a0_phi, Insect%Wings(wingID)%ai_phi(1:Insect%Wings(wingID)%nfft_phi), Insect%Wings(wingID)%bi_phi(1:Insect%Wings(wingID)%nfft_phi))
       call fseries_eval(time,alpha,alpha_dt, Insect%Wings(wingID)%a0_alpha, Insect%Wings(wingID)%ai_alpha(1:Insect%Wings(wingID)%nfft_alpha), Insect%Wings(wingID)%bi_alpha(1:Insect%Wings(wingID)%nfft_alpha))
       call fseries_eval(time,theta,theta_dt, Insect%Wings(wingID)%a0_theta, Insect%Wings(wingID)%ai_theta(1:Insect%Wings(wingID)%nfft_theta), Insect%Wings(wingID)%bi_theta(1:Insect%Wings(wingID)%nfft_theta))
+
+
+      ! add twist offset from deformation measurements and suoerimpore upon alpha. 
+      call fseries_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%twistOffset_a0, Insect%Wings(wingID)%deformation%twistOffset_ai, Insect%Wings(wingID)%deformation%twistOffset_bi)
+
+      alpha = alpha + twistOffset
+      alpha_dt = alpha_dt + twistOffset_dt
 
     case ("Hermite","hermite","HERMITE")
       ! evaluate hermite interpolation

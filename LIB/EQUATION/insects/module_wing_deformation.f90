@@ -20,6 +20,7 @@ module module_wing_deformation
 
         character(len=clong) :: model_name
         character(len=clong) :: filename
+        character(len=clong) :: units
 
         ! variables for a model I'm going to call "lin_sin": a spatially linear increase in the deformation angle D_alpha, multiplied by some sin - cos sum
 
@@ -34,7 +35,6 @@ module module_wing_deformation
         real(kind=rk) :: flexion_angle
         real(kind=rk) :: pivot_flexion(1:3)
 
-        ! compensate for 
 
         ! maybe program a fourier series later
 
@@ -49,6 +49,14 @@ module module_wing_deformation
 
         type(generic_function1D) :: A_tilde
         type(generic_function1D) :: D_alpha_tilde
+
+        ! a twist offset is problematic when we have an fseries, since the function is then no longer separable. 
+        ! to mitigate this, we store the twist offset as a separate array of fourier coefficients, which is added to alpha (feathering angle) in the main flapping motion subroutine.
+        ! this also allows us to separate the twisting into pitching of the wing and deformation, and is helpful for exmperimental measurements which describe the twist with an offset.
+
+        real(kind=rk) :: twistOffset_ai(10)
+        real(kind=rk) :: twistOffset_bi(10)
+        real(kind=rk) :: twistOffset_a0 = 0.0_rk
 
     end type
 
@@ -74,10 +82,14 @@ module module_wing_deformation
                 alpha_tip = model%D_alpha_tilde%coeffs(2)
                 alpha_root = model%D_alpha_tilde%coeffs(1)
 
+                if (model%units == "deg") then
                 ! rescale so we can work with degrees
 
                 model%D_alpha_tilde%coeffs(2) = 2 * 3.141592654_rk * ((alpha_tip - alpha_root) / R) / 360.0_rk
                 model%D_alpha_tilde%coeffs(1) = 2.0_rk * 3.141592654_rk * (alpha_root / R) / 360.0_rk
+
+                end if
+
 
                 ! make sure no higher order terms sneak into our spatial distribution (the keyword is LINEAR alpha)
 
@@ -104,6 +116,21 @@ module module_wing_deformation
 
                     model%A_tilde%coeffs(4) = 1.0_rk - model%A_tilde%coeffs(4)
                 endif
+                model%model_name = "generic_angle_distribution"
+
+            case("WalkerTaylor")
+                ! Import deformation measurements according to 
+                ! Walker, S. M., & Taylor, G. K. (n.d.). A semi-empirical model of the aerodynamics of manoeuvring insect flight.
+                ! for now, we only consider the periodic components of the local twist. The offset could be added to the feathering angle.
+                ! 
+                model%D_alpha_tilde%function_name = "polynomial"
+
+                if (model%units == "deg") then
+                ! the amplitude is set by the fourier coefficients. note the deg2rad conversion in the polynomial!
+                model%D_alpha_tilde%coeffs = (/0.0_rk, 3.141592654_rk/180.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/)
+
+                end if
+                model%A_tilde%function_name = "fseries"
                 model%model_name = "generic_angle_distribution"
 
             case("generic_angle_distribution", "lin_sin")
@@ -392,12 +419,8 @@ module module_wing_deformation
         type(deformation_model), intent(in) :: model
         character(len=1), intent(in) :: side
         real(kind=rk),intent(inout)::x_tip_w(3), us_tip_w(3)
-        LOGICAL, intent(in) :: rigid
-
-        real(kind=rk)::xd,yd,zd
-        real(kind=rk)::c00,c10,c01,c11,c0,c1
-        integer :: ix,iy,iz
-        real(kind=rk) :: x_tip_mat(3), x_tip_b(3), x_tip_g(3), v_tmp(3), v_tmp_b(3)
+        real(kind=rk) :: x_tip_mat(3), v_tmp(3)
+        logical, INTENT(IN):: rigid
 
         v_tmp = 0.0_rk
         x_tip_mat = x_tip_w
@@ -409,7 +432,7 @@ module module_wing_deformation
         end if
         
         if (.not. rigid) then
-            call add_deformation_velocity(time, x_tip_mat, v_tmp, model, side)
+            call add_deformation_velocity(time, x_tip_w, v_tmp, model, side)
         end if
         us_tip_w = v_tmp
         x_tip_w =x_tip_mat

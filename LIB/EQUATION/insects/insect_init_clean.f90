@@ -45,7 +45,7 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     integer, optional, intent(in) :: colors_default(6)
 
     type(inifile) :: PARAMS
-    real(kind=rk) :: defaultvec(1:3), defaultvec5(5), alpha_tip, alpha_root, reversalPhase, NReversals,nt_frac
+    real(kind=rk) :: defaultvec(1:3), defaultvec5(5), alpha_tip, alpha_root, reversalPhase, NReversals,nt_frac, defaultvec10(10)
     character(len=clong) :: DoF_string, dummystr, filenameL, filenameR, filenameL2, filenameR2
     integer :: j, tmp, mpirank, mpicode, ntri
     integer(kind=2) :: wingID
@@ -127,52 +127,6 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     call read_param_mpi(PARAMS, SECTION, "LeftWing2Rigid", Insect%Wings(3)%rigid, .true.)
     call read_param_mpi(PARAMS, SECTION, "RightWing2Rigid", Insect%Wings(4)%rigid, .true.)
 
-    do wingID=1,4
-        call read_param_mpi(PARAMS, SECTION, 'modelName', Insect%Wings(wingID)%deformation%model_name, "lin_sin")
-        call read_param_mpi(PARAMS, SECTION, 'offsetDalpha', Insect%Wings(wingID)%deformation%D_alpha_0, 0.0_rk)
-        call read_param_mpi(PARAMS, SECTION, 'slopeDalpha', Insect%Wings(wingID)%deformation%D_alpha_slope, 0.0_rk)
-        call read_param_mpi(PARAMS, SECTION, 'ai', Insect%Wings(wingID)%deformation%ai_D_alpha, 0.0_rk)
-        call read_param_mpi(PARAMS, SECTION, 'bi', Insect%Wings(wingID)%deformation%bi_D_alpha, 0.0_rk)
-        call read_param_mpi(PARAMS, SECTION, 'omega', Insect%Wings(wingID)%deformation%omega, 0.0_rk)
-
-
-        call read_param_mpi(PARAMS, SECTION, 'timeCoefficients', defaultvec5, (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/))
-        call read_param_mpi(PARAMS, SECTION, 'timeFunction', Insect%Wings(wingID)%deformation%A_tilde%function_name, "sin")
-        !search for parameters for the linearAlpha model (temporal)
-        call read_param_mpi(PARAMS, SECTION, 'NReversals', NReversals, -1e5_rk)
-        call read_param_mpi(PARAMS, SECTION, 'reversalPhase', reversalPhase, -1e5_rk)
-
-        Insect%Wings(wingID)%deformation%A_tilde%coeffs = defaultvec5
-
-        call read_param_mpi(PARAMS, SECTION, 'spatialCoefficients', defaultvec5, (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/))
-        !search for parameters for the linearAlpha model (spatial)
-        call read_param_mpi(PARAMS, SECTION, 'alphaTip', alpha_tip, -1e5_rk)
-        call read_param_mpi(PARAMS, SECTION, 'alphaRoot', alpha_root, -1e5_rk)
-        Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs = defaultvec5
-        call read_param_mpi(PARAMS, SECTION, 'spatialFunction', Insect%Wings(wingID)%deformation%D_alpha_tilde%function_name, "polynomial")
-        call read_param_mpi(PARAMS, SECTION, 'negativeTwistFraction', nt_frac, -1e5_rk)
-
-
-        call read_param_mpi(PARAMS, SECTION, 'flexionLineAngle', Insect%Wings(wingID)%deformation%flexion_angle, 0.0_rk)
-        call read_param_mpi(PARAMS, SECTION, 'flexionLinePivot', defaultvec, (/0.0_rk, 0.0_rk, 0.0_rk/))
-        Insect%Wings(wingID)%deformation%pivot_flexion = defaultvec
-
-        if ((alpha_tip/=-1e5_rk) .and. (alpha_root/=-1e5_rk) .and. (NReversals/=-1e5_rk) .and. (reversalPhase/=-1e5_rk)) then
-
-            Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs(1) = alpha_root
-            Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs(2) = alpha_tip
-            Insect%Wings(wingID)%deformation%A_tilde%coeffs(2)  = NReversals
-            Insect%Wings(wingID)%deformation%A_tilde%coeffs(3)  = reversalPhase
-            Insect%Wings(wingID)%deformation%A_tilde%coeffs(4)  = nt_frac
-
-        end if
-
-        call break_down_into_simple_model(Insect%Wings(wingID)%deformation)
-
-
-
-    end do
-
     ! determine whether the second pair of wings is present
     ! This variable is used to control output files.
     Insect%second_wing_pair = .false.
@@ -226,6 +180,28 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     ! if the wing motion is read from file (the most often used case), then we extract the file to be used (from the 
     ! string "from_file::FILENAME.INI" we extract "FILENAME.INI")
     do wingID = 1, 4
+
+
+
+        ! loading kinematics: load the twist offset
+    if (Insect%Wings(wingID)%rigid) then
+        ! Some sources explicitly add a twist offset. This is superimposed upon the feathering angle.
+        ! start with ai
+        defaultvec10 = 0.0_rk
+        call read_param_mpi(PARAMS, SECTION, 'twistOffset_ai', defaultvec10, defaultvec10)
+        Insect%Wings(wingID)%deformation%twistOffset_ai = defaultvec10
+
+        defaultvec10 = 0.0_rk
+        call read_param_mpi(PARAMS, SECTION, 'twistOffset_bi', defaultvec10, defaultvec10)
+
+        Insect%Wings(wingID)%deformation%twistOffset_bi = defaultvec10
+
+
+        call read_param_mpi(PARAMS, SECTION, 'twistOffset_a0', Insect%Wings(wingID)%deformation%twistOffset_a0, 0.0_rk)
+
+      end if
+
+
         if ( index(Insect%Wings(wingID)%FlappingMotion, "from_file::") /= 0 ) then
             ! Store the file to be used in the wingkinematics 
             Insect%Wings(wingID)%infile = Insect%Wings(wingID)%FlappingMotion( 12:clong  )
@@ -382,6 +358,105 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     Insect%Wings(2)%color = Insect%color_r 
     Insect%Wings(3)%color = Insect%color_l2
     Insect%Wings(4)%color = Insect%color_r2
+
+
+
+        ! header information
+    if (root) then
+        write(*,'(A)') "---------------------------------------------------------------------------------------"                                                             
+        write(*,'(A)') " (Prescribed)                   *%%       %                                       "
+        write(*,'(A)') "                        %%%%%   %        *%%%#%%             (Insect)            "
+        write(*,'(A)') "                         %%%%%+ %        %%%%  %%%                               "
+        write(*,'(A)') "                         % %%%%% %      #%%%* %%%%     .%                        "
+        write(*,'(A)') "              %%%%%       * :%%%%%      %%%%  %%%%     %%%%.                     "
+        write(*,'(A)') "            %%#  .        %   #%%%%    %%%%+ %%%%      %%%%  %                   "
+        write(*,'(A)') "          %%%%%%  %%      :%    %%%   %%%%%  %%%      %%%%   %%%                 "
+        write(*,'(A)') "            :%%%%#  + %   %%                         %%%%%%:                     "
+        write(*,'(A)') "              %%%%%   %%                          %-%%%%%                        "
+        write(*,'(A)') "     %%%%      :%%%%#:      (Wing)                  %%%                          "
+        write(*,'(A)') "   =%#%%%%       %%.                                  #                          "
+        write(*,'(A)') "  %%%   %%%%%%=                                                                  "
+        write(*,'(A)') "#%%%%%%:   %%%%                 %%%%%=     %%%*                                  "
+        write(*,'(A)') "   #%%%%%%  :%                   %%%%        %%%%  %%%                           "
+        write(*,'(A)') "      %%%%%%#        =%          %%%%        %%%%  *:                            "
+        write(*,'(A)') "        -%%           %          =%%%-     %  %%%% %      %%%% .                 "
+        write(*,'(A)') "                  %%%  +*         %%%%     %  %%%%%#    %%%%.   %%%              "
+        write(*,'(A)') "                %  %%%%%%         %%%%    %-   %%%%    %%%%=    %%               "
+        write(*,'(A)') "              *%%%+ %%%%%%%      %%%*     %%   +%%%   %%%%* %   +    #%%         "
+        write(*,'(A)') "             %%%%%%%%% :%%%%                          -%%%  %%%%   %%%%  %#      "
+        write(*,'(A)') "                 %%%%%%%   .                           #%  %%%%    %%%%   %%     "
+        write(*,'(A)') "                     %%%%                                 -%%=  :% %%%%% :%      "
+        write(*,'(A)') "                                  (Deformation)                %%   #%%%%        "
+        write(*,'(A)') "                                                                .%   %%%%        "
+        write(*,'(A)') "                                                                   %%%%          "
+        write(*,'(A)') "---------------------------------------------------------------------------------------"
+        write(*,'(A)') "*.ini file is: "//trim(adjustl(fname_ini))// " and insect is in section "//trim(adjustl(SECTION))
+        write(*,'(80("<"))')
+        write(*,'("Lx=",g12.4," Ly=",g12.4," Lz=",g12.4," nu=",g12.4)') xl, yl, zl, nu
+        write(*,'("dx=",g12.4," nx_equidistant=",i6)') dx_reference, nint(xl/dx_reference)
+    endif
+
+    do wingID=1,4
+        call read_param_mpi(PARAMS, SECTION, 'modelName', Insect%Wings(wingID)%deformation%model_name, "lin_sin")
+        call read_param_mpi(PARAMS, SECTION, 'offsetDalpha', Insect%Wings(wingID)%deformation%D_alpha_0, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'slopeDalpha', Insect%Wings(wingID)%deformation%D_alpha_slope, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'ai', Insect%Wings(wingID)%deformation%ai_D_alpha, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'bi', Insect%Wings(wingID)%deformation%bi_D_alpha, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'omega', Insect%Wings(wingID)%deformation%omega, 0.0_rk)
+
+
+        call read_param_mpi(PARAMS, SECTION, 'timeCoefficients', defaultvec5, (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/))
+        call read_param_mpi(PARAMS, SECTION, 'timeFunction', Insect%Wings(wingID)%deformation%A_tilde%function_name, "sin")
+        !search for parameters for the linearAlpha model (temporal)
+        call read_param_mpi(PARAMS, SECTION, 'NReversals', NReversals, -1e5_rk)
+        call read_param_mpi(PARAMS, SECTION, 'reversalPhase', reversalPhase, -1e5_rk)
+
+        Insect%Wings(wingID)%deformation%A_tilde%coeffs = defaultvec5
+
+        call read_param_mpi(PARAMS, SECTION, 'spatialCoefficients', defaultvec5, (/0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/))
+        !search for parameters for the linearAlpha model (spatial)
+        call read_param_mpi(PARAMS, SECTION, 'alphaTip', alpha_tip, -1e5_rk)
+        call read_param_mpi(PARAMS, SECTION, 'alphaRoot', alpha_root, -1e5_rk)
+        Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs = defaultvec5
+        call read_param_mpi(PARAMS, SECTION, 'spatialFunction', Insect%Wings(wingID)%deformation%D_alpha_tilde%function_name, "polynomial")
+        call read_param_mpi(PARAMS, SECTION, 'negativeTwistFraction', nt_frac, -1e5_rk)
+
+
+        call read_param_mpi(PARAMS, SECTION, 'flexionLineAngle', Insect%Wings(wingID)%deformation%flexion_angle, 0.0_rk)
+        call read_param_mpi(PARAMS, SECTION, 'flexionLinePivot', defaultvec, (/0.0_rk, 0.0_rk, 0.0_rk/))
+        Insect%Wings(wingID)%deformation%pivot_flexion = defaultvec
+
+        if ((alpha_tip/=-1e5_rk) .and. (alpha_root/=-1e5_rk) .and. (NReversals/=-1e5_rk) .and. (reversalPhase/=-1e5_rk)) then
+
+            Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs(1) = alpha_root
+            Insect%Wings(wingID)%deformation%D_alpha_tilde%coeffs(2) = alpha_tip
+            Insect%Wings(wingID)%deformation%A_tilde%coeffs(2)  = NReversals
+            Insect%Wings(wingID)%deformation%A_tilde%coeffs(3)  = reversalPhase
+            Insect%Wings(wingID)%deformation%A_tilde%coeffs(4)  = nt_frac
+
+        end if
+
+
+        defaultvec10 = 0.0_rk
+        call read_param_mpi(PARAMS, SECTION, 'wingGradient_ai', defaultvec10, defaultvec10)
+
+        Insect%Wings(wingID)%deformation%A_tilde%ai = defaultvec10
+        call read_param_mpi(PARAMS, SECTION, 'wingGradient_a0', Insect%Wings(wingID)%deformation%A_tilde%a0, 0.0_rk)
+
+        defaultvec10 = 0.0_rk
+        call read_param_mpi(PARAMS, SECTION, 'wingGradient_bi', defaultvec10, defaultvec10)
+
+        Insect%Wings(wingID)%deformation%A_tilde%bi = defaultvec10
+
+        call read_param_mpi(PARAMS, SECTION, 'DeformationModelUnits', Insect%Wings(wingID)%deformation%units, "deg")
+
+
+        call break_down_into_simple_model(Insect%Wings(wingID)%deformation)
+
+
+
+    end do
+
 
     ! clean ini file
     call clean_ini_file_mpi(PARAMS)

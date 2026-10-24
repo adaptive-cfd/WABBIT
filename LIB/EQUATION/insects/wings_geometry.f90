@@ -1508,7 +1508,7 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                     ! calculate the velocity component through the deformation
 
                     if (.not. Insect%Wings(wingID)%rigid) then
-                        call add_deformation_velocity(Insect%time, x_mat, v_tmp, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
+                        call add_deformation_velocity(Insect%time, x_w, v_tmp, Insect%Wings(wingID)%deformation, Insect%Wings(wingID)%side)
                     end if
 
                     us(ix,iy,iz,1:3) = matmul(transpose(M_b2w), v_tmp)

@@ -11,6 +11,8 @@ module generic_functions_module
 
         ! coefficients for the function, their use depends on the funciton at hand.
         real(kind=rk)   :: coeffs(5)
+        real(kind=rk)   :: ai(10), a0
+        real(kind=rk)   :: bi(10)
 
     end type
     contains
@@ -21,7 +23,8 @@ module generic_functions_module
     integer, intent(in) :: derivative
     integer :: i, n, j, power
     real(kind=rk) :: coeff_factor
-    real(kind=rk) :: output
+    real(kind=rk) :: output, k
+    integer :: nfft
 
     output = 0.0_rk
     n = size(function%coeffs)
@@ -75,6 +78,43 @@ module generic_functions_module
         if (derivative==0) then
             output = output + function%coeffs(4)
         endif
+
+    case("fseries")
+        nfft = size(function%ai)
+        if (derivative == 0) then
+            output = function%a0
+        end if 
+        select case (mod(derivative, 4))
+
+
+            case(0)
+                do i = 1, nfft
+                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
+                    output = output+ (k ** derivative) * (function%ai(i) * cos(k * value) + function%bi(i) * sin(k * value))
+                end do
+
+
+            case(1)
+                do i = 1, nfft
+                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
+                    output = output+ (k ** derivative) * (-function%ai(i) * sin(k * value) + function%bi(i) * cos(k * value))
+                end do
+
+            case(2)
+                do i = 1, nfft
+                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
+                    output = output+ (k ** derivative) * ( - function%ai(i) * cos(k * value) - function%bi(i) * sin(k * value))
+                end do
+
+            case(3)
+                do i = 1, nfft
+                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
+                    output = output+ (k ** derivative) * (function%ai(i) * sin(k * value) - function%bi(i) * cos(k * value))
+                end do
+        end select
+
+
+
     case default
         write(*,*) 'UNKNOWN FUNCTION: >', function%function_name, '<'
         write(*,*) 'TRIMMED:          >', trim(function%function_name), '<'

@@ -760,6 +760,8 @@ subroutine draw_body_drosophila_maeda( xx0, ddx, mask, mask_color, us, Insect)
 end subroutine draw_body_drosophila_maeda
 
 
+
+
 !-------------------------------------------------------------------------------
 subroutine draw_body_jerry( xx0, ddx, mask, mask_color, us, Insect)
     implicit none

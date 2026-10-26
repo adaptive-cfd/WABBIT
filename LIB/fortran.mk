@@ -8,7 +8,7 @@ post_average_snapshots.f90 post_superstl.f90 post_dry_run.f90 performance_test.f
 post_dump_neighbors.f90 post_meta_analyse.f90 operator_reconstruction.f90 rhs_operator_reconstruction.f90 post_extract_slice.f90 \
 post_evaluate_thresholding.f90 post_unit_test.f90 post_compression_unit_test.f90 post_denoising.f90 post_cvs_invertibility_test.f90 \
 post_wavelet_transform.f90 post_wavelet_contributions.f90 post_denoising_test.f90 post_derivative.f90 proto_GS_multigrid.f90 proto_pressure_multigrid.f90 \
-post_pressure_interpolation.f90 post_sort.f90 post_external_adapt.f90 post_filter.f90
+post_pressure_interpolation.f90 post_sort.f90 post_external_adapt.f90 post_filter.f90 
 # Object and module directory:
 OBJDIR = OBJ
 OBJS := $(FFILES:%.f90=$(OBJDIR)/%.o)
@@ -24,7 +24,7 @@ MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_t
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90\
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90\
 	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 module_NSPP.f90 module_geometry.f90\
-	module_wing_deformation.f90\
+	module_wing_deformation.f90 module_trimesh.f90\
 	generic_functions_module.f90# Jonas module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
@@ -36,6 +36,7 @@ VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
 VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS:LIB/WAVELETS:LIB/FFT:LIB/POISSON
 VPATH += :LIB/EQUATION/navier_stokes_pressure_poisson
+VPATH += :LIB/TRIMESH
 
 # Set the default compiler if it's not already set
 ifndef $(FC)

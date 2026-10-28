@@ -225,7 +225,7 @@ program main
     tfile_headers(6) = "Jmin"
     tfile_headers(7) = "Jmax"
     tfile_headers(8) = "N_procs"
-    tfile_headers(9) = "N_blocks_total"
+    tfile_headers(9) = "N_blocks_allocated"
     call init_t_file('performance.t', overwrite, tfile_headers(1:9) )
     call init_t_file('eps_norm.t', overwrite)
     tfile_headers(2) = "dt"

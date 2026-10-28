@@ -1381,13 +1381,13 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     real(kind=rk), allocatable, save :: tmp_block(:,:,:)
 
     integer :: safety, i, ntri, Bs(1:3)
-    integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax
+    integer :: ix, iy, iz, ivertex, xmin, xmax, ymin, ymax, zmin, zmax, idir
     integer(kind=2) :: color_body
 
     real(kind=rk), dimension(1:3) :: vertex1, vertex2, vertex3, vertex1_normal
     real(kind=rk), dimension(1:3) :: vertex2_normal, vertex3_normal, face_normal, edge1_normal, edge2_normal, edge3_normal
-    real(kind=rk), dimension(1:3) :: tri_center
-    real(kind=rk) :: scale, origin(1:3), tmp, x, y, z, tri_radius, dc2
+    real(kind=rk), dimension(1:3) :: tri_center, AABB_min, AABB_max
+    real(kind=rk) :: scale, origin(1:3), tmp, x, y, z, tri_radius, dc2, a, b
     real(kind=rk) :: x_glob(1:3), x_body(1:3), signed_distance, shell_thickness, shell_thickness_safe
     character(len=clong) :: fname_stl
     logical :: informed = .false.
@@ -1413,12 +1413,11 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     ! thickness of the shell around the surface we compute. (the real thickness not half the value)
     shell_thickness = Insect%C_shell_thickness * Insect%C_smooth * Insect%dx_reference
 
-    ! Note: if Insect%smoothing_thickness=="local", then Insect%safety is not
-    ! a constant; it depends on the level of the block
     ! On coarse levels, the safety is 8 points, then on the finest it is the value Insect%safety (3.5 points)
     shell_thickness_safe = shell_thickness + min(8.0_rk*Insect%C_smooth*Insect%dx_reference, Insect%safety)
 
-    safety = ceiling( shell_thickness_safe/2.0_rk / Insect%dx_reference ) ! in grid points
+    ! safety = ceiling( shell_thickness_safe/2.0_rk / Insect%dx_reference ) ! in grid points
+    safety = ceiling( shell_thickness_safe/2.0_rk / maxval(dx) ) ! in grid points
 
     ! The below information may be misleading  because the important number for performance,
     ! "safety", is not a constant, if Insect%smoothing_thickness=="local"
@@ -1449,6 +1448,10 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
     ! resolution do not match. It is well possible, for detailed STL models, that hundredts of
     ! triangles are considered for a single point - of course, just one is eventually relevant.
 
+    ! take into account that our mask extends between [a, -b], not symmetrically around the zero isosurface
+    a = Insect%safety
+    b = shell_thickness_safe! / 2.0_rk
+
     ! loop over all triangles
     do i = 1, ntri
         ! data from the "superSTL" file are in the body system, but during the update_insect process
@@ -1467,14 +1470,31 @@ subroutine draw_body_superSTL(x0, dx, mask, mask_color, us, Insect)
         tri_center     = Insect%body_superSTL_g(i, 31:33)
         tri_radius     = Insect%body_superSTL_g(i, 34)
 
+        do idir = 1, 3
+            ! lower end of AABB
+            AABB_min(idir) = min( vertex1(idir), vertex2(idir), vertex3(idir) ) 
+            if (face_normal(idir) < 0.0_rk) then
+                AABB_min(idir) = AABB_min(idir) - max( a, b*sqrt(1.0_rk-face_normal(idir)**2))
+            else
+                AABB_min(idir) = AABB_min(idir) - b
+            endif
 
-        xmin = floor( ( minval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) - safety
-        ymin = floor( ( minval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) - safety
-        zmin = floor( ( minval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) - safety
+            ! upper end of AABB
+            AABB_max(idir) = max( vertex1(idir), vertex2(idir), vertex3(idir) ) 
+            if (face_normal(idir) < 0.0_rk) then
+                AABB_max(idir) = AABB_max(idir) + b
+            else
+                AABB_max(idir) = AABB_max(idir) + max( a, b*sqrt(1.0_rk-face_normal(idir)**2))
+            endif
+        enddo
 
-        xmax = ceiling( ( maxval((/vertex1(1),vertex2(1),vertex3(1)/)) - x0(1) ) / dx(1)) + safety
-        ymax = ceiling( ( maxval((/vertex1(2),vertex2(2),vertex3(2)/)) - x0(2) ) / dx(2)) + safety
-        zmax = ceiling( ( maxval((/vertex1(3),vertex2(3),vertex3(3)/)) - x0(3) ) / dx(3)) + safety
+        xmin = floor( (AABB_min(1) - x0(1)) / dx(1) )
+        ymin = floor( (AABB_min(2) - x0(2)) / dx(2) )
+        zmin = floor( (AABB_min(3) - x0(3)) / dx(3) )
+
+        xmax = ceiling( (AABB_max(1) - x0(1)) / dx(1) )
+        ymax = ceiling( (AABB_max(2) - x0(2)) / dx(2) )
+        zmax = ceiling( (AABB_max(3) - x0(3)) / dx(3) )
 
         ! Do not set the mask in the ghost nodes.
         ! Note these guys are zero based indexing...

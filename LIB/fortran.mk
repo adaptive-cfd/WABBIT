@@ -229,7 +229,7 @@ $(OBJDIR)/module_wing_deformation.o: module_wing_deformation.f90 \
 $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integration_flusi_wabbit.o $(OBJDIR)/module_geometry.o \
 	body_geometry.f90 body_motion.f90 rigid_solid_time_stepper.f90 wings_geometry.f90 wing_deformation_init.f90\
 	wings_motion.f90 insect_init_clean.f90 $(OBJDIR)/module_wing_deformation.o \
-	kineloader.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o
+	kineloader.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o $(OBJDIR)/module_trimesh.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_geometry.o: module_geometry.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
@@ -390,6 +390,9 @@ $(OBJDIR)/module_MOR.o: module_MOR.f90  \
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/generic_functions_module.o: generic_functions_module.f90 $(OBJDIR)/module_globals.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+
+$(OBJDIR)/module_trimesh.o: module_trimesh.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 # Compile remaining objects from Fortran files.

@@ -1,0 +1,260 @@
+
+module module_trimesh
+
+    use module_globals
+
+    implicit none
+
+    type surfaceTrimesh
+        ! Store information about the surface trimesh.
+        ! MUST be manifold, MUST be a surface (closed or open)
+        real(kind=rk), allocatable :: vertices(:, :)
+        real(kind=rk), allocatable :: bases(:, :, :)
+        integer, allocatable :: faces(:, :)
+        integer, allocatable :: edges(:, :)
+        integer, allocatable :: neighbours(:)
+
+    end type surfaceTrimesh
+
+contains
+
+    subroutine import2DGnuplotMesh(filename, trimesh)
+
+        Use, intrinsic :: iso_fortran_env, Only : iostat_end
+        
+        character(len=*), INTENT(IN) :: filename
+        type(surfaceTrimesh), INTENT(INOUT) :: trimesh
+        real(kind=rk) :: datap1(4, 2)
+        integer :: error, iunit, nedges, nelements, nverts
+        
+
+        iunit=2
+        nedges=0
+        nverts = 0
+        nelements = 0
+
+        ! read very simple Gnuplot mesh format. 
+        ! This consists of a set of triangles, defined by four points (p1 -> p2 -> p3 -> p1).
+        ! First we count the lines (how do I do this cleverly?)
+
+
+        OPEN(unit=iunit, file=filename)
+
+        do 
+            read(iunit, *, iostat=error) datap1(1, 1), datap1(1, 2), datap1(2, 1), datap1(2, 2), datap1(3, 1), datap1(3, 2), datap1(4, 1), datap1(4, 2)
+
+            select case(error)
+                case(0)
+                case(iostat_end)
+                    EXIT
+                case default
+                    write(*, *)
+            end select     
+            nelements = nelements + 1
+            nverts = nverts + 3
+            nedges = nedges + 3       
+        end do
+        write(*, *) 'total ', nelements, ' elements;' 
+        write(*, *) 'total ', nverts, ' vertices;' 
+        write(*, *) 'total ', nedges, ' edges loaded' 
+        CLOSE(iunit)
+
+
+        ! now we allocate the size of the array and read in the points
+
+        allocate(trimesh%faces(nelements, 3))
+        allocate(trimesh%edges(nedges, 2))
+        allocate(trimesh%vertices(nverts, 2))
+
+        OPEN(unit=iunit, file=filename)
+
+        nedges=0
+        nverts = 0
+        nelements = 0
+
+        do 
+            read(iunit, *, iostat=error) datap1(1, 1), datap1(1, 2), datap1(2, 1), datap1(2, 2), datap1(3, 1), datap1(3, 2), datap1(4, 1), datap1(4, 2)
+            
+            select case(error)
+                case(0)
+                case(iostat_end)
+                    EXIT
+                case default
+                    write(*, *)
+            end select
+            
+            nelements = nelements + 1
+            nverts = nverts + 3
+            nedges = nedges + 3
+
+            trimesh%vertices(nverts - 2, :) = (/datap1(1, 1), datap1(1, 2)/)
+            trimesh%vertices(nverts - 1, :) = (/datap1(2, 1), datap1(2, 2)/)
+            trimesh%vertices(nverts, :) = (/datap1(3, 1), datap1(3, 2)/)
+
+            trimesh%edges(nedges - 2, :) = (/nverts - 2, nverts - 1/)
+            trimesh%edges(nedges - 1, :) = (/nverts - 1, nverts/)
+            trimesh%edges(nedges, :) = (/nverts, nverts - 2/)
+
+            trimesh%faces(nelements, :) = (/nedges - 2, nedges - 1, nedges/)         
+            
+        end do
+        CLOSE(iunit)
+        write(*, *) "mesh loaded!"
+
+    end subroutine import2DGnuplotMesh
+
+    subroutine group_identical_verts(trimesh, tolerance)
+        type(surfaceTrimesh), INTENT(INOUT) :: trimesh
+        real(kind=rk), INTENT(IN) :: tolerance
+
+        real(kind=rk), allocatable :: x_tmp1(:), x_tmp2(:)
+        integer, allocatable :: shared_vertices(:)
+
+        integer :: i, nelements, nverts, nedges, counter_neighbours, counter_neighbours_tmp, same_verts
+        real(kind=rk) :: NORM
+
+        nelements = size(trimesh%faces, 1)
+        nverts = size(trimesh%vertices, 1)
+        nedges = size(trimesh%edges, 1)
+
+        ALLOCATE(x_tmp1(size(trimesh%vertices, 2)))
+        ALLOCATE(x_tmp2(size(trimesh%vertices, 2)))
+        ALLOCATE(shared_vertices(nverts))
+
+        shared_vertices = 1
+        same_verts = 1
+
+        ! now we loop through all vertices and update our neighbour list by the neighbour counter. 
+        ! when we encounter a new point that falls outside of a certain tolerance, we increment our neighbour counter
+
+        do counter_neighbours = 1, nverts
+
+
+
+            x_tmp1 = trimesh%vertices(counter_neighbours, :)
+            shared_vertices(counter_neighbours) = counter_neighbours
+
+            ! loop through the list again, comparing other points.
+            do counter_neighbours_tmp = 1, counter_neighbours - 1
+                x_tmp2 = trimesh%vertices(counter_neighbours_tmp, :)
+
+                ! calculate the L2 norm
+                NORM = 0.0_rk
+                do i = 1, size(x_tmp2)
+                    NORM = NORM + (x_tmp1(i) - x_tmp2(i)) ** 2
+                end do
+                NORM = SQRT(NORM)
+
+                if (NORM < tolerance) then
+                    ! first case: Within our specified tolerance, the vertices are identical
+                    shared_vertices(counter_neighbours) = counter_neighbours_tmp
+                    same_verts = same_verts + 1
+                    exit
+                end if
+                
+
+            end do
+
+        end do
+        trimesh%neighbours = shared_vertices
+
+    end subroutine group_identical_verts
+
+    subroutine displace_vertex(trimesh, idx, displacement, n_displaced)
+        type(surfaceTrimesh), INTENT(INOUT) :: trimesh
+        integer, INTENT(IN) :: idx
+        integer, INTENT(OUT) :: n_displaced
+        real(KIND=rk), INTENT(IN) :: displacement(:)
+
+        integer :: i
+        n_displaced = 0
+
+        if (size(displacement) /= size(trimesh%vertices, 2)) then
+            call abort(12345, "wrong dimensions!")
+        end if
+
+        ! loop through the mesh's points, finding all points with the same index which are also shared by neighbouring triangles
+
+        do i = 1, size(trimesh%vertices, 1)
+
+            if (trimesh%neighbours(i) == idx) then
+                trimesh%vertices(i,:) = trimesh%vertices(i,:) - displacement
+                n_displaced = n_displaced + 1
+            end if
+
+        end do
+
+
+    end subroutine displace_vertex
+    
+    subroutine mesh_2Dto3D(trimesh)
+        type(surfaceTrimesh), INTENT(INOUT) :: trimesh
+        type(surfaceTrimesh) :: trimesh_tmp
+
+        integer :: nelements, nedges, nverts, i
+
+        nelements = size(trimesh%faces, 1)
+        nverts = size(trimesh%vertices, 1)
+        nedges = size(trimesh%edges, 1)
+
+        ! now we allocate the size of the array and read in the points
+
+        allocate(trimesh_tmp%faces(nelements, 3))
+        allocate(trimesh_tmp%edges(nedges, 2))
+        allocate(trimesh_tmp%vertices(nverts, 3))
+
+        trimesh_tmp%faces = trimesh%faces
+        trimesh_tmp%edges = trimesh%edges
+
+        do i = 1, nverts
+            trimesh_tmp%vertices(i, 1) = trimesh%vertices(i, 1)
+            trimesh_tmp%vertices(i, 2) = trimesh%vertices(i, 2)
+            trimesh_tmp%vertices(i, 3) = 0.0_rk
+        end do
+
+        trimesh = trimesh_tmp
+
+
+    
+
+    end subroutine mesh_2Dto3D
+
+    subroutine import2DMatrix(trimesh, mesh)
+
+        real(kind=rk), ALLOCATABLE, INTENT(IN) :: mesh(:, :)
+        type(surfaceTrimesh), INTENT(INOUT) :: trimesh
+
+        integer :: nedges, nelements, nverts, idx_mat, base
+
+        if (size(mesh, 2) /= 2) call abort(12346, "import2DMatrix: mesh must have 2 columns")
+        if (mod(size(mesh, 1), 4) /= 0) call abort(12347, "import2DMatrix: rows not a multiple of 4 (Closed triangle with the first point given twice)")
+
+        nelements = size(mesh, 1) / 4
+        nverts    = 3 * nelements
+        nedges    = 3 * nelements
+
+        allocate(trimesh%faces(nelements, 3))
+        allocate(trimesh%edges(nedges, 2))
+        allocate(trimesh%vertices(nverts, 2))
+
+        do idx_mat = 1, nelements
+            base = 4*(idx_mat-1)
+            ! vertex indices of this triangle (also the rows of mesh)
+            nverts = 3 * idx_mat
+            nedges = 3 * idx_mat
+
+            trimesh%vertices(nverts - 2, :) = mesh(base + 1, :)
+            trimesh%vertices(nverts - 1, :) = mesh(base + 2, :)
+            trimesh%vertices(nverts, :)     = mesh(base + 3, :)
+
+            trimesh%edges(nedges - 2, :) = (/nverts - 2, nverts - 1/)
+            trimesh%edges(nedges - 1, :) = (/nverts - 1, nverts/)
+            trimesh%edges(nedges, :)     = (/nverts, nverts - 2/)
+
+            trimesh%faces(idx_mat, :) = (/nedges - 2, nedges - 1, nedges/)
+        end do
+
+        write(*, *) "mesh loaded!"
+end subroutine import2DMatrix
+
+end module module_trimesh

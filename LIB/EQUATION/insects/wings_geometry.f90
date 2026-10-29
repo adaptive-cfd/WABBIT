@@ -147,6 +147,11 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID,
       call draw_wing_suzuki(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, &
       M_b2w,x_pivot_b, rot_rel_wing_w)
 
+    case ("superSTLWing")
+        ! load a mesh consisting of triangular prisms. Do not use!
+        call draw_deformable_superstl_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, &
+        x_pivot_b, rot_rel_wing_w)
+
   case ("TwoEllipses")
       call draw_wing_twoellipses(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, &
       M_b2w,x_pivot_b, rot_rel_wing_w)
@@ -170,6 +175,11 @@ subroutine draw_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID,
           ! polygon can be an arbitrily shaped wing with coordinates given in the ini-file
           call draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, &
           x_pivot_b, rot_rel_wing_w)
+
+    case ("superSTLWing")
+        ! load a mesh consisting of triangular prisms
+        call draw_deformable_superstl_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, &
+        x_pivot_b, rot_rel_wing_w)
 
       case default
           call abort(26111901, "The wing-ini-setup has a TYPE setting that the code does not know: "//trim(adjustl(Insect%Wings(wingID)%WingShapeType)))
@@ -1699,7 +1709,7 @@ subroutine Setup_WingShape(Insect, wingID)
   type(diptera),intent(inout)::Insect
   integer(kind=2), intent(in) :: wingID ! wing id number
   character(len=clong) :: wingshape_str
-  integer(kind=ik) :: nfft_shape
+  integer(kind=ik) :: nfft_shape, ntri
 
   !-----------------------------------------
   ! hard-coded Fourier coefficients for R(theta)
@@ -2105,6 +2115,35 @@ subroutine Setup_WingShape(Insect, wingID)
     Insect%Wings(wingID)%xc = -0.0716018
     Insect%Wings(wingID)%WingShapeType = "fourier"  ! for readability only; default set in type(diptera) definition
 
+
+    !---------------------------------------------------------------------------
+    ! initialization for superSTl wing
+    !---------------------------------------------------------------------------
+    case("superSTLWing")
+        if ((.not. allocated(Insect%wings(wingID)%superstl_wing%superstl_mat)) .or. (.not. allocated(Insect%wings(wingID)%superstl_wing%superstl_w))) then
+
+            DEALLOCATE(Insect%wings(wingID)%superstl_wing%superstl_mat)
+            DEALLOCATE(Insect%wings(wingID)%superstl_wing%superstl_w)
+
+            if (root) write(*,'("INSECT WING: STL: init start")')
+            if (root) write(*,'("INSECT WING: STL: file=",A)') Insect%wings(wingID)%superstl_wing%fname
+
+            call count_lines_in_ascii_file_mpi(Insect%wings(wingID)%superstl_wing%fname, ntri, 0)
+
+            if (root) write(*,'("INSECT WING: STL: file length is ntri=", i7 )') ntri
+
+            allocate( Insect%wings(wingID)%superstl_wing%superstl_mat(1:ntri,1:30) )
+            allocate( Insect%wings(wingID)%superstl_wing%superstl_w(1:ntri,1:30) )
+
+            ! No scaling or origin shift is applied: we assume you did that when generating
+            ! the superSTL file. The data is thus understood in the body coordinate system.
+            call read_array_from_ascii_file_mpi(Insect%wings(wingID)%superstl_wing%fname, Insect%wings(wingID)%superstl_wing%superstl_mat, 0)
+            call read_array_from_ascii_file_mpi(Insect%wings(wingID)%superstl_wing%fname, Insect%wings(wingID)%superstl_wing%superstl_w, 0)
+
+            call generate_edges_and_points(Insect%wings(wingID)%superstl_wing)
+            if (root) write(*,'("INSECT WING: STL: read from file...done! We are good to go.")')
+        endif
+
     case default
 
         ! if all other options fail, we still might load coefficients from file:
@@ -2347,6 +2386,32 @@ subroutine Setup_WingShape_from_inifile( Insect, wingID, fname )
             write(*,'("Polygon wing shape from ini-file: read ",i0," points from polygon_points")') a
         endif
 
+    case("superSTLWing")
+        call read_param_mpi(ifile,"Wing","fname",Insect%Wings(wingID)%superstl_wing%fname, "dummy.sstl")
+                if ((.not. allocated(Insect%wings(wingID)%superstl_wing%superstl_mat)) .or. (.not. allocated(Insect%wings(wingID)%superstl_wing%superstl_w))) then
+
+            DEALLOCATE(Insect%wings(wingID)%superstl_wing%superstl_mat)
+            DEALLOCATE(Insect%wings(wingID)%superstl_wing%superstl_w)
+
+            if (root) write(*,'("INSECT WING: STL: init start")')
+            if (root) write(*,'("INSECT WING: STL: file=",A)') Insect%wings(wingID)%superstl_wing%fname
+
+            call count_lines_in_ascii_file_mpi(Insect%wings(wingID)%superstl_wing%fname, Insect%wings(wingID)%superstl_wing%ntri, 0)
+
+            if (root) write(*,'("INSECT WING: STL: file length is ntri=", i7 )') Insect%wings(wingID)%superstl_wing%ntri
+
+            allocate( Insect%wings(wingID)%superstl_wing%superstl_mat(1:Insect%wings(wingID)%superstl_wing%ntri,1:30) )
+            allocate( Insect%wings(wingID)%superstl_wing%superstl_w(1:Insect%wings(wingID)%superstl_wing%ntri,1:30) )
+
+            ! No scaling or origin shift is applied: we assume you did that when generating
+            ! the superSTL file. The data is thus understood in the body coordinate system.
+            call read_array_from_ascii_file_mpi(Insect%wings(wingID)%superstl_wing%fname, Insect%wings(wingID)%superstl_wing%superstl_mat, 0)
+            call read_array_from_ascii_file_mpi(Insect%wings(wingID)%superstl_wing%fname, Insect%wings(wingID)%superstl_wing%superstl_w, 0)
+
+            call generate_edges_and_points(Insect%wings(wingID)%superstl_wing)
+            if (root) write(*,'("INSECT WING: STL: read from file...done! We are good to go.")')
+        endif
+        
     case default
         call abort(6652, "ini file for wing does not seem to be correct type...")
 
@@ -2545,7 +2610,38 @@ subroutine set_wing_bounding_box( Insect, wingID)
 
         Insect%Wings(wingID)%wing_bounding_box(1:4) = (/xmin, xmax, ymin, ymax/)
 
-    case("polygon")
+    case("superSTLWing")
+        !         yw
+        !         ^
+        !         |
+        !  ymax   |    +-----------------+
+        !         |    |      P4 o       |
+        !         |    |        / \      |
+        !         |    |       /   o P3  |
+        !         |    |  P5 o     |     |
+        !         |    |     \     |     |
+        !         |    |      \    o P2  |
+        !         |    |       \  /      |
+        !         |    |        o P1     |
+        !  ymin   |    +-----------------+
+        !         |
+        !         o------------------------------> xw
+        !            xmin               xmax     
+        
+        ! 3D box
+        
+
+        ! write(*,*) "BBOX: ", Insect%Wings(wingID)%triangle_mesh%vertices
+        ! ! x = chord direction, y = span direction
+        xmin = minval( Insect%Wings(wingID)%superstl_wing%verts(:, 1) )
+        xmax = maxval( Insect%Wings(wingID)%superstl_wing%verts(:, 1) )
+        ymin = minval( Insect%Wings(wingID)%superstl_wing%verts(:, 2) )
+        ymax = maxval( Insect%Wings(wingID)%superstl_wing%verts(:, 2) )
+
+        Insect%Wings(wingID)%wing_bounding_box(1:4) = (/xmin, xmax, ymin, ymax/)
+
+
+        case("polygon")
         !         yw
         !         ^
         !         |
@@ -2904,6 +3000,143 @@ subroutine draw_bristle(x1w, x2w, R0, xx0, ddx, mask, mask_color, us, Insect, co
     enddo
 
 end subroutine
+!------------------------------------------------------------------------------------------------------
+! draw a mesh (not necessarily manifold) consisting of triangles
+!------------------------------------------------------------------------------------------------------
+
+! subroutine draw_trimesh_wing(xx0, ddx, mask, mask_color, us,Insect,color_wing,wingID,M_g2b,M_b2w,x_pivot_b,rot_rel_wing_w)
+!     type(diptera), intent(inout) :: Insect
+!     real(kind=rk), intent(in) :: xx0(1:3), ddx(1:3)
+!     real(kind=rk), intent(inout) :: mask(0:,0:,0:), mask_color(0:,0:,0:)
+!     real(kind=rk), intent(inout) :: us(0:,0:,0:,1:)
+!     integer(kind=2), intent(in) :: color_wing, wingID
+!     real(kind=rk), intent(in) :: M_g2b(1:3,1:3), M_b2w(1:3,1:3), x_pivot_b(1:3), rot_rel_wing_w(1:3)
+
+!     integer(kind=ik) :: Bs(1:3)
+!     integer :: ix,iy,iz, face_idx, idx_e
+!     integer :: v, idx_p1, idx_p2, edge_idx
+!     real(kind=rk):: x1_w(3, 3), x2_w(3, 3), x1_tri(3, 3), x2_tri(3, 3), vec(3, 3), bases(3, 3), bases_orthonormal(3, 3), IDENTITY(3, 3)
+!     real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3),x_local(1:3), M_tri2w(1:3,1:3), M_w2tri(1:3,1:3)
+
+!     !----EXCEPTION HANDLING------------
+!     if ((Insect%Wings(wingID)%WingShapeType) /= "triangleMesh") call abort(01072601,"draw_trimesh_wing called with non-triangle wing...")
+!     if (.not. allocated(Insect%Wings(wingID)%triangle_mesh%vertices)) call abort(01072602, "draw_trimesh_wing: vertices don't exist yet")
+!     !if (Insect%Wings(wingID)%damaged) call abort(21072601, "draw_wing_polygon can currently only be used with non-damaged wings")
+!     !if (Insect%Wings(wingID)%corrugated) call abort(21072602, "draw_wing_polygon can currently only be used with non-corrugated wings")
+!     if ( Insect%wings(wingID)%wing_thickness_distribution=="variable") call abort(21072603, "draw_wing_polygon can currently only be used with a constant wing thickness")
+!     if (Insect%Wings(wingID)%bristles) call abort(21072603, "bristled wings are not an option here...")
+!     !---------------------------------
+
+
+!     IDENTITY=0.0_rk
+!     IDENTITY(1, 1) = 1.0_rk
+!     IDENTITY(2, 2) = 1.0_rk
+!     IDENTITY(3, 3) = 1.0_rk
+
+!     !-----------------------------------------------------------------------------
+!     ! code for trimesh wing
+!     !-----------------------------------------------------------------------------
+!     Bs(1) = size(mask,1) - 2*g
+!     Bs(2) = size(mask,2) - 2*g
+!     Bs(3) = size(mask,3) - 2*g
+
+!     ! iterate trhough all triangles in the mesh
+!     do face_idx = 1, size(Insect%Wings(wingID)%triangle_mesh%faces, 1)
+!         ! each triangle has three edges. get the vertex indices and calculate the local bases.
+
+!         do edge_idx = 1, 3
+
+!             ! get current edge index
+
+!             idx_e = Insect%Wings(wingID)%triangle_mesh%faces(face_idx, edge_idx)
+
+!             ! get start and end point of the edge
+
+!             idx_p1 = Insect%Wings(wingID)%triangle_mesh%edges(idx_e, 1)
+!             idx_p2 = Insect%Wings(wingID)%triangle_mesh%edges(idx_e, 2)
+
+
+!             x1_w(:, edge_idx) = Insect%Wings(wingID)%triangle_mesh%vertices(idx_p1, :)
+!             x2_w(:, edge_idx) = Insect%Wings(wingID)%triangle_mesh%vertices(idx_p2, :)
+            
+!         end do
+
+!         ! edge vectors
+!         vec = x2_w - x1_w
+
+!         bases(:, 1) = vec(:, 1)
+!         bases(:, 2) = vec(:, 2)
+
+!         ! calculate the normal using the cross product of the two vectors. 
+!         bases(1, 3)= vec(2, 1) * vec(3, 2) - vec(3, 1) * vec(2, 2)
+!         bases(2, 3)= vec(3, 1) * vec(1, 2) - vec(1, 1) * vec(3, 2)
+!         bases(3, 3)= vec(1, 1) * vec(2, 2) - vec(2, 1) * vec(1, 2)
+
+!         ! use gram schmidt to find an orthonormal basis. 
+!         ! Using this, we can rotate into the plane in which the triangle lies and calculate the SDF.
+
+!         bases(:, 1) = bases(:, 1) / sqrt(bases(1, 1) ** 2 + bases(2, 1) ** 2 + bases(3, 1) ** 2)
+
+!         bases(:, 2) = bases(:, 2) - (bases(1, 2) * bases(1, 1) + bases(2, 2) * bases(2, 1) + bases(3, 2) * bases(3, 1)) * bases(:, 1)
+!         bases(:, 2) = bases(:, 2) / sqrt(bases(1, 2) ** 2 + bases(2, 2) ** 2 + bases(3, 2) ** 2)
+
+!         bases(:, 3) = bases(:, 3) - (bases(1, 3) * bases(1, 1) + bases(2, 3) * bases(2, 1) + bases(3, 3) * bases(3, 1)) * bases(:, 1)
+!         bases(:, 3) = bases(:, 3) - (bases(1, 3) * bases(1, 2) + bases(2, 3) * bases(2, 2) + bases(3, 3) * bases(3, 2)) * bases(:, 2)
+!         bases(:, 3) = bases(:, 3) / sqrt(bases(1, 3) ** 2 + bases(2, 3) ** 2 + bases(3, 3) ** 2)
+        
+!         ! now that the matrix is orthonormal, We get the rotation matrix to the local triangle plane by inverting the bases.
+
+!         M_w2tri = bases
+!         M_tri2w = TRANSPOSE(M_w2tri)
+
+!         x1_tri = MATMUL(M_tri2w, x1_w)
+!         x2_tri = MATMUL(M_tri2w, x2_w)
+        
+!         call draw_trianglular_prism(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_g2b, M_b2w,x_pivot_b,rot_rel_wing_w, &
+!                         x1_w(1, 1), x2_w(2, 1), x1_w(1, 2), x2_w(2, 2), x1_w(1, 3), x2_w(2, 3), wingID)
+!     end do
+
+! end subroutine draw_trimesh_wing 
+
+
+subroutine draw_deformable_superstl_wing(xx0, ddx, mask, mask_color, us, Insect, color_wing, wingID, M_g2b, M_b2w, x_pivot_b,rot_rel_wing_w)
+    implicit none
+
+    type(diptera),intent(inout) :: Insect
+    real(kind=rk),intent(in) :: xx0(1:3), ddx(1:3)
+    real(kind=rk),intent(inout) :: mask(0:,0:,0:)
+    real(kind=rk),intent(inout) :: us(0:,0:,0:,1:)
+    real(kind=rk),intent(inout) :: mask_color(0:,0:,0:)
+    integer(kind=2), intent(in) :: color_wing, wingID  !< wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
+    real(kind=rk),intent(in)::M_g2b(1:3,1:3),M_b2w(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
+    real(kind=rk) :: x1,y1,z1, x2,y2,z2 ,x3,y3,z3  ! coordinates of the triangle in the wing system
+    integer :: i, j
+
+    
+
+    !do i = 1, Insect%Wings(wingID)%superstl_wing%ntri
+
+    !    x1 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 1)
+    !     y1 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 2)
+    !     z1 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 3)
+
+
+    !     x2 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 4)
+    !     y2 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 5)
+    !     z2 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 6)
+
+
+    !     x3 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 7)
+    !     y3 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 8)
+    !     z3 = Insect%Wings(wingID)%superstl_wing%superstl_w(i, 9)
+
+    !     call draw_trianglular_prism(xx0, ddx, mask, mask_color, us,Insect,color_wing,M_g2b,M_b2w,x_pivot_b,rot_rel_wing_w, &
+    !                     x1,y1,x2,y2,x3,y3, wingID)
+
+
+    ! end do
+
+end subroutine draw_deformable_superstl_wing
 
 
 !-------------------------------------------------------------------------------

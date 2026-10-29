@@ -6,6 +6,7 @@ module module_insects
    use module_stl_file_reader
    use module_geometry
    use module_wing_deformation
+   use module_trimesh
 
    implicit none
 
@@ -84,6 +85,9 @@ module module_insects
       ! polygon_wings(:,2) = y_w coordinates
       real(kind=rk), allocatable :: polygon_wings(:,:)
       integer(kind=ik) :: n_polygon_points = 0
+
+      ! -----wing shapes described as a triangle mesh------
+      type(deformable_superstl) :: superstl_wing
 
       ! ---- wing damage ----
       ! used for musca domestica wing damage project

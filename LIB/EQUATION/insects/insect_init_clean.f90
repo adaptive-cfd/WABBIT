@@ -275,6 +275,10 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     call read_param_mpi(PARAMS, SECTION, "stif", Insect%Wings(1)%stif, 1.0_rk)
     call read_param_mpi(PARAMS, SECTION, "damp", Insect%Wings(1)%damp, 0.0_rk)
     call read_param_mpi(PARAMS, SECTION, "ang0", Insect%Wings(1)%ang0, 0.0_rk)
+
+    ! ang0 is given in degrees in PARAMS.ini -> convert to radians
+    Insect%Wings(1)%ang0 = Insect%Wings(1)%ang0 * (pi/180.0_rk)
+
     Insect%Wings(2)%stif = Insect%Wings(1)%stif
     Insect%Wings(2)%damp = Insect%Wings(1)%damp
     Insect%Wings(2)%ang0 = Insect%Wings(1)%ang0
@@ -282,6 +286,9 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     call read_param_mpi(PARAMS, SECTION, "stif2", Insect%Wings(3)%stif, 1.0_rk)
     call read_param_mpi(PARAMS, SECTION, "damp2", Insect%Wings(3)%damp, 0.0_rk)
     call read_param_mpi(PARAMS, SECTION, "ang02", Insect%Wings(3)%ang0, 0.0_rk)
+
+    Insect%Wings(3)%ang0 = Insect%Wings(3)%ang0 * (pi/180.0_rk)
+
     Insect%Wings(4)%stif = Insect%Wings(3)%stif
     Insect%Wings(4)%damp = Insect%Wings(3)%damp
     Insect%Wings(4)%ang0 = Insect%Wings(3)%ang0

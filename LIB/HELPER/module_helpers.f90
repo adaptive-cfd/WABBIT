@@ -49,7 +49,7 @@ contains
     ! + \dfrac{1}{16}\arcsin\!\bigl(\sqrt{2(|\xi|-2)}\bigr), & 1.5 \leq |\xi| \leq 2.5, \\[6pt]
     ! 0, & 2.5 \leq |\xi|.
     ! \end{cases}$$
-    real (kind=rk) function delta_interpolation(x,dx1)
+    real (kind=rk) function deltaInterpolationKernel(x,dx1)
         ! use vars
         real(kind=rk), intent(in) :: x, dx1
         real(kind=rk) :: r
@@ -60,28 +60,28 @@ contains
         r = abs(x/dx1)
 
         if (r<0.5_rk) then
-            delta_interpolation = (3.0_rk/8.0_rk)+(pi/32.0_rk)-0.250_rk*r**2
+            deltaInterpolationKernel = (3.0_rk/8.0_rk)+(pi/32.0_rk)-0.250_rk*r**2
         elseif ( (r>=0.50_rk) .and. (r<=1.50_rk)   ) then
-            delta_interpolation = 0.25_rk + (1.0_rk-r)/8.0_rk  *sqrt(-2.0_rk + 8.0_rk*r - 4.0_rk*r**2) -asin(sqrt(2.0_rk)*(r-1.0_rk))/8.0_rk
+            deltaInterpolationKernel = 0.25_rk + (1.0_rk-r)/8.0_rk  *sqrt(-2.0_rk + 8.0_rk*r - 4.0_rk*r**2) -asin(sqrt(2.0_rk)*(r-1.0_rk))/8.0_rk
         elseif ( (r>=1.5_rk) .and. (r<=2.5_rk)   ) then
-            delta_interpolation = (17.0_rk/16.0_rk) - (pi/64.0_rk) - (3.0_rk*r/4.0_rk) + ((r**2)/8.0_rk) + &
+            deltaInterpolationKernel = (17.0_rk/16.0_rk) - (pi/64.0_rk) - (3.0_rk*r/4.0_rk) + ((r**2)/8.0_rk) + &
                     (r-2.0_rk)*sqrt(-14.0_rk + 16.0_rk*r - 4.0_rk*r**2)/16.0_rk +asin(sqrt(2.0_rk)*(r-2.0_rk))/16.0_rk
         elseif ( (r>=2.5_rk)    ) then
-            delta_interpolation = 0.0_rk
+            deltaInterpolationKernel = 0.0_rk
         endif
     end function
 
-    ! linear function for interpolation
-    real (kind=rk) function linear_interpolation(x,dx1)
+    ! linear function kernel for interpolation (a Hat function:  __/\__ )
+    real (kind=rk) function linearInterpolationKernel(x,dx1)
         ! use vars
         real(kind=rk), intent(in) :: x, dx1
         real(kind=rk) :: r
         r = abs(x/dx1)
 
         if (r < 1.0_rk) then
-            linear_interpolation = 1.0_rk - r
+            linearInterpolationKernel = 1.0_rk - r
         else
-            linear_interpolation = 0.0_rk
+            linearInterpolationKernel = 0.0_rk
         endif
     end function
 

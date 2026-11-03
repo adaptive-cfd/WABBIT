@@ -3,7 +3,7 @@
 #		MAKEFILE for WABBIT
 ##################################################################
 ##################################################################
-all: directories wabbit wabbit-post #python
+all: version.f90 directories wabbit wabbit-post #python
 ##################################################################
 include LIB/fortran.mk	# includes the makefile of fortran library
 include LIB/python.mk 	# includes the makefile of python library

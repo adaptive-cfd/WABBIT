@@ -5,6 +5,7 @@ module module_acm
 
   use mpi
   use module_insects
+  use module_solid_model ! (beam equation solver)
   use module_t_files
 
   use module_globals
@@ -29,7 +30,7 @@ module module_acm
   PUBLIC :: READ_PARAMETERS_ACM, PREPARE_SAVE_DATA_ACM, RHS_ACM, GET_DT_BLOCK_ACM, &
   INICOND_ACM, BOUNDCOND_ACM, FIELD_NAMES_ACM, STATISTICS_ACM, TIME_STATISTICS_ACM, create_mask_2D_ACM, &
   create_mask_3D_ACM, geometry_indicator_acm, PREPARE_THRESHOLDFIELD_ACM, &
-  INITIALIZE_ASCII_FILES_ACM
+  INITIALIZE_ASCII_FILES_ACM, additionalSaving_ACM
   !**********************************************************************************************
 
 ! how many different parts of the mask can be distinguished at max
@@ -56,6 +57,9 @@ module module_acm
     real(kind=rk) :: C_sponge, L_sponge, p_sponge=20.0, C_smooth=1.5_rk
     character(len=cshort) :: eps_norm
     logical :: symmetry_BC(1:3) = .false., periodic_BC(1:3) = .true.
+
+    ! solid model (beam equation solver)
+    logical :: use_solid_model = .false.
 
     ! linear forcing
     logical :: HIT_linear_forcing = .false., skew_symmetry=.false.
@@ -458,6 +462,9 @@ contains
         end select
     enddo
 
+    ! Solid Model (beam equation solver)
+    call read_param_mpi(FILE, 'SolidModel', 'use_solid_model', params_acm%use_solid_model, .false.)
+
     ! print some time-step related information
     if (params_acm%c_0 > 0.0_rk) then
         dt_min_c0 = params_acm%CFL*dx_min/params_acm%c_0
@@ -511,7 +518,7 @@ contains
 
     ! Loop over all geometries and do geometry-specific initialization
     ncolors = 1
-    do i=1,params_acm%n_geometries
+    do i = 1, params_acm%n_geometries
 
         ncolors = max( ncolors, params_acm%geometry_colors(i) )
 
@@ -521,11 +528,7 @@ contains
         if (strings_are_similar(params_acm%geometries(i), "insect") .or. &
             strings_are_similar(params_acm%geometries(i), "cylinder-free") .or. strings_are_similar(params_acm%geometries(i), "sphere-free") .or. &
             strings_are_similar(params_acm%geometries(i), "plate-free")) then
-            ! when computing passive scalars, we require derivatives of the mask function, which
-            ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
-            ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
-            ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
-            ! to set the mask on all points of a block (incl ghost nodes)
+            
             call get_insect_id( i, insect_id )
 
             ! we differentiate different insects, legacy one is [Insects], new INI files are "Insect1", "Insect2", etc
@@ -553,6 +556,11 @@ contains
                 endif
             endif
 
+            ! when computing passive scalars, we require derivatives of the mask function, which
+            ! is not too difficult on paper. however, in wabbit, ghost node syncing is not a physics
+            ! module task so the ACM module cannot do it. Note it has to be done only if scalars are used.
+            ! Its a waste of resources otherwise. Hence, we have the flag to set masks on ghost nodes as well
+            ! to set the mask on all points of a block (incl ghost nodes)
             if (params_acm%set_mask_on_ghost_nodes) then
                 call initialize_insect( params_acm%start_time, filename, Insects(insect_id), SECTION, insect_id, params_acm%read_from_files, "", params_acm%domain_size, &
                 params_acm%nu, params_acm%C_eta, dx_min, params_acm%smoothing_type(i), N_ghost_nodes=0, colors_default=(/params_acm%n_geometries+1+5*(insect_id-1),params_acm%n_geometries+2+5*(insect_id-1),params_acm%n_geometries+3+5*(insect_id-1),params_acm%n_geometries+4+5*(insect_id-1),params_acm%n_geometries+5+5*(insect_id-1), params_acm%geometry_colors(i)/))
@@ -598,6 +606,12 @@ contains
 
             call read_array_from_ascii_file_mpi(params_acm%file_usp, buffer_array, 0)
             params_acm%u_lamballais(:,:,3) = reshape(buffer_array, (/nx_max, nx_max/))
+        endif
+
+        
+        ! solid model (beam equation)
+        if (params_acm%geometries(i) == "flexibility-beameqn") then
+            call init_beams( filename, dx_min, params_acm%start_time, params_acm%read_from_files )
         endif
     enddo
 
@@ -781,9 +795,11 @@ contains
       headers(2) = "e_kin"
       headers(3) = "p^2/2c0^2+ekin"
       call init_t_file('e_kin.t', overwrite, headers(1:3))
+
       headers(2) = "enstrophy"
       headers(3) = "max(omega)"
       call init_t_file('enstrophy.t', overwrite, headers(1:3))
+
       if (params_acm%dim == 3) then
         headers(2) = "helicity"
         call init_t_file('helicity.t', overwrite, headers(1:2))
@@ -973,6 +989,57 @@ contains
         call init_t_file('penal_power.t', overwrite, (/&
         "           time", &
         "  E_dot_f_solid"/))
+
+
+        if (params_acm%use_solid_model) then
+            call init_t_file( "beam_x1.t", overwrite)
+            call init_t_file( "beam_y1.t", overwrite)
+            call init_t_file( "beam_xx1.t", overwrite)
+            call init_t_file( "beam_vy1.t", overwrite)
+            call init_t_file( "beam_theta1.t", overwrite)
+            call init_t_file( "beam_p1.t", overwrite)
+
+            headers(1) = "time"
+            headers(2) = "alpha"
+            headers(3) = "alpha_t"
+            headers(4) = "alpha_tt"
+            headers(5) = "leadingedge_x"
+            headers(6) = "leadingedge_y"
+            headers(7) = "leadingedge_vx"
+            headers(8) = "leadingedge_vy"
+            headers(9) = "leadingedge_ax"
+            headers(10) = "leadingedge_ay"
+            call init_t_file('mouvement1.t', overwrite, headers(1:10))
+
+            headers(1)  = "time"
+            headers(2)  = "press(ns-1)"
+            headers(3)  = "press(3ns/4)"
+            headers(4)  = "press(ns/2)"
+            headers(5)  = "x(ns-1)"
+            headers(6)  = "y(ns-1)"
+            headers(7)  = "vx(ns-1)"
+            headers(8)  = "vy(ns-1)"
+            headers(9)  = "theta(ns-1)"
+            headers(10) = "theta_dot(ns-1)"
+            headers(11) = "Force(1)"
+            headers(12) = "Force(2)"
+            headers(13) = "Force_unst(1)"
+            headers(14) = "Force_unst(2)"
+            headers(15) = "Force_press(1)"
+            headers(16) = "Force_press(2)"
+            headers(17) = "Inert_Force(1)"
+            headers(18) = "Inert_Force(2)"
+            headers(19) = "E_kinetic"
+            headers(20) = "E_elastic"
+            headers(21) = "E_pot"
+            call init_t_file('beam_data1.t', overwrite, headers(1:21))
+
+            headers(1) = "time"
+            headers(2) = "iterations"
+            call init_t_file('IBES_iter.t', overwrite, headers(1:2))
+
+        endif
+
     endif
 
 
@@ -997,5 +1064,16 @@ contains
     enddo
     insect_id = count_insects
   end subroutine
+
+    ! Additional saving for ACM - because the PREPARE_SAVE_DATA routine is called per block
+    ! and this routine needs to be called only once per time step
+    subroutine additionalSaving_ACM(time)
+        implicit none
+        real(kind=rk), intent(in) :: time 
+
+        if (params_acm%use_solid_model) then
+            call dump_solid_backup( time )
+        endif
+    end subroutine
 
 end module module_acm

@@ -410,7 +410,6 @@ subroutine deallocate_forest(params, hvy_block, hvy_work, hvy_tmp, hvy_mask )
     if (present(hvy_mask)) then
         if (allocated(hvy_mask)) deallocate( hvy_mask )
     endif
-    if (allocated(hvy_tmp)) deallocate( hvy_tmp )
     if (allocated(hvy_neighbor)) deallocate( hvy_neighbor )
     if (allocated(lgt_block)) deallocate( lgt_block )
     if (allocated(lgt_sortednumlist)) deallocate( lgt_sortednumlist )

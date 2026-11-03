@@ -127,6 +127,7 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     endif
 
     ! store the sides for each wing - done only once for the rest of the code
+    ! Wings: 1=left 2=right 3=left hind 4=right hind
     Insect%Wings(1)%side = "L"
     Insect%Wings(2)%side = "R"
     Insect%Wings(3)%side = "L"

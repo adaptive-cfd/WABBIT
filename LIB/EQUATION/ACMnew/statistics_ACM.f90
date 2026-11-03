@@ -637,6 +637,12 @@ subroutine STATISTICS_ACM( time, dt, u, g, x0, dx, stage, work, mask )
             ! this file is to simply keep track of simulations, should they be restarted with different parameters.
             ! We just keep track of the most important and most frequently changed parameters.
             call append_t_file( 'parameters.t', (/time, params_acm%C_0, params_acm%C_eta, params_acm%C_sponge, params_acm%nu/) )
+
+            ! dump useful information for the beam equation solver if that model is used.
+            if (params_acm%use_solid_model) then
+                call SaveBeamData( time )
+            endif
+
         end if
 
     case default

@@ -23,7 +23,9 @@ MFILES = module_forestMetaData.f90 module_globals.f90 module_params.f90 module_t
 	module_insects.f90 module_funnel.f90 module_navier_stokes_cases.f90\
 	module_simple_geometry.f90 module_shock.f90 module_pipe_flow.f90\
 	module_MOR.f90 module_sparse_operators.f90 module_stl_file_reader.f90\
-	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 module_NSPP.f90 module_geometry.f90 # module_sync_ghosts_redundantGrid.f90 module_sync_ghosts_uniqueGrid.f90
+	module_t_files.f90 module_saving.f90 module_fft.f90 module_poisson.f90 module_NSPP.f90 module_geometry.f90 \
+	module_solid_solver.f90
+
 MOBJS := $(MFILES:%.f90=$(OBJDIR)/%.o)
 
 # Source code directories (colon-separated):
@@ -34,6 +36,7 @@ VPATH += :LIB/OPERATORS:LIB/EQUATION/convection-diffusion:LIB/POSTPROCESSING:LIB
 VPATH += :LIB/EQUATION/navier_stokes:LIB/EQUATION/navier_stokes/case_study:LIB/MPI/BRIDGE
 VPATH += :LIB/EQUATION/insects:LIB/BOUNDARYCONDITIONS:LIB/WAVELETS:LIB/FFT:LIB/POISSON
 VPATH += :LIB/EQUATION/navier_stokes_pressure_poisson
+VPATH += :LIB/EQUATION/solid_solver_beam
 
 # Set the default compiler if it's not already set
 ifndef $(FC)
@@ -223,6 +226,11 @@ $(OBJDIR)/module_insects.o: module_insects.f90 $(OBJDIR)/module_insects_integrat
 	wings_motion.f90 insect_init_clean.f90 \
 	kineloader.f90 $(OBJDIR)/module_t_files.o $(OBJDIR)/module_stl_file_reader.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
+	
+$(OBJDIR)/module_solid_solver.o: module_solid_solver.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
+    aux.f90 init_beam.f90 plate_geometry.f90 save_beam.f90 \
+	solid_solver_wrapper.f90 $(OBJDIR)/module_ini_files_parser_mpi.o
+	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_geometry.o: module_geometry.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/module_helpers.o $(OBJDIR)/module_ini_files_parser_mpi.o \
 	geometry_primitive_2D.f90 geometry_primitive_3D.f90 geometry_primitives_collection.f90
@@ -274,7 +282,8 @@ $(OBJDIR)/module_shock.o: module_shock.f90 $(OBJDIR)/module_globals.o $(OBJDIR)/
 
 $(OBJDIR)/module_ACM.o: module_ACM.f90 rhs_ACM.f90 create_mask.f90 sponge.f90 save_data_ACM.f90 \
 	$(OBJDIR)/module_ini_files_parser_mpi.o $(OBJDIR)/module_operators.o $(OBJDIR)/module_globals.o $(OBJDIR)/module_t_files.o \
-	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o
+	$(OBJDIR)/module_helpers.o $(OBJDIR)/module_insects.o statistics_ACM.f90 time_statistics_ACM.f90 inicond_ACM.f90 boundcond_ACM.f90 \
+	$(OBJDIR)/module_params.o $(OBJDIR)/module_timing.o $(OBJDIR)/module_geometry.o $(OBJDIR)/module_solid_solver.o
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_ConvDiff_new.o: module_ConvDiff_new.f90 rhs_convdiff.f90 statistics_convdiff.f90 time_statistics_convdiff.f90 \
@@ -343,7 +352,7 @@ $(OBJDIR)/module_mesh.o: module_mesh.f90 $(OBJDIR)/module_params.o $(OBJDIR)/mod
 	find_family.f90 ActiveLevel_tree.f90 get_free_local_light_id.f90 quicksort.f90 updateMetadata_tree.f90 createEquidistantGrid_tree.f90 \
 	createRandomGrid_tree.f90 reset_tree.f90 allocate_forest.f90 write_block_distribution.f90 check_lgt_block_synchronization.f90 \
 	remove_nonperiodic_neighbors.f90 forest.f90 setInitialCondition_tree.f90 securityZone_tree.f90 coarseExtensionUpdate_tree.f90 updateFamily_tree.f90 \
-	multigrid_vcycle.f90 poisson_operations.f90 probes.f90
+	multigrid_vcycle.f90 poisson_operations.f90 probes.f90 pointInBlock_block.f90 interpolatePointCloud_tree.f90
 	$(FC) $(FFLAGS) -c -o $@ $< $(LDFLAGS)
 
 $(OBJDIR)/module_unit_test.o: module_unit_test.f90 $(OBJDIR)/module_params.o $(OBJDIR)/module_mesh.o $(OBJDIR)/module_time_step.o \

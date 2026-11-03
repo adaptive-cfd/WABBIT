@@ -46,6 +46,10 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
         call pressure_from_velocity(params, time, hvy_block, hvy_tmp, hvy_mask, tree_ID_flow)
     endif
 
+    if (params%physics_type == "ACM-new") then
+        ! Saving of beam equation backups, if the solid model is used.
+        call additionalSaving_ACM(time)
+    endif
 
     ! preparatory step. The physics modules have to copy everything they want to
     ! save to disk to the work array. missing qty's shall be computed.

@@ -103,6 +103,9 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
 
             end select
 
+        case ("flexibility-beameqn")
+            call Draw_flexible_plate( time, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4), x0, dx, g, 1_ik)
+
         case ('channel-3d')
             if (stage == "time-independent-part" .or. stage == "all-parts") then
                 call draw_channel(x0, dx, Bs, g, mask, i_geom=i_geom)
@@ -844,6 +847,7 @@ subroutine draw_channel(x0, dx, Bs, g, mask, i_geom )
     safety_dis = dx(2)*0.2_rk
 
     ! Note: this basic mask function is set on the ghost nodes as well.
+    ! TE: IT IS NOT
     do iz = g+1, Bs(3)+g
         z = dble(iz-(g+1)) * dx(3) + x0(3)
         do iy = g+1, Bs(2)+g

@@ -94,7 +94,6 @@ contains
 
 
     !-----------------------------------------------------------------
-#include "mouvement.f90"
 #include "init_beam.f90"
 #include "save_beam.f90"
 #include "plate_geometry.f90"
@@ -1473,7 +1472,7 @@ contains
     ! LeadingEdge: x, y, vx, vy, ax, ay (Array)
     real(kind=rk), dimension(1:6), intent(out) :: LeadingEdge
     real(kind=rk) :: f,angle_max, R
-    real(kind=rk) :: a,b,c,d,k,kt,ktt,y,yt,ytt, t
+    real(kind=rk) :: a,b,c,d,k,kt,ktt,y,yt,ytt, t, a0
 
     ! Unlike FLUSI versions of this code, we use the LeadingEdge variable as it was used in the
     ! 2D codes. So heaving motion would indeed be imposed here.
@@ -1487,6 +1486,23 @@ contains
         alpha    = beam%AngleBeam*pi/180.0
         alpha_t  = 0.0
         alpha_tt = 0.0
+
+    case ("heaving")
+        ! for comparison with Yeh, Alexeev (PoF 2014)
+        f = 2.0_rk*pi
+        a0 = 0.1_rk
+
+        LeadingEdge(1) = 0.0_rk ! x
+        LeadingEdge(2) = a0*cos(f*time) ! y
+        LeadingEdge(3) = 0.0_rk ! vx
+        LeadingEdge(4) = -a0*f*sin(f*time) ! vy
+        LeadingEdge(5) = 0.0_rk ! ax
+        LeadingEdge(6) = - 0.10_rk * dcos(2.0_rk*pi*time) * (2.0_rk*pi)**2 ! ay
+        
+        alpha = 0.0_rk
+        alpha_t = 0.0_rk
+        alpha_tt = 0.0_rk
+
 
     case default
         call abort(17,"Mouvement.f90: imposed_motion_leadingedge="//trim(adjustl(imposed_motion_leadingedge))//" is unknown")

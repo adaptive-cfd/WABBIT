@@ -26,9 +26,7 @@ subroutine interpolatePointCloud_tree( params, hvy_block, tree_ID, xq, fq, inter
     integer(kind=ik) :: ix, iy, iz, mpierr, g, lgt_id, hvy_id, k
     real(kind=rk) :: x(1:3), xx, yy, zz, delx, delz, dely, x0(1:3), dx(1:3)
 
-    ! nothing to do?
-    if (npoints == 0) return
-
+    
     ! determine how many ghost points we need.
     select case(interpolationMethod)
     case ("floor")
@@ -57,10 +55,12 @@ subroutine interpolatePointCloud_tree( params, hvy_block, tree_ID, xq, fq, inter
         ! floor interpolation does not require sync'ing by design
         call sync_ghosts_tree( params, hvy_block, tree_ID=tree_ID, g_minus=g, g_plus=g )
     endif
-
+    
     npoints = size(xq, 2)
     dim     = params%dim
-
+    
+    ! nothing to do?
+    if (npoints == 0) return
 
     if (size(fq,2) /= npoints) then
         call abort(26094258, "Output array size is incorrect. You seem tired, take a nap.")

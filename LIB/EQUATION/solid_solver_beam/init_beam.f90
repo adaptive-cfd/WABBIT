@@ -93,6 +93,7 @@ subroutine init_beams( fname_ini, dx_min_in, time, backup_resuming )
         call read_param_mpi(PARAMS,"SolidModel","L_span",L_span,1.0d0)
         !-- time marching method for the solid
         call read_param_mpi(PARAMS,"SolidModel","TimeMethodSolid",TimeMethodSolid,"BDF2")
+        call read_param_mpi(PARAMS,"SolidModel","interpolationMethod", interpolationMethod, "delta")
 
         call read_param_mpi(PARAMS,"SolidModel","imposed_motion_leadingedge", imposed_motion_leadingedge,"fixed_middle")
         call read_param_mpi(PARAMS,"SolidModel","plate_shape",plate_shape,"rectangular")

@@ -14,7 +14,7 @@ module module_solid_model
     PRIVATE
 
     PUBLIC :: dump_solid_backup, init_beams, plate_geometry, xq_solid, pq_solid_old, pq_solid_new, Draw_flexible_plate, &
-        SolidSolverWrapper, SaveBeamData
+        SolidSolverWrapper, SaveBeamData, interpolationMethod
 
     !----------------------------------------------
     ! module global variables
@@ -34,8 +34,9 @@ module module_solid_model
     real(kind=rk),save :: T_release, tau
 
     real(kind=rk), parameter :: error_stop = 1.0e-6_rk
-    character(len=clong),save :: imposed_motion_leadingedge, TimeMethodSolid
-    character(len=clong),save :: plate_shape, beam_inicond
+    character(len=clong), save :: imposed_motion_leadingedge, TimeMethodSolid
+    character(len=clong), save :: plate_shape, beam_inicond
+    character(len=cshort), save :: interpolationMethod = 'linear'
 
     ! this is a hack to avoid allocating/deallacting these arrays in every time
     ! step. turing fails with memory issues if done otherwise. 7 Aug 2014

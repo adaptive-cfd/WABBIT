@@ -104,7 +104,7 @@ program main_post
     case ("--external-refine", "--external-coarsen")
         call external_adapt(params)
 
-    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test")
+    case("--refine-coarsen-test", "--ghost-nodes-test","--wavelet-decomposition-unit-test", "--wavelet-decomposition-invertibility-test", "--sync-test", "--treecode-test", "--interpolation-test")
         call post_unit_test(params)
 
     case ("--performance-test")

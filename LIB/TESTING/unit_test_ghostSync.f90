@@ -254,3 +254,155 @@ subroutine unit_test_ghostSync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, a
     ! delete the grid we created for this subroutine
     call reset_tree(params, .true., tree_ID=tree_ID)
 end subroutine
+
+
+
+
+
+
+
+
+
+subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose)
+
+    implicit none
+    type (type_params), intent(inout) :: params                     !> user defined parameter structure
+    real(kind=rk),  intent(inout)     :: hvy_block(:, :, :, :, :)   !> heavy data array - block data
+    !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
+    real(kind=rk), intent(out)        :: hvy_tmp(:, :, :, :, :)
+    !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
+    real(kind=rk), intent(out)        :: hvy_work(:, :, :, :, :, :)
+    integer(kind=ik), intent(in)      :: tree_ID
+    logical, optional, intent(in)     :: verbose
+
+    integer(kind=ik)                  :: k, it_random, lgt_id, hvy_id, l_init
+    integer(kind=ik)                  :: rank, number_procs
+    real(kind=rk)                     :: ddx(1:3), xx0(1:3)
+    integer(kind=ik)                  :: g, number_blocks, ix, iy, iz, JmaxA, JminA
+    integer(kind=ik), dimension(3)    :: Bs
+    real(kind=rk)                     :: Lx, Ly, Lz, x, y, z, e, pexact
+    integer(kind=ik)                  :: d
+    integer(kind=ik)                  :: Npoints, ipoint
+    real(kind=rk), allocatable :: xq(:,:), pq(:,:)
+
+
+    rank = params%rank
+    Lx = params%domain_size(1)
+    Ly = params%domain_size(2)
+    Lz = params%domain_size(3)
+    d  = params%dim
+
+
+    if (rank == 0) then
+        write(*,'("")')  ! newline
+        write(*,'(20("_/¯\"))')
+        write(*,'("UNIT TEST: Beginning interpolation unit test")')
+        write(*,'("UNIT TEST: It tests correctness of interpolation routine")')
+    end if
+
+    Bs = params%Bs
+    g  = params%g
+    number_procs  = params%number_procs
+    number_blocks = params%number_blocks
+
+    if (rank == 0) then
+        write(*,'("UNIT TEST: testing Bs=",i3," x ",i3," x ",i3," blocks-per-mpirank=",i0)')  Bs(1),Bs(2),Bs(3), params%number_blocks
+    end if
+
+    !---------------------------------------------------------------------------
+    ! Step 1: Construct a random grid for testing. Note we keep this grid
+    ! and perform the same test for differnet frequencies (= resolutions) only on
+    ! this one grid.
+    !---------------------------------------------------------------------------
+    ! this parameter controls roughly how dense the random grid is, i.e., in % of the
+    ! complete memory.
+    ! perform at min 3 iterations of random refinement/coarsening
+    it_random = max(4, params%Jmax-params%Jmin)
+    l_init = max(min(3, params%Jmax), params%Jmin)  ! init on level 3 but adhere to Jmin Jmax restrictions
+    call createRandomGrid_tree( params, hvy_block, hvy_tmp, level_init=l_init, verbosity=.true., iterations=it_random, tree_ID=tree_ID )
+
+
+
+    ! loop over all active blocks
+    do k = 1, hvy_n(tree_ID)
+        ! hvy_id of the block we're looking at
+        hvy_id = hvy_active(k, tree_ID)
+
+        ! light id of this block
+        call hvy2lgt( lgt_id, hvy_id, rank, params%number_blocks )
+
+        ! compute block spacing and origin from treecode
+        call get_block_spacing_origin( params, lgt_id, xx0, ddx )
+
+        ! create some data
+        do iz = 1, Bs(3)+2*g
+            z = real(iz-(g+1), kind=rk) * ddx(3) + xx0(3)
+            do iy = 1, Bs(2)+2*g
+                y = real(iy-(g+1), kind=rk) * ddx(2) + xx0(2)
+                do ix = 1, Bs(1)+2*g
+                    x = real(ix-(g+1), kind=rk) * ddx(1) + xx0(1)
+
+                    ! use cos functions because theyre symmetric (symmetry BC)
+                    hvy_block(ix, iy, iz, 1, hvy_id) = cos( 2.0_rk*pi*x/Lx ) * cos( 2.0_rk*pi*y/Ly ) * cos( 2.0_rk*pi*z/Lz )
+                enddo
+            enddo
+        enddo
+    enddo
+        
+    !-----------------------------------------------------------------------
+    ! synchronize ghost nodes
+    !-----------------------------------------------------------------------
+    call sync_ghosts_tree( params, hvy_block, tree_ID )
+
+    Npoints = 100
+
+    allocate( xq(1:3,1:Npoints), pq(1,1:Npoints))
+    xq = 0.0_rk
+    pq = 0.0_rk
+
+    ! create a bunch of query points
+    do ix = 1, Npoints
+        xq(1, ix) = rand_nbr()*Lx
+        xq(2, ix) = rand_nbr()*Ly
+        xq(3, ix) = rand_nbr()*Lz
+    end do
+
+    ! run interpolation (this is what we test here)
+    call interpolatePointCloud_tree( params, hvy_block(:,:,:,1:1,:), tree_ID, xq, pq, 'delta', sync=.false. )
+
+    do ix = 1, Npoints
+        ! exact value of interpolated point
+        pexact = cos( 2.0_rk*pi*xq(1,ix)/Lx ) &
+               * cos( 2.0_rk*pi*xq(2,ix)/Ly ) &
+               * cos( 2.0_rk*pi*xq(3,ix)/Lz )
+
+        ! compute error (rel if possible, abs otherwise)
+        e = abs(pq(1,ix) - pexact)
+
+        if (abs(pexact) > 1.0e-8_rk) then
+            e = abs(e) / abs(pexact) ! relative error
+        else
+            e = abs(e) ! abs error
+        endif
+
+        if (rank == 0) then
+            write(*,'(i3, 6(g12.4))') ix, xq(1,ix), xq(2,ix), xq(2,ix), pq(1,ix), pexact, e
+        endif
+
+        pq(1,ix) = e
+    end do
+
+    ! barrier (for clean output)
+    call MPI_Barrier(WABBIT_COMM, ix)
+
+    ! summary
+    if (rank == 0) then
+        write(*,*) "max error:", maxval(pq(1,:))
+        write(*,*) "min error:", minval(pq(1,:))
+        write(*,*) "avg error:", sum(pq(1,:)) / dble(Npoints)
+    endif
+
+
+    ! delete the grid we created for this subroutine
+    call reset_tree(params, .true., tree_ID=tree_ID)
+end subroutine

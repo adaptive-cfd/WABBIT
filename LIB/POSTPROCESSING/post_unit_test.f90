@@ -59,6 +59,7 @@ subroutine post_unit_test(params)
             write(*, '(A)') "   --wavelet-decomposition-invertibility-test"
             write(*, '(A)') "   --sync-test"
             write(*, '(A)') "   --treecode-test"
+            write(*, '(A)') "   --interpolation-test"
             write(*,'(20("_/¯\"))')
             write(*, '(A)') "Parameters with default value:"
             write(*, '(A)') "   --wavelet=CDF44           - wavelet to be utilized"
@@ -179,12 +180,18 @@ subroutine post_unit_test(params)
 
     case("--wavelet-decomposition-unit-test")
         call unit_test_waveletDecomposition( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose )
+
     case("--wavelet-decomposition-invertibility-test")
         call unit_test_waveletDecomposition_invertibility( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose )
+
     case("--sync-test")
         call unit_test_Sync( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true., verbose=verbose)
+
     case("--treecode-test")
         call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true.)
+
+    case("--interpolation-test")
+        call unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
 
     case default
         call abort(202355462,"unknown operator")

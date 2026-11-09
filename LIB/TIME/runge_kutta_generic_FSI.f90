@@ -93,7 +93,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
 
         ! interpolate pressure at the top- and bottom surface (the Beam eqn will only see their difference)
         ! Note: interpolation is a grid level routine and thus needs to be done here, on the WABBIT level
-        call interpolatePointCloud_tree(params, hvy_block(:,:,:,4:4,:), 1, xq_solid, pq_solid_old, interpolationMethod, .false. )
+        call interpolatePointCloud_tree(params, hvy_block(:,:,:,4:4,:), tree_ID_flow, xq_solid, pq_solid_old, interpolationMethod, .false. )
     endif
 
     ! calculate time step
@@ -307,7 +307,7 @@ subroutine RungeKuttaGeneric_FSI(time, dt, iteration, params, hvy_block, hvy_wor
         ! nonlinear implicit system. (In other words, pressure_new is not actually the pressure_new, because 
         ! the deformation is at the old time level).
         ! Note: interpolation is a grid level routine and thus needs to be done here, on the WABBIT level
-        call interpolatePointCloud_tree(params, hvy_block(:,:,:,4:4,:), 1, xq_solid, pq_solid_new, interpolationMethod, .true. )
+        call interpolatePointCloud_tree(params, hvy_block(:,:,:,4:4,:), tree_ID_flow, xq_solid, pq_solid_new, interpolationMethod, .true. )
         
         ! Make the time step of the solid, t->t+dt
         ! Input time is the old time level.

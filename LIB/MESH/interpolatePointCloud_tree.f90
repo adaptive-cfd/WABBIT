@@ -158,7 +158,9 @@ subroutine interpolatePointCloud_tree( params, hvy_block, tree_ID, xq, fq, inter
     end do
 
     ! maximum across mpiranks
-    call MPI_allreduce( MPI_IN_PLACE, fq, size(fq), MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+    do ix = 1, size(fq, 1)
+        call MPI_allreduce( MPI_IN_PLACE, fq(ix, :), size(fq,2), MPI_DOUBLE_PRECISION, MPI_MAX, WABBIT_COMM, mpierr)
+    enddo
 
 
 end subroutine interpolatePointCloud_tree

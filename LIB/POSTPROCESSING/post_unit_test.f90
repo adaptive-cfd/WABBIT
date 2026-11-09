@@ -191,7 +191,7 @@ subroutine post_unit_test(params)
         call unit_test_treecode( params, hvy_block, hvy_work, hvy_tmp, tree_ID, abort_on_fail=.true.)
 
     case("--interpolation-test")
-        call unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose=verbose)
+        call unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     case default
         call abort(202355462,"unknown operator")

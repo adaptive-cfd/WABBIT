@@ -263,7 +263,7 @@ end subroutine
 
 
 
-subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_ID, verbose)
+subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_ID)
 
     implicit none
     type (type_params), intent(inout) :: params                     !> user defined parameter structure
@@ -273,7 +273,6 @@ subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_I
     !> heavy work array: used for RHS evaluation in multistep methods (like RK4: u0, k1, k2 etc)
     real(kind=rk), intent(out)        :: hvy_work(:, :, :, :, :, :)
     integer(kind=ik), intent(in)      :: tree_ID
-    logical, optional, intent(in)     :: verbose
 
     integer(kind=ik)                  :: k, it_random, lgt_id, hvy_id, l_init
     integer(kind=ik)                  :: rank, number_procs
@@ -281,16 +280,14 @@ subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_I
     integer(kind=ik)                  :: g, number_blocks, ix, iy, iz, JmaxA, JminA
     integer(kind=ik), dimension(3)    :: Bs
     real(kind=rk)                     :: Lx, Ly, Lz, x, y, z, e, pexact
-    integer(kind=ik)                  :: d
-    integer(kind=ik)                  :: Npoints, ipoint
-    real(kind=rk), allocatable :: xq(:,:), pq(:,:)
+    integer(kind=ik)                  :: Npoints, ipoint, ierr
+    real(kind=rk), allocatable :: xq(:,:), pq_delta(:,:), pq_linear(:,:)
 
 
     rank = params%rank
     Lx = params%domain_size(1)
     Ly = params%domain_size(2)
     Lz = params%domain_size(3)
-    d  = params%dim
 
 
     if (rank == 0) then
@@ -343,7 +340,7 @@ subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_I
                     x = real(ix-(g+1), kind=rk) * ddx(1) + xx0(1)
 
                     ! use cos functions because theyre symmetric (symmetry BC)
-                    hvy_block(ix, iy, iz, 1, hvy_id) = cos( 2.0_rk*pi*x/Lx ) * cos( 2.0_rk*pi*y/Ly ) * cos( 2.0_rk*pi*z/Lz )
+                    hvy_block(ix, iy, iz, 1, hvy_id) = cos( 2.0_rk*pi*x/Lx ) * cos( 2.0_rk*pi*y/Ly ) * cos( 2.0_rk*pi*z/Lz ) + 2.0_rk
                 enddo
             enddo
         enddo
@@ -354,52 +351,76 @@ subroutine unit_test_interpolation( params, hvy_block, hvy_work, hvy_tmp, tree_I
     !-----------------------------------------------------------------------
     call sync_ghosts_tree( params, hvy_block, tree_ID )
 
-    Npoints = 100
+    Npoints = 10000
 
-    allocate( xq(1:3,1:Npoints), pq(1,1:Npoints))
+    allocate( xq(1:3,1:Npoints), pq_delta(1,1:Npoints), pq_linear(1,1:Npoints))
     xq = 0.0_rk
-    pq = 0.0_rk
+    pq_linear = 0.0_rk
+    pq_delta = 0.0_rk
 
     ! create a bunch of query points
-    do ix = 1, Npoints
-        xq(1, ix) = rand_nbr()*Lx
-        xq(2, ix) = rand_nbr()*Ly
-        xq(3, ix) = rand_nbr()*Lz
-    end do
+    if (rank == 0) then
+        do ipoint = 1, Npoints
+            xq(1, ipoint) = rand_nbr()*Lx
+            xq(2, ipoint) = rand_nbr()*Ly
+            xq(3, ipoint) = rand_nbr()*Lz
+        end do
+    endif
+    call MPI_Bcast(xq, size(xq), MPI_DOUBLE_PRECISION, 0, WABBIT_COMM, ierr)
 
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     ! run interpolation (this is what we test here)
-    call interpolatePointCloud_tree( params, hvy_block(:,:,:,1:1,:), tree_ID, xq, pq, 'delta', sync=.false. )
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    call interpolatePointCloud_tree( params, hvy_block(:,:,:,1:1,:), tree_ID, xq, pq_delta, 'delta', sync=.false. )
+    call interpolatePointCloud_tree( params, hvy_block(:,:,:,1:1,:), tree_ID, xq, pq_linear, 'linear', sync=.false. )
 
-    do ix = 1, Npoints
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ! Compute interpolation error
+    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    do ipoint = 1, Npoints
         ! exact value of interpolated point
-        pexact = cos( 2.0_rk*pi*xq(1,ix)/Lx ) &
-               * cos( 2.0_rk*pi*xq(2,ix)/Ly ) &
-               * cos( 2.0_rk*pi*xq(3,ix)/Lz )
+        pexact = cos( 2.0_rk*pi*xq(1,ipoint)/Lx ) &
+               * cos( 2.0_rk*pi*xq(2,ipoint)/Ly ) &
+               * cos( 2.0_rk*pi*xq(3,ipoint)/Lz ) + 2.0_rk
 
         ! compute error (rel if possible, abs otherwise)
-        e = abs(pq(1,ix) - pexact)
-
+        e = abs(pq_linear(1,ipoint) - pexact) ! abs error
         if (abs(pexact) > 1.0e-8_rk) then
             e = abs(e) / abs(pexact) ! relative error
-        else
-            e = abs(e) ! abs error
         endif
+        pq_linear(1,ipoint) = e
 
-        if (rank == 0) then
-            write(*,'(i3, 6(g12.4))') ix, xq(1,ix), xq(2,ix), xq(2,ix), pq(1,ix), pexact, e
+
+        ! compute error (rel if possible, abs otherwise)
+        e = abs(pq_delta(1,ipoint) - pexact) ! abs error
+        if (abs(pexact) > 1.0e-8_rk) then
+            e = abs(e) / abs(pexact) ! relative error        
         endif
+        
+        pq_delta(1,ipoint) = e
 
-        pq(1,ix) = e
+
+        ! if (rank == 0) then
+        !     write(*,'(i3, 6(g12.4))') ipoint, xq(1, ipoint), xq(2, ipoint), xq(2, ipoint), pq(1, ipoint), pexact, e
+        ! endif
+
     end do
 
     ! barrier (for clean output)
-    call MPI_Barrier(WABBIT_COMM, ix)
+    call MPI_Barrier(WABBIT_COMM, ierr)
 
     ! summary
     if (rank == 0) then
-        write(*,*) "max error:", maxval(pq(1,:))
-        write(*,*) "min error:", minval(pq(1,:))
-        write(*,*) "avg error:", sum(pq(1,:)) / dble(Npoints)
+        write(*,*) "~~~~~~~~~~~~Interpolation error summary ~~~~~~~~~~~~"
+        write(*,*) "Tested Npoints=", Npoints
+        write(*,*) "~~ linear interpolation:"
+        write(*,*) "max error:", maxval(pq_linear(1,:))
+        write(*,*) "min error:", minval(pq_linear(1,:))
+        write(*,*) "avg error:", sum(pq_linear(1,:)) / dble(Npoints)
+        write(*,*) "~~ delta interpolation:"
+        write(*,*) "max error:", maxval(pq_delta(1,:))
+        write(*,*) "min error:", minval(pq_delta(1,:))
+        write(*,*) "avg error:", sum(pq_delta(1,:)) / dble(Npoints)
     endif
 
 

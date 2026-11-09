@@ -16,7 +16,6 @@ subroutine plate_geometry( time )
 
     integer :: ih, is, isurf, k, nh
     real(kind=rk) :: dh,xf,yf,s,ztop,zbot
-    real(kind=rk),dimension(1:3) :: x, x_plate, x0_plate
 
     !-----------------------------------------------------------------------------
     !-- decide how many points in the rigid direction
@@ -33,15 +32,12 @@ subroutine plate_geometry( time )
         heights(ih) = real(ih, kind=rk)*dh - 0.5_rk*L_span
     enddo
 
-
-
     ! this array holds the interpolation points (2 2D arrays of 3D vectors = 4 indices)
     ! allocate arrays only once, as ns,nh will not change over time
     if(.not.allocated(surfaces)) allocate(surfaces(0:ns-1,0:nh,1:2,1:3))
     if(.not.allocated(p_surface)) allocate(p_surface(0:ns-1,0:nh,1:2))
-    ! if(.not.allocated(active_points)) allocate(active_points(0:ns-1,0:nh))
 
-    surfaces = 999.9d0
+    surfaces = 999.9_rk
 
     ! ! by default, all points are active
     ! active_points = 1.d0
@@ -62,38 +58,24 @@ subroutine plate_geometry( time )
     ! enddo
 
 
-    x0_plate = beams(1)%x0_origin
-
     !-----------------------------------------------------------------------------
     ! Compute the two 2D surfaces in 3D space (top and bottom)
     !-----------------------------------------------------------------------------
     do is = 0, ns-1
         do ih = 0, nh
             !-- top surface points
-            xf = beams(1)%x(is)-t_beam*dsin(beams(1)%theta(is))
-            yf = beams(1)%y(is)+t_beam*dcos(beams(1)%theta(is))
-            !-- point in plate coordinate system
-            x_plate = (/ xf,yf,heights(ih)/)
-
-            !x = matmul( transpose(M_plate) , x_plate )
-            x = x_plate
-
+            xf = beams(1)%x(is) - t_beam*dsin(beams(1)%theta(is))
+            yf = beams(1)%y(is) + t_beam*dcos(beams(1)%theta(is))
+            
             !-- point in global coordinate system
-            x = x + x0_plate
-            surfaces(is,ih,1,1:3) = x
-
+            surfaces(is,ih,1,1:3) = (/ xf, yf, heights(ih) /) + beams(1)%x0_origin
 
             !-- bottom surface points
-            xf = beams(1)%x(is)+t_beam*dsin(beams(1)%theta(is))
-            yf = beams(1)%y(is)-t_beam*dcos(beams(1)%theta(is))
-            !-- point in plate coordinate system
-            x_plate = (/ xf,yf,heights(ih)/)
-            !x = matmul( transpose(M_plate) , x_plate )
-            x = x_plate
+            xf = beams(1)%x(is) + t_beam*dsin(beams(1)%theta(is))
+            yf = beams(1)%y(is) - t_beam*dcos(beams(1)%theta(is))
+            
             !-- point in global coordinate system
-            x = x + x0_plate
-            surfaces(is,ih,2,1:3) = x
-
+            surfaces(is,ih,2,1:3) = (/ xf, yf, heights(ih) /) + beams(1)%x0_origin
         enddo
     enddo
 

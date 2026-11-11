@@ -612,6 +612,10 @@ def compare_hdf5_files(test_dir, tmp_dir, verbose=False, write_diff=False, log_f
                 print(msg, end='')
             all_ok = False
 
+        # readability
+        if log_f:
+            log_f.write('\n\n')
+
     # check if any hdf5 file from the reference is missing
     ref_files = sorted(glob.glob(os.path.join(test_dir, "*.h5")))
     for ref_file in ref_files:

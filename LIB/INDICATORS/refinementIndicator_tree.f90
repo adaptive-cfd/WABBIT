@@ -178,10 +178,15 @@ subroutine refinementIndicator_tree(params, hvy_block, tree_ID, indicator, time)
                 endif
             endif
 
-            ! merge selects 2D or 3D bounds depending on params%dim
-            if (any(hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
+            
+            if (any(hvy_block(:, :, :, 1, hvy_id) > 0.0_rk)) then
                 lgt_block(lgt_id, IDX_REFINE_STS) = +1
             endif
+
+            ! ! merge selects 2D or 3D bounds depending on params%dim
+            ! if (any(hvy_block(g+1:Bs(1)+g+1, g+1:Bs(2)+g+1, merge(1, 1+g, params%dim == 2):merge(1, Bs(3)+g+1, params%dim == 2), 1, hvy_id) > 0.0_rk)) then
+            !     lgt_block(lgt_id, IDX_REFINE_STS) = +1
+            ! endif
         enddo
 
         ! very important: CPU1 cannot decide if blocks on CPU0 have to be refined.

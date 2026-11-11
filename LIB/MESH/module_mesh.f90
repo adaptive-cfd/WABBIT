@@ -80,6 +80,8 @@ contains
 #include "forest.f90"
 #include "pointInBlock_block.f90"
 #include "interpolatePointCloud_tree.f90"
+#include "setZeros_tree.f90"
+
 
 ! former module_initialization
 #include "setInitialCondition_tree.f90"

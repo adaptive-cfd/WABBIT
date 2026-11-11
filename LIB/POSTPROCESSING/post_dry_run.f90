@@ -248,8 +248,10 @@ subroutine post_dry_run(params)
                     ! Sync possible only before pruning.
                     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-                    ! refine the mesh, but only where the mask is interesting (not everywhere - that is very expensive!)
-                    call refine_tree( params, hvy_block, "mask-anynonzero", tree_ID_flow, error_OOM )
+                    ! refine the mesh everywhere. This ensures that even for coarse resolutions (typical for 
+                    ! unit tests) we do not miss the mask function. In createEquidistantGrid_tree, the same is used. For the dry
+                    ! run, this results in extra work. But this extra work is only done in the first snapshot.
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM )
 
                     if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
@@ -334,7 +336,13 @@ subroutine post_dry_run(params)
 
                     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-                    ! refine tree (by at most one level, hence the loop...)
+                    ! refine tree (by at most one level, hence the loop...).
+                    ! It is safest to use "everywhere" here. Consider a block that has no mask function,
+                    ! because it is too coarse (no point is nonzero, because the resolution is too coarse).
+                    ! It is not possible to tell from this block alone if, after refinement, nonzero mask
+                    ! values will appear. Therefore, using the everywhere criterion is our safest bet.
+                    ! One can also use "mask-anynonzero", which is faster and should be reliable if the first snap-
+                    ! shot is done. 
                     call refine_tree( params, hvy_block, "mask-anynonzero", tree_ID_flow, error_OOM )
 
                     if (error_OOM) call abort(2512179,"Refinement failed, out of memory. Try with more memory.")

@@ -201,11 +201,9 @@ subroutine post_dry_run(params)
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         ! NOTE: since 11/2026 the dry run mode allocates a dummy state vector hvy_block with only one component.
-        ! This mimicks better the actual behavior when running a simulation. The only difference is the refinement:
-        ! we copy the mask to our pseudo-statevectorm and use a mask refinement indicator on it. Using "refine_everywhere"
-        ! would be possible as well but is very expensive. The coarsening ignores the state vector, because thresholding
-        ! is turned off for all components. Only the mask function (which is used as secondary criterion in a simulation)
-        ! is used. 
+        ! This mimicks better the actual behavior when running a simulation. The coarsening ignores the state vector, 
+        ! because thresholding is turned off for all components. Only the mask function (which is used as secondary 
+        ! criterion in a simulation) is used. 
         ! -TE
 
         first_snapshot = .true.        
@@ -221,6 +219,9 @@ subroutine post_dry_run(params)
                 call createEquidistantGrid_tree( params, hvy_block, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
                 ! the body is not yet there - we need to create it
                 create_time_independent_mask = .true.
+
+                ! init data with zeros (interpolation and coarsening wont change that)
+                call setZeros_tree(params, hvy_block, tree_ID_flow)
 
                 if (params%rank==0) then
                     write(*,'(80("~"))')
@@ -244,7 +245,6 @@ subroutine post_dry_run(params)
 
             ! generate mask at current time on current grid
             call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
-            call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
 
 
             ! loop: refine, create mask, coarsen until the grid no longer changes.
@@ -265,9 +265,8 @@ subroutine post_dry_run(params)
 
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
-                ! Create mask and copy the mask function to our pseudo-statevector
+                ! Create mask
                 call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
-                call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
                 Nmask = lgt_n(tree_ID_flow)
 
                 ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
@@ -275,9 +274,8 @@ subroutine post_dry_run(params)
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
                 lgt_n_new = lgt_n(tree_ID_flow)
 
-                ! Create mask and copy the mask function to our pseudo-statevector
+                ! Create mask
                 call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
-                call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
 
                 ! current finest level is:
                 Jnow = maxActiveLevel_tree(tree_ID_flow)
@@ -305,9 +303,8 @@ subroutine post_dry_run(params)
                 endif
             enddo
 
-            ! Create mask and copy the mask function to our pseudo-statevector
+            ! Create mask
             call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
-            call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
 
             if (params%rank==0) write(*,'(A, g12.4)') "Snapshot done. t_elapsed=", MPI_wtime()-t0
             first_snapshot = .false. ! now did the first one

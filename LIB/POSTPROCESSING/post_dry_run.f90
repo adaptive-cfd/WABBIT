@@ -30,6 +30,7 @@ subroutine post_dry_run(params)
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect, first_snapshot
     type(inifile) :: FILE
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
+    logical :: create_time_independent_mask
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -211,16 +212,15 @@ subroutine post_dry_run(params)
         ! time loop over snapshots
         do while ( time < params%time_max .or. (include_tfinal .and. time == params%time_max) )
             t0 = MPI_wtime()        
-            ! if ( first_snapshot .or. pruned ) then
+
             if ( first_snapshot ) then
-                !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                ! First snapshot
-                !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 ! First snapshot: The grid needs to be created from scratch.
                 ! This mimicks the routine setInitialCondition_tree, but it uses only one component of the state vector
                 ! (saves memory) and always sets "zero" for the state vector start with an equidistant grid on coarsest level.
                 ! Note: createEquidistantGrid_tree also deletes any existing mesh in the tree.
                 call createEquidistantGrid_tree( params, hvy_block, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
+                ! the body is not yet there - we need to create it
+                create_time_independent_mask = .true.
 
                 if (params%rank==0) then
                     write(*,'(80("~"))')
@@ -228,147 +228,95 @@ subroutine post_dry_run(params)
                     maxActiveLevel_tree(tree_ID_flow), lgt_n(tree_ID_flow), time
                     write(*,'(80("~"))')
                 endif
+            else
+                ! Following snapshots: the body can be recycled, if that is implemented.
+                if (params%rank==0) then
+                    write(*,*) ""
+                    write(*,'("Starting mask generation for next snapshot. time=",g12.4)') time
+                endif
+                ! the body is existing from the previous snapshot (has not been deleted).
+                ! We do not need to re-create it.
+                create_time_independent_mask = .false.
+                ! once EGs work on not deleting the mask function is done, the next line can be removed
+                ! create_time_independent_mask = .true. 
+            endif
 
-                ! generate complete mask on the initial equidistant grid
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.) ! need to create body as well
-                call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
+
+            ! generate mask at current time on current grid
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
+            call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
 
 
-                ! loop: refine, create mask, coarsen until the grid no longer changes.
-                iterate = .true.
-                iteration = 0
-                do while (iterate)
-                    ! number of Nblocks on current grid
-                    lgt_n_old = lgt_n(tree_ID_flow)
+            ! loop: refine, create mask, coarsen until the grid no longer changes.
+            iterate = .true.
+            iteration = 0
+            do while (iterate)
+                ! number of Nblocks on current grid
+                lgt_n_old = lgt_n(tree_ID_flow)
 
-                    ! synchronization before refinement (because the interpolation takes place on the extended blocks
-                    ! including the ghost nodes)
-                    ! Note: at this point the grid is rather coarse (fewer blocks), and the sync step is rather cheap.
-                    ! Snyc'ing becomes much more expensive once the grid is refined.
-                    ! Sync possible only before pruning.
-                    call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
+                ! synchronization before refinement (because the interpolation takes place on the extended blocks
+                ! including the ghost nodes).
+                call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-                    ! refine the mesh everywhere. This ensures that even for coarse resolutions (typical for 
-                    ! unit tests) we do not miss the mask function. In createEquidistantGrid_tree, the same is used. For the dry
-                    ! run, this results in extra work. But this extra work is only done in the first snapshot.
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM )
+                ! refine the mesh everywhere. This ensures that even for coarse resolutions (typical for 
+                ! unit tests) we do not miss the mask function. In createEquidistantGrid_tree, the same is used. 
+                ! For the dry run, this results in extra work, but increased reliability.
+                call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM )
 
-                    if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
-
-                    ! Create mask and copy the mask function to our pseudo-statevector
-                    call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.)! need to create body as well
-                    call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
-                    Nmask = lgt_n(tree_ID_flow)
-
-                    ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
-                    ! why do we use hvy_tmp here for the mask? Because hvy_mask will be decomposed and we will backup everything in hvy_tmp during adapt_tree
-                    call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
-                    lgt_n_new = lgt_n(tree_ID_flow)
-
-                    ! Create mask and copy the mask function to our pseudo-statevector
-                    call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.)! need to create body as well
-                    call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
-
-                    ! current finest level is:
-                    Jnow = maxActiveLevel_tree(tree_ID_flow)
-
-                    if (params%rank==0) then
-                        write(*,'("Did iteration ", i0," for mask generation. Mask computed on ",i6," blocks.&
-                        & After coarsening: Jmax=",i2, " Nb=",i7)') iteration, Nmask, Jnow, lgt_n(tree_ID_flow)
-                    endif
-
-                    ! We're done once the mask is created on the final level. Relevant only if the start grid is not
-                    ! created on Jmin, but on Jequi. A second condition is that the grid does not change anymore:
-                    ! sometimes, the start level is so coarse that the blocks retain not a single point of the mask
-                    ! function, which can lead to not all parts of the grid being properly generated. If *none* of the
-                    ! blocks contains a mask function point on Jmin, the only solution is to increase --Jmin in the call.
-                    if ((Jnow==Jmax) .and. (lgt_n_new==lgt_n_old)) iterate = .false.
-                    iteration = iteration + 1
-
-                    ! empty mask is created?
-                    if ((Jnow==Jmin) .and. (iteration>2)) then
-                        ! we did some refinements, but the grid is still on Jmin - nothing did trigger the refinement. 
-                        ! This means no mask was created for some reason - maybe the object just moved out of the domain
-                        ! or it is a bug somewhere. Is also possible on huge domains with tiny resolution: the object covers
-                        ! then less than 1 grid point. NOTE: this latter case should be corrected by "geometry_indicator" (07/2026)
-                        call abort(071120251, "Error: Dry run generated an empty mask. Possible causes: resolution too coarse, object out of domain, no mask defined.")
-                    endif
-                enddo
+                if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
                 ! Create mask and copy the mask function to our pseudo-statevector
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.) ! need to create body as well
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
+                call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
+                Nmask = lgt_n(tree_ID_flow)
+
+                ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
+                ! why do we use hvy_tmp here for the mask? Because hvy_mask will be decomposed and we will backup everything in hvy_tmp during adapt_tree
+                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
+                lgt_n_new = lgt_n(tree_ID_flow)
+
+                ! Create mask and copy the mask function to our pseudo-statevector
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
                 call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
 
-                first_snapshot = .false. ! now did the first one
+                ! current finest level is:
+                Jnow = maxActiveLevel_tree(tree_ID_flow)
+
+                if (params%rank==0) then
+                    write(*,'("Did iteration ", i0," for mask generation. Mask computed on ",i6," blocks.&
+                    & After coarsening: Jmax=",i2, " Nb=",i7)') iteration, Nmask, Jnow, lgt_n(tree_ID_flow)
+                endif
+
+                ! We're done once the mask is created on the final level. Relevant only if the start grid is not
+                ! created on Jmin, but on Jequi. A second condition is that the grid does not change anymore:
+                ! sometimes, the start level is so coarse that the blocks retain not a single point of the mask
+                ! function, which can lead to not all parts of the grid being properly generated. If *none* of the
+                ! blocks contains a mask function point on Jmin, the only solution is to increase --Jmin in the call.
+                if ((Jnow==Jmax) .and. (lgt_n_new==lgt_n_old)) iterate = .false.
+                iteration = iteration + 1
+
+                ! empty mask is created?
+                if ((Jnow==Jmin) .and. (iteration>2)) then
+                    ! we did some refinements, but the grid is still on Jmin - nothing did trigger the refinement. 
+                    ! This means no mask was created for some reason - maybe the object just moved out of the domain
+                    ! or it is a bug somewhere. Is also possible on huge domains with tiny resolution: the object covers
+                    ! then less than 1 grid point. NOTE: this latter case should be corrected by "geometry_indicator" (07/2026)
+                    call abort(071120251, "Error: Dry run generated an empty mask. Possible causes: resolution too coarse, object out of domain, no mask defined.")
+                endif
+            enddo
+
+            ! Create mask and copy the mask function to our pseudo-statevector
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
+            call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
+
+            if (first_snapshot) then
                 if (params%rank==0) then
                     write(*,'(80("~"))')
                     write(*,'(A, g12.4)') "First snapshot is created. t_elapsed=", MPI_wtime()-t0
                     write(*,'(80("~"))')
                 endif
-
-            else ! not first snapshot
-                !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                ! other snapshots 
-                !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                ! Creating the next snapshot starts with the grid created for the previous snapshot. The mask is already there from the 
-                ! previous time step. We need to create the mask on the current time level. Then we adapt the grid until it is constant.
-                ! 
-                ! From now on the body is there and if the "do-not-delete-static-masks" approach is used, we can skip its creation.
-                
-                if (params%rank==0) then
-                    write(*,*) ""
-                    write(*,'("Starting mask generation for next snapshot. time=",g12.4)') time
-                endif
-
-                ! Create mask and copy the mask function to our pseudo-statevector
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.) ! no need to create body
-                call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
-                
-
-                ! Refine the mesh, but only where the mask is interesting (not everywhere!).
-                ! Note: between two snapshots, the wings may move quite far. That means they may move into a (very) coarse
-                ! region. Calling refine_tree once is not enough - we need to call it until the grid is no longer refined, i.e.
-                ! all parts of the mask function are on Jmax.
-                iterate = .true.
-                do while (iterate)
-                    ! number of blocks before refinement                
-                    lgt_n_old = lgt_n(tree_ID_flow)
-
-                    call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
-
-                    ! refine tree (by at most one level, hence the loop...).
-                    ! It is safest to use "everywhere" here. Consider a block that has no mask function,
-                    ! because it is too coarse (no point is nonzero, because the resolution is too coarse).
-                    ! It is not possible to tell from this block alone if, after refinement, nonzero mask
-                    ! values will appear. Therefore, using the everywhere criterion is our safest bet.
-                    ! One can also use "mask-anynonzero", which is faster and should be reliable if the first snap-
-                    ! shot is done. 
-                    call refine_tree( params, hvy_block, "mask-anynonzero", tree_ID_flow, error_OOM )
-
-                    if (error_OOM) call abort(2512179,"Refinement failed, out of memory. Try with more memory.")
-                    if (params%rank==0) write(*,'("Refined to   Nblocks=",i7)') lgt_n(tree_ID_flow)
-                    
-                    ! Create mask and copy the mask function to our pseudo-statevector
-                    call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.) ! no need to create body
-                    call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
-
-                    ! grid did not change anymore - we can start to coarsen
-                    if (lgt_n_old == lgt_n(tree_ID_flow)) iterate = .false.
-                end do
-
-                ! coarsening - coarsen all blocks that do not contain the mask interface (including blocks that are all 
-                ! one inside the solid). because params%threshold_state_vector_component = 0, the state vecor 
-                ! is ignored and only the same (secondary) criterion as used in simulations is used.
-                call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
-                if (params%rank==0) write(*,'("Coarsened to Nblocks=",i7)') lgt_n(tree_ID_flow)
-                if (params%rank==0) write(*,'("t_elapsed=",g12.4)') MPI_wtime()-t0
-
-                ! final mask creation before saving (not really required, as adapt_tree should not remove relevant blocks on 
-                ! the interface, but it might remove some all-constant blocks, so kept this call for safety....)
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.true.) ! no need to create body
-                call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
-
             endif
+            first_snapshot = .false. ! now did the first one
 
             ! write the kinematics file for the insects
             if (is_insect) call write_insect_data(time)

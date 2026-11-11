@@ -309,13 +309,7 @@ subroutine post_dry_run(params)
             call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
             call copyMask_tree(params, hvy_block, hvy_mask, tree_ID_flow)
 
-            if (first_snapshot) then
-                if (params%rank==0) then
-                    write(*,'(80("~"))')
-                    write(*,'(A, g12.4)') "First snapshot is created. t_elapsed=", MPI_wtime()-t0
-                    write(*,'(80("~"))')
-                endif
-            endif
+            if (params%rank==0) write(*,'(A, g12.4)') "Snapshot done. t_elapsed=", MPI_wtime()-t0
             first_snapshot = .false. ! now did the first one
 
             ! write the kinematics file for the insects
@@ -403,6 +397,9 @@ subroutine post_dry_run(params)
                 
                 
             time = time + params%write_time
+
+            ! delete pruned tree copy after saving to save on memory
+            if (pruned) call delete_tree(params, tree_ID_mask)
 
             if (params%rank==0) write(*,'(A)') ""
             if (params%rank==0) write(*,'(A)') ""

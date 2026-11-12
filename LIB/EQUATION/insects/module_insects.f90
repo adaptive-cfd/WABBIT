@@ -158,6 +158,13 @@ module module_insects
       ! rotation matrices for the various coordinate system for the insect
       real(kind=rk),dimension(1:3,1:3) :: M_b2w
 
+      ! ---- not prescribed kinematics ----
+      ! passive feathering
+      ! hinge/torsional stifness, rotational damping, 
+      real(kind=rk) :: stif=1.0_rk, damp=0.0_rk, ang0=0.0_rk
+      ! muscle driven wing model coefficients
+      ! real(kind=rk) :: musc_amf2=0.0_rk, musc_c1mf=0.0_rk, musc_kmf2=0.0_rk
+
    end type
 
    ! **********************************************************************************************
@@ -281,7 +288,7 @@ module module_insects
       ! STATE(11) : x-angular velocity of body (in body system)
       ! STATE(12) : y-angular velocity of body (in body system)
       ! STATE(13) : z-angular velocity of body (in body system)
-      ! STATE(14) : 1st component of left wing quaternion (WHY ONLY LEFT?)
+      ! STATE(14) : 1st component of left wing quaternion
       ! STATE(15) : 2nd component of left wing quaternion
       ! STATE(16) : 3rd component of left wing quaternion
       ! STATE(17) : 4th component of left wing quaternion
@@ -296,6 +303,9 @@ module module_insects
       real(kind=rk), dimension(1:3) :: torque_muscle_l_w=0.0_rk, torque_muscle_r_w=0.0_rk
       real(kind=rk), dimension(1:3) :: torque_muscle_l_b=0.0_rk, torque_muscle_r_b=0.0_rk
       real(kind=rk), dimension(1:3) :: init_alpha_phi_theta=0.0_rk
+
+      ! passive feathering, control parameter
+      character(len=clong) :: wing_fsi=""
 
       ! the following flag makes the code write the kinematics log to either kinematics.t
       ! (regular simulation) or kinematics.dry-run.t (for a dry run). The reason for this

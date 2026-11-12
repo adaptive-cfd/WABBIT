@@ -280,6 +280,9 @@ tests = [
     {"name": "dry_butterflyKineloaderV2_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
         "groups": ["insects", "mask"], "input_files": ["*.ini", "*.kineloader", "*.superstl"],
         "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
+    {"name": "dry_butterflyKineloaderV2largeDomain", "type": "simulation", "root_folder": "insects", "wavelet": 20, "dim": 3,
+        "groups": ["insects", "mask"], "input_files": ["*.ini", "*.kineloader", "*.superstl"],
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
     {"name": "dry_3Dbristles_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
         "groups": ["insects", "mask"], "input_files": ["*.ini"],
         "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
@@ -611,6 +614,10 @@ def compare_hdf5_files(test_dir, tmp_dir, verbose=False, write_diff=False, log_f
             else:
                 print(msg, end='')
             all_ok = False
+
+        # readability
+        if log_f:
+            log_f.write('\n\n')
 
     # check if any hdf5 file from the reference is missing
     ref_files = sorted(glob.glob(os.path.join(test_dir, "*.h5")))

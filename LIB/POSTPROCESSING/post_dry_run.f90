@@ -144,18 +144,16 @@ subroutine post_dry_run(params)
     
     params%eps = 1.0 ! large value (as the pseudo-state vector is all zeros anyways, doesn't matter)
     params%coarsening_indicator = "threshold-state-vector"  ! we only want the real mask checking, so wavelet thresholding is ignored
-    params%refinement_indicator = "mask-anynonzero"  ! refine everywhere, where we have a mask interface
     params%threshold_mask = .true.  ! we want to refine based on the mask value
 
     if (params%rank==0) then
-        write(*,'(A)') "DRY-RUN: hardcoding eps=1.0e-6, threshold_state_vector_component(:)=1 and threshold_mask=T"
+        write(*,'(A)') "DRY-RUN: hardcoding eps=1.0, threshold_state_vector_component(:)=0 (ignore state vector) and threshold_mask=T"
     endif
 
     Bs     = params%Bs
     g      = params%g
     Jmax   = params%Jmax
     Jmin   = params%Jmin
-    tree_n = params%forest_size ! used only for resetting at this point
     time   = time_start
 
     ! initializes the communicator for Wabbit and creates a bridge if needed
@@ -255,12 +253,16 @@ subroutine post_dry_run(params)
                 lgt_n_old = lgt_n(tree_ID_flow)
 
                 ! synchronization before refinement (because the interpolation takes place on the extended blocks
-                ! including the ghost nodes).
+                ! including the ghost nodes). NOte: as the state vector is zeros anyways, we could also omit this step.
+                ! Kept only to better reflect what is done during a simulation.
                 call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
                 ! refine the mesh everywhere. This ensures that even for coarse resolutions (typical for 
                 ! unit tests) we do not miss the mask function. In createEquidistantGrid_tree, the same is used. 
-                ! For the dry run, this results in extra work, but increased reliability.
+                ! For the dry run, this results in extra work (compared to "mask-anynonzero"), but increased reliability.
+                ! The reason is that if a block has no mask function (all zeros), we cannot be sure that it won't have
+                ! a mask function after refinement. Hence, "mask-anynonzero" would not trigger the refinement.
+                ! Therefore, "everywhere" is a suitable strategy.
                 call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM )
 
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
@@ -270,7 +272,6 @@ subroutine post_dry_run(params)
                 Nmask = lgt_n(tree_ID_flow)
 
                 ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
-                ! why do we use hvy_tmp here for the mask? Because hvy_mask will be decomposed and we will backup everything in hvy_tmp during adapt_tree
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
                 lgt_n_new = lgt_n(tree_ID_flow)
 
@@ -285,8 +286,8 @@ subroutine post_dry_run(params)
                     & After coarsening: Jmax=",i2, " Nb=",i7)') iteration, Nmask, Jnow, lgt_n(tree_ID_flow)
                 endif
 
-                ! We're done once the mask is created on the final level. Relevant only if the start grid is not
-                ! created on Jmin, but on Jequi. A second condition is that the grid does not change anymore:
+                ! We're done once the mask is created on the final level (Jmax). 
+                ! A second condition is that the grid does not change anymore:
                 ! sometimes, the start level is so coarse that the blocks retain not a single point of the mask
                 ! function, which can lead to not all parts of the grid being properly generated. If *none* of the
                 ! blocks contains a mask function point on Jmin, the only solution is to increase --Jmin in the call.
@@ -307,7 +308,9 @@ subroutine post_dry_run(params)
             call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
 
             if (params%rank==0) write(*,'(A, g12.4)') "Snapshot done. t_elapsed=", MPI_wtime()-t0
-            first_snapshot = .false. ! now did the first one
+
+            ! now did the first one
+            first_snapshot = .false. 
 
             ! write the kinematics file for the insects
             if (is_insect) call write_insect_data(time)
@@ -395,7 +398,7 @@ subroutine post_dry_run(params)
                 
             time = time + params%write_time
 
-            ! delete pruned tree copy after saving to save on memory
+            ! delete pruned tree copy after saving to HDF5 file to save on memory
             if (pruned) call delete_tree(params, tree_ID_mask)
 
             if (params%rank==0) write(*,'(A)') ""

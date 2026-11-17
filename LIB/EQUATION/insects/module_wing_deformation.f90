@@ -281,18 +281,15 @@ module module_wing_deformation
                 ! IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
                 ! So we effectively conduct a passive rotation, but for readability, this will be changed...
                 ! calculate the deformation angle
-                D_alpha = -D_alpha
-                dDalpha_dy = -dDalpha_dy
-                !
 
                 dDalpha_dy = model%dDalpha_dy
 
+                ! yes, this is confusing. Bear in mind that walker and taylor define their angles relative to the right wing
                 if (side == "L") then
-                    D_alpha = -D_alpha
                     dDalpha_dy = -dDalpha_dy
                 endif
 
-                D_alpha = dDalpha_dy * x_wing(2)
+                D_alpha = dDalpha_dy * x_mat(2)
 
                 ! factor to rescale our normal to 1
 
@@ -404,14 +401,10 @@ module module_wing_deformation
                 ! IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
                 ! So we effectively conduct a passive rotation, but for readability, this will be changed...
                 ! calculate the deformation angle
-                D_alpha = -D_alpha
-                dDalpha_dy = -dDalpha_dy
-                !
-
+                dDalpha_dy = model%dDalpha_dy
                 dDalpha_dydt = model%dDalpha_dydt
 
                 if (side == "L") then
-                    D_alpha = -D_alpha
                     dDalpha_dy = -dDalpha_dy
                     dDalpha_dydt = -dDalpha_dydt
                 endif

@@ -312,6 +312,11 @@ module module_insects
       ! is that during postprocessing of an existing run, the dry run would overwrite the
       ! simulation data.
       character(len=clong) :: kinematics_file = "kinematics.t"
+
+      ! Being well aware that changing the size of the main kinematics file could break tools expecting a different array size etc.,
+      ! the deformation kinematics are saved in a separate t file.
+      character(len=clong) :: deformation_kinematics_file = "deformation_kinematics.t"
+
       ! rotation matrices for the various coordinate system for the insect
       real(kind=rk),dimension(1:3,1:3) :: M_g2b, M_b2g
 
@@ -493,8 +498,9 @@ contains
       implicit none
 
       logical, intent(in) :: overwrite
+      character(len=clong) :: deformation_header(1:4*n_insects*3 + 1) ! used, rigid, gradient_dalpha
 
-      integer :: i, i_check
+      integer :: i, i_check, j, j_check
       logical :: do_init
       character(len=clong) :: header(1:43*n_insects+1)
 
@@ -552,6 +558,28 @@ contains
          write(header(44+(i-1)*43), '(A, i0.2, A)') "insect", i, ":rot_dt_r2_w_z"
       enddo
       call init_t_file( Insects(1)%kinematics_file, overwrite, header=header(1:43*n_insects+1))
+
+      deformation_header(1)="time"
+      ! ------- NOW DEFORMATION DATA ----------
+      do i = 1, n_insects
+         write(header(2+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_l:used"
+         write(header(3+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_l2:used"
+         write(header(4+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r:used"
+         write(header(5+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r2:used"
+
+         write(header(6+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_l:rigid"
+         write(header(7+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_l2:rigid"
+         write(header(8+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r:rigid"
+         write(header(9+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r2:rigid"
+
+         write(header(10+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_l:gradient_dalpha"
+         write(header(11+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_l2:gradient_dalpha"
+         write(header(12+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r:gradient_dalpha"
+         write(header(13+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r2:gradient_dalpha"
+      end do
+      call init_t_file( Insects(1)%deformation_kinematics_file, overwrite, header=header(1:12*n_insects+1))
+
+
    end subroutine Init_insect_data
 
    !-------------------------------------------------------------------------------
@@ -561,9 +589,10 @@ contains
       implicit none
       real(kind=rk), intent(in) :: time
       real(kind=rk), allocatable, dimension(:) :: buffer_local
-      integer :: i, n_entries
+      integer :: i, n_entries, n_entries_deformation
 
       n_entries = 43
+      n_entries_deformation = 3
 
       if (allocated(buffer_local)) then
          if (size(buffer_local) < n_entries*n_insects) deallocate(buffer_local)
@@ -600,8 +629,37 @@ contains
             /)
       enddo
       call append_t_file( Insects(1)%kinematics_file, (/time, buffer_local(1:n_entries*n_insects) /) )
-   end subroutine Write_insect_data
 
+
+   
+
+      ! ----------------------save the deformation kinematics -------------------
+      ! reallocate the buffer: n insects, four wings
+
+      if (allocated(buffer_local)) then
+         if (size(buffer_local) < n_entries_deformation*n_insects*4) deallocate(buffer_local)
+      endif
+      if (.not. allocated(buffer_local)) allocate(buffer_local(1:n_entries_deformation*n_insects*4))
+
+      do i = 1, n_insects
+         buffer_local((i-1)*n_entries_deformation*4+1:i*n_entries_deformation*4) = (/&
+                  merge(0.0_rk, 1.0_rk, Insects(i)%Wings(1)%WingShape=='NOT-USED'),& ! check if the wing is used at all.&
+                  merge(0.0_rk, 1.0_rk, Insects(i)%Wings(2)%WingShape=='NOT-USED'),&
+                  merge(0.0_rk, 1.0_rk, Insects(i)%Wings(3)%WingShape=='NOT-USED'),&
+                  merge(0.0_rk, 1.0_rk, Insects(i)%Wings(4)%WingShape=='NOT-USED'),&
+                  merge(1.0_rk, 0.0_rk, Insects(i)%Wings(1)%rigid), & ! rigidity
+                  merge(1.0_rk, 0.0_rk, Insects(i)%Wings(2)%rigid), &
+                  merge(1.0_rk, 0.0_rk, Insects(i)%Wings(3)%rigid), &
+                  merge(1.0_rk, 0.0_rk, Insects(i)%Wings(4)%rigid), &
+                  Insects(i)%Wings(1)%deformation%dDalpha_dy, &
+                  Insects(i)%Wings(2)%deformation%dDalpha_dy, &
+                  Insects(i)%Wings(3)%deformation%dDalpha_dy, &
+                  Insects(i)%Wings(4)%deformation%dDalpha_dy&
+            /)
+      enddo
+      call append_t_file( Insects(1)%deformation_kinematics_file, (/time, buffer_local(1:n_insects*4*n_entries_deformation) /) )
+
+   end subroutine Write_insect_data
 
    !-------------------------------------------------------------------------------
    ! Main routine for drawing insects. Draws body and wings, parameters are in "INSECT"

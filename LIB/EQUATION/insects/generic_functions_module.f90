@@ -23,7 +23,7 @@ module generic_functions_module
     integer, intent(in) :: derivative
     integer :: i, n, j, power
     real(kind=rk) :: coeff_factor
-    real(kind=rk) :: output, k
+    real(kind=rk) :: output, f
     integer :: nfft
 
     output = 0.0_rk
@@ -82,38 +82,37 @@ module generic_functions_module
     case("fseries")
         nfft = size(function%ai)
         if (derivative == 0) then
-            output = function%a0
+            ! in keeping with the conventions in WABBIT, we halve the constant
+            output = function%a0 * 0.5
         end if 
         select case (mod(derivative, 4))
 
 
             case(0)
                 do i = 1, nfft
-                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
-                    output = output+ (k ** derivative) * (function%ai(i) * cos(k * value) + function%bi(i) * sin(k * value))
+                    f = pi * 2.0_rk * real(i, kind=rk)
+                    output = output+ (f ** derivative) * (function%ai(i) * cos(f * value) + function%bi(i) * sin(f * value))
                 end do
 
 
             case(1)
                 do i = 1, nfft
-                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
-                    output = output+ (k ** derivative) * (-function%ai(i) * sin(k * value) + function%bi(i) * cos(k * value))
+                    f = pi * 2.0_rk * real(i, kind=rk)
+                    output = output+ (f ** derivative) * (-function%ai(i) * sin(f * value) + function%bi(i) * cos(f * value))
                 end do
 
             case(2)
                 do i = 1, nfft
-                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
-                    output = output+ (k ** derivative) * ( - function%ai(i) * cos(k * value) - function%bi(i) * sin(k * value))
+                    f = pi * 2.0_rk * real(i, kind=rk)
+                    output = output+ (f ** derivative) * ( - function%ai(i) * cos(f * value) - function%bi(i) * sin(f * value))
                 end do
 
             case(3)
                 do i = 1, nfft
-                    k = 3.141592654_rk * 2.0_rk * real(i, kind=rk)
-                    output = output+ (k ** derivative) * (function%ai(i) * sin(k * value) - function%bi(i) * cos(k * value))
+                    f = pi * 2.0_rk * real(i, kind=rk)
+                    output = output+ (f ** derivative) * (function%ai(i) * sin(f * value) - function%bi(i) * cos(f * value))
                 end do
         end select
-
-
 
     case default
         write(*,*) 'UNKNOWN FUNCTION: >', function%function_name, '<'

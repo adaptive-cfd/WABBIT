@@ -62,6 +62,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
   integer :: i,mpicode
   character(len=clong) :: dummy
   type(inifile) :: kinefile
+  real(kind=rk) :: defaultvec(3) = (/0_rk, 0_rk, 0_rk/)
 
   select case ( protocoll )
   case ("from_file")
@@ -148,10 +149,52 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       call read_param_mpi(kinefile,"kinematics","ai_theta",Insect%Wings(wingID)%ai_theta(1:Insect%Wings(wingID)%nfft_theta))
       call read_param_mpi(kinefile,"kinematics","bi_theta",Insect%Wings(wingID)%bi_theta(1:Insect%Wings(wingID)%nfft_theta))
 
+
+      !---------------deformation kinematics----------------------------------
+      ! Cleaner implementation of the linear twist distribution. 
+      ! The gradient and offset feathering angle are stored as a set of fourier coefficients in the wing kinematics file. 
+      !--------------------------------------------------------------------------------------
+
+      if (root) write(*,*) "~~~~~~~~~~~~~~~~initialising bendy wing!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
+      
+      ! which wings are rigid?
+
+      call read_param_mpi(kinefile, "deformation", "model_name", Insect%Wings(wingID)%deformation%model_name, "walkerTaylor_clean")
+      call read_param_mpi(kinefile, "deformation", "rigid", Insect%Wings(wingID)%rigid, .true.)
+
+      call read_param_mpi(kinefile, "deformation", 'flexionLineAngle', Insect%Wings(wingID)%deformation%flexion_angle, 0.0_rk)
+      call read_param_mpi(kinefile, "deformation", 'flexionLinePivot', defaultvec, (/0.0_rk, 0.0_rk, 0.0_rk/))
+      Insect%Wings(wingID)%deformation%pivot_flexion = defaultvec
+
+      ! -- Dalpha gradient
+
+      call read_param_mpi(kinefile,"deformation","nfft_Dalpha_gradient",Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient,0)
+
+      if (.not. allocated(Insect%Wings(wingID)%deformation%ai_Dalpha_gradient)) allocate(Insect%Wings(wingID)%deformation%ai_Dalpha_gradient(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient)))
+      if (.not. allocated(Insect%Wings(wingID)%deformation%bi_Dalpha_gradient)) allocate(Insect%Wings(wingID)%deformation%bi_Dalpha_gradient(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient)))
+
+      call read_param_mpi(kinefile,"deformation","ai_Dalpha_gradient",Insect%Wings(wingID)%deformation%ai_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient))
+      call read_param_mpi(kinefile,"deformation","bi_Dalpha_gradient",Insect%Wings(wingID)%deformation%bi_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient))
+      call read_param_mpi(kinefile,"deformation","a0_Dalpha_gradient",Insect%Wings(wingID)%deformation%a0_Dalpha_gradient,0.0_rk)
+
+      ! -- Dalpha offset
+
+      call read_param_mpi(kinefile,"deformation","nfft_Dalpha_offset",Insect%Wings(wingID)%deformation%nfft_Dalpha_offset,0)
+
+      if (.not. allocated(Insect%Wings(wingID)%deformation%ai_Dalpha_offset)) allocate(Insect%Wings(wingID)%deformation%ai_Dalpha_offset(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_offset)))
+      if (.not. allocated(Insect%Wings(wingID)%deformation%bi_Dalpha_offset)) allocate(Insect%Wings(wingID)%deformation%bi_Dalpha_offset(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_offset)))
+
+      call read_param_mpi(kinefile,"deformation","ai_Dalpha_offset",Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+      call read_param_mpi(kinefile,"deformation","bi_Dalpha_offset",Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+      call read_param_mpi(kinefile,"deformation","a0_Dalpha_offset",Insect%Wings(wingID)%deformation%a0_Dalpha_offset, 0.0_rk)
+
+
       Insect%Wings(wingID)%initialized = .true.
       call clean_ini_file_mpi( kinefile )
 
       if (root) write(*,*) " --- Kinematics initialization from file complete ---"
+
+
     endif
 
     !---------------------------------------------------------------------------
@@ -166,18 +209,33 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       call fseries_eval(time,alpha,alpha_dt, Insect%Wings(wingID)%a0_alpha, Insect%Wings(wingID)%ai_alpha(1:Insect%Wings(wingID)%nfft_alpha), Insect%Wings(wingID)%bi_alpha(1:Insect%Wings(wingID)%nfft_alpha))
       call fseries_eval(time,theta,theta_dt, Insect%Wings(wingID)%a0_theta, Insect%Wings(wingID)%ai_theta(1:Insect%Wings(wingID)%nfft_theta), Insect%Wings(wingID)%bi_theta(1:Insect%Wings(wingID)%nfft_theta))
 
+      ! calculate gradient
+      if (.not. Insect%Wings(wingID)%rigid) then
+        call fseries_eval(time,Insect%Wings(wingID)%deformation%dDalpha_dy,Insect%Wings(wingID)%deformation%dDalpha_dydt, Insect%Wings(wingID)%deformation%a0_Dalpha_gradient, Insect%Wings(wingID)%deformation%ai_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient), Insect%Wings(wingID)%deformation%bi_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient))
+        ! add twist offset from deformation measurements and suoerimpore upon alpha. 
+        call fseries_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%a0_Dalpha_offset, Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset), Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
 
-      ! add twist offset from deformation measurements and suoerimpore upon alpha. 
-      call fseries_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%twistOffset_a0, Insect%Wings(wingID)%deformation%twistOffset_ai, Insect%Wings(wingID)%deformation%twistOffset_bi)
-
-      alpha = alpha + twistOffset
-      alpha_dt = alpha_dt + twistOffset_dt
+        alpha = alpha + twistOffset
+        alpha_dt = alpha_dt + twistOffset_dt
+      end if
 
     case ("Hermite","hermite","HERMITE")
       ! evaluate hermite interpolation
       call hermite_eval(time, phi, phi_dt    , Insect%Wings(wingID)%ai_phi(1:Insect%Wings(wingID)%nfft_phi), Insect%Wings(wingID)%bi_phi(1:Insect%Wings(wingID)%nfft_phi))
       call hermite_eval(time, alpha, alpha_dt, Insect%Wings(wingID)%ai_alpha(1:Insect%Wings(wingID)%nfft_alpha), Insect%Wings(wingID)%bi_alpha(1:Insect%Wings(wingID)%nfft_alpha))
       call hermite_eval(time, theta, theta_dt, Insect%Wings(wingID)%ai_theta(1:Insect%Wings(wingID)%nfft_theta), Insect%Wings(wingID)%bi_theta(1:Insect%Wings(wingID)%nfft_theta))
+
+      ! calculate gradient of the feathering angle alon gth e wing
+      if (.not. Insect%Wings(wingID)%rigid) then
+        call hermite_eval(time,Insect%Wings(wingID)%deformation%dDalpha_dy,Insect%Wings(wingID)%deformation%dDalpha_dydt, Insect%Wings(wingID)%deformation%ai_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient), Insect%Wings(wingID)%deformation%bi_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient))
+
+
+        ! add twist offset from deformation measurements and suoerimpore upon alpha. 
+        call hermite_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset), Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+
+        alpha = alpha + twistOffset
+        alpha_dt = alpha_dt + twistOffset_dt
+      end if
 
     case default
       call abort(1717,"kinematics file does not appear to be valid, set type=fourier or type=hermite")
@@ -195,6 +253,10 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       phi_dt = deg2rad(phi_dt)
       alpha_dt = deg2rad(alpha_dt)
       theta_dt = deg2rad(theta_dt)
+
+      Insect%Wings(wingID)%deformation%dDalpha_dy = deg2rad(Insect%Wings(wingID)%deformation%dDalpha_dy)
+      Insect%Wings(wingID)%deformation%dDalpha_dydt = deg2rad(Insect%Wings(wingID)%deformation%dDalpha_dydt)
+
     case ("radian","RADIAN","Radian","radiant","RADIANT","Radiant","rad","RAD")
       ! if the file is already in radiants, do nothing and be happy!
     case default

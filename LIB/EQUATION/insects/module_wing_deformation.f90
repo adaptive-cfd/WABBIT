@@ -22,29 +22,15 @@ module module_wing_deformation
         character(len=clong) :: filename
         character(len=clong) :: units
 
-        ! variables for a model I'm going to call "lin_sin": a spatially linear increase in the deformation angle D_alpha, multiplied by some sin - cos sum
-
-        real(kind=rk) :: D_alpha_slope = 0.0_rk
-        real(kind=rk) :: D_alpha_0 = 0.0_rk
-        real(kind=rk) :: omega = 0.0_rk
-
         ! define the axis of the flexion line. Wing deformation occurs around flexion lines, where veins stiffen the membrane (Hsu 2024). 
         ! we define this as the angle in rad between y^(mat)_(right wing) and the flexion line in question, as well as defining a pivot point through which the flexion line passes.
         ! for bluebottles, this corresponds to the claval flexion line (Hsu 2024).  
 
         real(kind=rk) :: flexion_angle
         real(kind=rk) :: pivot_flexion(1:3)
-
-
-        ! maybe program a fourier series later
-
-        real(kind=rk) :: ai_D_alpha = 0.0_rk
-        real(kind=rk) :: bi_D_alpha = 0.0_rk
-
         LOGICAL :: deinsect_verbose = .true.
 
         ! end goal: describe using an arbitrary (continuous) function of time and y coordinate
-
         ! the deformation angle D_alpha is treated as a separable function of time and space. the time function is A_tilde, the angle distribution is D_alpha_tilde
 
         type(generic_function1D) :: A_tilde
@@ -57,6 +43,20 @@ module module_wing_deformation
         real(kind=rk) :: twistOffset_ai(10)
         real(kind=rk) :: twistOffset_bi(10)
         real(kind=rk) :: twistOffset_a0 = 0.0_rk
+
+        ! WalkerTaylor_clean lets the user define the wing kinematics in the general kinematics ini file.
+
+        real(kind=rk), ALLOCATABLE :: ai_Dalpha_gradient(:)
+        real(kind=rk), ALLOCATABLE :: bi_Dalpha_gradient(:)
+        real(kind=rk) :: a0_Dalpha_gradient = 0.0_rk 
+        integer :: nfft_Dalpha_gradient = 0.0
+        real(kind=rk) :: dDalpha_dy=0.0_rk
+        real(kind=rk) :: dDalpha_dydt=0.0_rk
+
+        real(kind=rk), ALLOCATABLE :: ai_Dalpha_offset(:)
+        real(kind=rk), ALLOCATABLE :: bi_Dalpha_offset(:)
+        real(kind=rk) :: a0_Dalpha_offset = 0.0_rk
+        integer :: nfft_Dalpha_offset = 0.0
 
     end type
 
@@ -133,7 +133,7 @@ module module_wing_deformation
                 model%A_tilde%function_name = "fseries"
                 model%model_name = "generic_angle_distribution"
 
-            case("generic_angle_distribution", "lin_sin")
+            case("generic_angle_distribution", "lin_sin", "WalkerTaylor_clean")
 
                 ! don't try to translate these models
 
@@ -158,7 +158,7 @@ module module_wing_deformation
         character(len=1), intent(in) :: side
 
         real(kind=rk) :: A_tilde, D_alpha_tilde, dA_tilde_dt, dD_alpha_tilde_dy
-        real(kind=rk) :: D_alpha
+        real(kind=rk) :: D_alpha, dDalpha_dy
         real(kind=rk) :: normalisation
         real(kind=rk) :: x_w, y_w, z_w, x_n, y_n, z_n
 
@@ -250,6 +250,86 @@ module module_wing_deformation
                 x_wing(2) = x_wing(2) + model%pivot_flexion(2)
                 x_wing(3) = x_wing(3) + model%pivot_flexion(3)
                 x_mat = x_wing
+
+            case("walkerTaylor_clean")
+
+
+
+                x_tmp = x_mat
+
+                ! translate these coordinates to the pivot of the flexion line, so we can align our rotation axis with the primary flexion line.
+
+                x_wing(1) = x_tmp(1) - model%pivot_flexion(1)
+                x_wing(2) = x_tmp(2) - model%pivot_flexion(2)
+                x_wing(3) = x_tmp(3) - model%pivot_flexion(3)
+
+                x_tmp = x_wing
+
+                ! align the twisting axis with the flexion line
+                x_wing(1) = cos(model%flexion_angle) * x_tmp(1) - sin(model%flexion_angle) * x_tmp(2)
+                x_wing(2) = sin(model%flexion_angle) * x_tmp(1) + cos(model%flexion_angle) * x_tmp(2)
+
+                ! more generic case. Here, we assume that the angle distribution follows a prescribed function with a derivative along the y(mat) axis and a time derivative.
+                ! We define a material coordinate inherent to the wing, which describes a material point independent of deformation. 
+                ! This falls together with the wing coordinate in the rigid case.
+                ! x_c_mat_w denotes the points that lie in the centreplane of the wing's material coordinates.
+
+                x_c_mat_w = x_wing
+                x_c_mat_w(3) = 0
+
+                
+                ! IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
+                ! So we effectively conduct a passive rotation, but for readability, this will be changed...
+                ! calculate the deformation angle
+                D_alpha = -D_alpha
+                dDalpha_dy = -dDalpha_dy
+                !
+
+                dDalpha_dy = model%dDalpha_dy
+
+                if (side == "L") then
+                    D_alpha = -D_alpha
+                    dDalpha_dy = -dDalpha_dy
+                endif
+
+                D_alpha = dDalpha_dy * x_wing(2)
+
+                ! factor to rescale our normal to 1
+
+                normalisation = 1 / sqrt(dDalpha_dy ** 2 * x_wing(1) ** 2 + 1)
+
+                ! row wise calculation of the surface normal. IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
+                ! So we effectively conduct a passive rotation, but for readability, this will be changed...
+
+                e_n_mat_w(1) = normalisation * sin(D_alpha)
+                e_n_mat_w(2) = normalisation * dDalpha_dy * x_wing(1)
+                e_n_mat_w(3) = - normalisation * cos(D_alpha)
+
+                ! section-wise rotation around the flexion axis of the centreplane of the material coordinates
+                
+                x_c_mat_w(1) = cos(D_alpha)*x_wing(1)
+                x_c_mat_w(2) = x_wing(2)
+                x_c_mat_w(3) = sin(D_alpha)*x_wing(1)
+
+                ! By definition, the z coordinate is normal to the material x, y plane. Extrude normally to the centreplane, but describe this extrusion in the wing system
+
+                x_wing(1) = x_c_mat_w(1) - x_wing(3) * e_n_mat_w(1) 
+                x_wing(2) = x_c_mat_w(2) - x_wing(3) * e_n_mat_w(2) 
+                x_wing(3) = x_c_mat_w(3) - x_wing(3) * e_n_mat_w(3) 
+
+                x_tmp = x_wing
+
+                ! align the twisting axis with the flexion line
+
+                x_wing(1) = cos(model%flexion_angle) * x_tmp(1) + sin(model%flexion_angle) * x_tmp(2)
+                x_wing(2) = - sin(model%flexion_angle) * x_tmp(1) + cos(model%flexion_angle) * x_tmp(2)
+
+                ! translate these coordinates to the pivot of the flexion line, so we can align our rotation axis with the primary flexion line
+
+                x_wing(1) = x_wing(1) + model%pivot_flexion(1)
+                x_wing(2) = x_wing(2) + model%pivot_flexion(2)
+                x_wing(3) = x_wing(3) + model%pivot_flexion(3)
+                x_mat = x_wing
             case default
                 call abort(23673, "model not selected!")
         end select
@@ -290,13 +370,119 @@ module module_wing_deformation
         character(len=1), intent(in) :: side
 
         real(kind=rk) :: A_tilde
-        real(kind=rk) :: D_alpha, D_alphadot,A_tildedot,normalisation,normalisationdot, D_alpha_tilde, dA_tilde_dt, dD_alpha_tilde_dy
+        real(kind=rk) :: D_alpha, D_alphadot,A_tildedot,normalisation,normalisationdot, D_alpha_tilde, dA_tilde_dt, dD_alpha_tilde_dy, dDalpha_dy, dDalpha_dydt
         real(kind=rk) :: x_w, y_w, z_w, x_n, y_n, z_n
         real(kind=rk) :: u_midplane(1:3), u_displaced(1:3)
         real(kind=rk) ::  x_c_mat_w(1:3), x_mat(1:3), e_n_mat_w(1:3), e_x_mat_w(1:3), e_y_mat_w(1:3), de_n_mat_w_dt(1:3), de_x_mat_w_dt(1:3), de_y_mat_w_dt(1:3), R_y(1:3, 1:3), dR_y_dalpha(1:3, 1:3), x_tmp(1:3), A_tmp(1:3, 1:3)
 
         select case (model%model_name)
             
+            case("walkerTaylor_clean")
+
+
+                ! more generic case. Here, we assume that the angle distribution follows a prescribed, separable function with a derivative along the y(mat) axis and a time derivative.
+                ! We define a material coordinate inherent to the wing, which describes a material point independent of deformation. This falls together with the wing coordinate in the rigid case.
+
+                x_mat = x_wing
+
+                ! translate these coordinates to the pivot of the flexion line, so we can align our rotation axis with the primary flexion line
+
+                x_mat(1) = x_mat(1) - model%pivot_flexion(1)
+                x_mat(2) = x_mat(2) - model%pivot_flexion(2)
+                x_mat(3) = x_mat(3) - model%pivot_flexion(3)
+
+                x_tmp= x_mat
+
+                ! align the twisting axis with the flexion line
+                x_mat(1) = cos(model%flexion_angle) * x_tmp(1) - sin(model%flexion_angle) * x_tmp(2)
+                x_mat(2) = sin(model%flexion_angle) * x_tmp(1) + cos(model%flexion_angle) * x_tmp(2)
+
+
+                x_c_mat_w = x_mat
+                x_c_mat_w(3) = 0
+
+                ! IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
+                ! So we effectively conduct a passive rotation, but for readability, this will be changed...
+                ! calculate the deformation angle
+                D_alpha = -D_alpha
+                dDalpha_dy = -dDalpha_dy
+                !
+
+                dDalpha_dydt = model%dDalpha_dydt
+
+                if (side == "L") then
+                    D_alpha = -D_alpha
+                    dDalpha_dy = -dDalpha_dy
+                    dDalpha_dydt = -dDalpha_dydt
+                endif
+
+                D_alpha = dDalpha_dy * x_mat(2)
+
+                ! factor to rescale our normal to 1
+                normalisation = 1.0_rk / sqrt( &
+                    1.0_rk + (x_c_mat_w(1) * dDalpha_dy)**2 )
+
+                normalisationdot = -normalisation**3 * &
+                   x_c_mat_w(1)**2 * &
+                   dDalpha_dy * &
+                   dDalpha_dydt
+
+                ! row wise calculation of the time derivate of the surface normal
+
+                de_n_mat_w_dt(1) = normalisationdot * sin(D_alpha) &
+                                    + normalisation * cos(D_alpha) * &
+                                    dDalpha_dydt * x_c_mat_w(2)
+
+                de_n_mat_w_dt(2) = normalisationdot * x_c_mat_w(1) * &
+                                        dDalpha_dy &
+                                    + normalisation * x_c_mat_w(1) * &
+                                        dDalpha_dydt
+
+                de_n_mat_w_dt(3) = - normalisationdot * cos(D_alpha) &
+                    + normalisation * sin(D_alpha) * &
+                    dDalpha_dydt * x_c_mat_w(2)
+
+                ! finally we can calculate the velocity. start by calculating the velocity of the material centre plane and then add the velocity component through the distance normal to the surface
+
+                ! Calculate the velocity of the material centre plane
+                ! in the flexion-line frame.
+
+                u_midplane(1) = -x_c_mat_w(1) * sin(D_alpha) * &
+                        dDalpha_dydt * x_c_mat_w(2)
+
+                u_midplane(2) = 0.0_rk
+
+                u_midplane(3) = x_c_mat_w(1) * cos(D_alpha) * &
+                        dDalpha_dydt * x_c_mat_w(2)
+
+                ! Add the velocity component due to the changing normal.
+
+                u_displaced(1) = u_midplane(1) - &
+                        x_mat(3) * de_n_mat_w_dt(1)
+
+                u_displaced(2) = u_midplane(2) - &
+                        x_mat(3) * de_n_mat_w_dt(2)
+
+                u_displaced(3) = u_midplane(3) - &
+                        x_mat(3) * de_n_mat_w_dt(3)
+
+                ! Rotate the deformation velocity back into the wing frame.
+                ! Do not rotate the existing u_s_w contribution again.
+
+                x_tmp = u_displaced
+
+                u_displaced(1) = cos(model%flexion_angle) * x_tmp(1) &
+                        + sin(model%flexion_angle) * x_tmp(2)
+
+                u_displaced(2) = -sin(model%flexion_angle) * x_tmp(1) &
+                        + cos(model%flexion_angle) * x_tmp(2)
+
+                u_displaced(3) = x_tmp(3)
+
+                ! Add deformation velocity to the existing wing velocity.
+
+                u_s_w = u_s_w + u_displaced
+                                
             case("generic_angle_distribution")
 
 

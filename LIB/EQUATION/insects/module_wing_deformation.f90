@@ -289,7 +289,7 @@ module module_wing_deformation
                     dDalpha_dy = -dDalpha_dy
                 endif
 
-                D_alpha = dDalpha_dy * x_mat(2)
+                D_alpha = dDalpha_dy * x_wing(2)
 
                 ! factor to rescale our normal to 1
 

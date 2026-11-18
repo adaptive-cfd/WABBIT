@@ -72,7 +72,7 @@ module module_acm
     ! mean flow acceleration
     logical :: use_mean_flow_acceleration = .false.
     real(kind=rk) :: F_total(1:3) = 0.0_rk
-    real(kind=rk) :: M_solid = 1.0_rk
+    real(kind=rk) :: M_solid = 1.0_rk, tau_startup_meanflow = 0.25_rk, T0_startup_meanflow = 0.25_rk
     logical, dimension(1:3) :: mean_flow_forcing_directions = (/.false., .false., .false./)
 
     ! channel flow
@@ -353,6 +353,8 @@ contains
 
     call read_param_mpi(FILE, 'MeanFlowForcing', 'use_mean_flow_acceleration', params_acm%use_mean_flow_acceleration, .false. )
     call read_param_mpi(FILE, 'MeanFlowForcing', 'M_solid', params_acm%M_solid, 1.0_rk )
+    call read_param_mpi(FILE, 'MeanFlowForcing', 'T0_startup', params_acm%T0_startup_meanflow, 0.25_rk )
+    call read_param_mpi(FILE, 'MeanFlowForcing', 'tau_startup', params_acm%tau_startup_meanflow, 0.25_rk )
     params_acm%mean_flow_forcing_directions = .false.
     call read_param_mpi(FILE, 'MeanFlowForcing', 'mean_flow_forcing_directions', params_acm%mean_flow_forcing_directions, params_acm%mean_flow_forcing_directions )
 

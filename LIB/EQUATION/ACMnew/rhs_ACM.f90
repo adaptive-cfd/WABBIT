@@ -219,6 +219,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             do iz = merge(1, g+1, params_acm%dim == 2), merge(1, Bs(3)+g, params_acm%dim == 2)
                 do iy = g+1, Bs(2)+g
                     do ix = g+1, Bs(1)+g
+                        ! get this points color
+                        color = int( mask(ix, iy, iz, 5), kind=2 )
+                        
                         ! penalization term
                         penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_apply_inv(color)
 
@@ -355,7 +358,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, nu_bulk, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     up_dx, vp_dy, V_fluid
+                     up_dx, vp_dy, V_fluid, s
     ! loop variables
     integer(kind=ik) :: ix, iy, idir, color
     ! coefficients for Tam&Webb (4th order 1st derivative), see T&W 1993 - Dispersion- Relation- Preserving FD schemes for Computational Acoustics
@@ -902,9 +905,11 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     if (params_acm%use_mean_flow_acceleration) then
         ! NOTE:this should be domainSizeCropped
         V_fluid = product( params_acm%domain_size(1:params_acm%dim) )
+        ! startup conditioner (to avoid problems with impulsive start)
+        s = startup_conditioner(time, params_acm%T0_startup_meanflow, params_acm%tau_startup_meanflow)
         do idir = 1, params_acm%dim
             if (params_acm%mean_flow_forcing_directions(idir)) then
-                rhs(:, :, idir) = rhs(:, :, idir) - params_acm%F_total(idir) / ( V_fluid*params_acm%M_solid )
+                rhs(:, :, idir) = rhs(:, :, idir) - s*params_acm%F_total(idir) / ( V_fluid*params_acm%M_solid )
             endif
         enddo
     endif
@@ -1002,7 +1007,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
                      nu, C_eta_apply_inv(0:ncolors), C_sponge_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set, &
-                     V_fluid
+                     V_fluid, s
     !> derivatives
     real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, u_dxdy, u_dxdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, v_dxdy, v_dydz, &
@@ -1775,9 +1780,11 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     if (params_acm%use_mean_flow_acceleration) then
         ! NOTE:this should be domainSizeCropped
         V_fluid = product( params_acm%domain_size(1:params_acm%dim) )
+        ! startup conditioner (to avoid problems with impulsive start)
+        s = startup_conditioner(time, params_acm%T0_startup_meanflow, params_acm%tau_startup_meanflow)
         do idir = 1, params_acm%dim
             if (params_acm%mean_flow_forcing_directions(idir)) then
-                rhs(:, :, :, idir) = rhs(:, :, :, idir) - params_acm%F_total(idir) / ( V_fluid*params_acm%M_solid )
+                rhs(:, :, :, idir) = rhs(:, :, :, idir) - s * params_acm%F_total(idir) / ( V_fluid*params_acm%M_solid )
             endif
         enddo
     endif

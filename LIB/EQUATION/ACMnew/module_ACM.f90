@@ -69,6 +69,12 @@ module module_acm
     logical :: use_energy_limiter = .false.
     real(kind=rk) :: energy_start = -1.0_rk
 
+    ! mean flow acceleration
+    logical :: use_mean_flow_acceleration = .false.
+    real(kind=rk) :: F_total(1:3) = 0.0_rk
+    real(kind=rk) :: M_solid = 1.0_rk
+    logical, dimension(1:3) :: mean_flow_forcing_directions = (/.false., .false., .false./)
+
     ! channel flow
     logical :: use_channel_forcing = .false.
     real(kind=rk), allocatable :: mask_volume(:)
@@ -343,6 +349,18 @@ contains
     call read_param_mpi(FILE, 'Sponge', 'C_sponge', params_acm%C_sponge, 1.0e-2_rk )
     call read_param_mpi(FILE, 'Sponge', 'sponge_type', params_acm%sponge_type, "rect" )
     call read_param_mpi(FILE, 'Sponge', 'p_sponge', params_acm%p_sponge, 20.0_rk )
+
+
+    call read_param_mpi(FILE, 'MeanFlowForcing', 'use_mean_flow_acceleration', params_acm%use_mean_flow_acceleration, .false. )
+    call read_param_mpi(FILE, 'MeanFlowForcing', 'M_solid', params_acm%M_solid, 1.0_rk )
+    params_acm%mean_flow_forcing_directions = .false.
+    call read_param_mpi(FILE, 'MeanFlowForcing', 'mean_flow_forcing_directions', params_acm%mean_flow_forcing_directions, params_acm%mean_flow_forcing_directions )
+
+    if (params_acm%use_sponge .and. params_acm%use_mean_flow_acceleration) then
+        ! Because the mean flow forcing term accelerates the mean flow, setting a (constant) Dirichlet BC
+        ! using the sponge makes no sense .
+        call abort(202611181, "You cannot use_sponge AND use_mean_flow_acceleration at the same time.")
+    endif
 
     call read_param_mpi(FILE, 'Time', 'CFL', params_acm%CFL, 1.0_rk   )
     call read_param_mpi(FILE, 'Time', 'CFL_eta', params_acm%CFL_eta, 0.99_rk   )

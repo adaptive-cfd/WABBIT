@@ -119,6 +119,10 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             enddo
         endif
 
+        if (params_acm%use_mean_flow_acceleration) then
+            params_acm%F_total(:) = 0.0_rk
+        endif
+
     case ("integral_stage")
         !-------------------------------------------------------------------------
         ! 2nd stage: integral_stage.
@@ -173,7 +177,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
 
         ! if (params_acm%geometry == "Insect".and. params_acm%use_free_flight_solver) then
         if (params_acm%use_free_flight_solver) then
-            dV = product(dx(1:params_acm%dim))
             f_block = 0.0_rk
             do i_insect = 1, n_insects
                 do iz = merge(1, g+1, params_acm%dim == 2), merge(1, Bs(3)+g, params_acm%dim == 2)
@@ -210,6 +213,26 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
             ! NOTE: MPI_SUM is perfomed in the post_stage.
         endif
 
+        if (params_acm%use_mean_flow_acceleration) then
+            ! For mean flow acceleration, we need the entire forces excerted on all bodies (all colors!)
+            f_block(:) = 0.0_rk
+            do iz = merge(1, g+1, params_acm%dim == 2), merge(1, Bs(3)+g, params_acm%dim == 2)
+                do iy = g+1, Bs(2)+g
+                    do ix = g+1, Bs(1)+g
+                        ! penalization term
+                        penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_apply_inv(color)
+
+                        ! summation (multiplication with dV below)
+                        f_block(1:params_acm%dim) = f_block(1:params_acm%dim) - penal(1:params_acm%dim)
+                    enddo
+                enddo
+            enddo
+            ! integration (summation of blocks)
+            params_acm%F_total = params_acm%F_total + f_block*dV
+            ! NOTE: MPI_SUM is perfomed in the post_stage.
+        endif
+
+
     case ("post_stage")
         !-------------------------------------------------------------------------
         ! 3rd stage: post_stage.
@@ -231,6 +254,10 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 call MPI_ALLREDUCE(MPI_IN_PLACE, insects(i_insect)%force_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
                 call MPI_ALLREDUCE(MPI_IN_PLACE, insects(i_insect)%moment_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
             enddo
+        endif
+
+        if (params_acm%use_mean_flow_acceleration) then
+            call MPI_ALLREDUCE(MPI_IN_PLACE, params_acm%F_total, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
         endif
 
     case ("local_stage")
@@ -328,7 +355,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                      v_dydy, p_dx, p_dy, penalx, penaly, x, y, term_2, spo, p_dxdx, p_dydy, nu_p, nu_bulk, &
                      u_dx4, v_dx4, u_dy4, v_dy4, &
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
-                     up_dx, vp_dy
+                     up_dx, vp_dy, V_fluid
     ! loop variables
     integer(kind=ik) :: ix, iy, idir, color
     ! coefficients for Tam&Webb (4th order 1st derivative), see T&W 1993 - Dispersion- Relation- Preserving FD schemes for Computational Acoustics
@@ -870,6 +897,19 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     end select
 
     ! --------------------------------------------------------------------------
+    ! mean flow acceleration
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_mean_flow_acceleration) then
+        ! NOTE:this should be domainSizeCropped
+        V_fluid = product( params_acm%domain_size(1:params_acm%dim) )
+        do idir = 1, params_acm%dim
+            if (params_acm%mean_flow_forcing_directions(idir)) then
+                rhs(:, :, idir) = rhs(:, :, idir) - params_acm%F_total(idir) / ( V_fluid*params_acm%M_solid )
+            endif
+        enddo
+    endif
+
+    ! --------------------------------------------------------------------------
     ! sponge term.
     ! --------------------------------------------------------------------------
     ! HACK
@@ -961,7 +1001,8 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
 
     !> inverse dx, physics/acm parameters
     real(kind=rk) :: dx_inv, dy_inv, dz_inv, dx2_inv, dy2_inv, dz2_inv, c_0, &
-                     nu, C_eta_apply_inv(0:ncolors), C_sponge_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set
+                     nu, C_eta_apply_inv(0:ncolors), C_sponge_inv, gamma, spo, A_forcing, G_gain, t_l_inf, e_kin_set, &
+                     V_fluid
     !> derivatives
     real(kind=rk) :: u_dx, u_dy, u_dz, u_dxdx, u_dydy, u_dzdz, u_dxdy, u_dxdz, &
                      v_dx, v_dy, v_dz, v_dxdx, v_dydy, v_dzdz, v_dxdy, v_dydz, &
@@ -970,7 +1011,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
                      uu_dx, uv_dy, uw_dz, vu_dx, vv_dy, vw_dz, wu_dx, wv_dy, ww_dz, &
                      p_dxdx, p_dydy, p_dzdz, pu_dx, pv_dy, pw_dz, div_u
     !> loop variables
-    integer(kind=ik) :: ix, iy, iz, color
+    integer(kind=ik) :: ix, iy, iz, color, idir
 
     ! coefficients for a standard centered 4th order 1st derivative
     real(kind=rk), parameter :: a_FD4(-2:2) = (/1.0_rk/12.0_rk, -2.0_rk/3.0_rk, 0.0_rk, +2.0_rk/3.0_rk, -1.0_rk/12.0_rk/)
@@ -1727,6 +1768,20 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
         endif
 
     end select
+
+    ! --------------------------------------------------------------------------
+    ! mean flow acceleration
+    ! --------------------------------------------------------------------------
+    if (params_acm%use_mean_flow_acceleration) then
+        ! NOTE:this should be domainSizeCropped
+        V_fluid = product( params_acm%domain_size(1:params_acm%dim) )
+        do idir = 1, params_acm%dim
+            if (params_acm%mean_flow_forcing_directions(idir)) then
+                rhs(:, :, :, idir) = rhs(:, :, :, idir) - params_acm%F_total(idir) / ( V_fluid*params_acm%M_solid )
+            endif
+        enddo
+    endif
+
 
     ! --------------------------------------------------------------------------
     ! sponge term.

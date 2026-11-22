@@ -282,7 +282,18 @@ subroutine balanceLoad_tree( params, hvy_block, tree_ID, balanceMode, balance_re
     !---------------------------------------------------------------------------------
     ! 4th: actual communication (send/recv)
     !---------------------------------------------------------------------------------
-    call block_xfer( params, sfc_com_list(1:3, 1:com_i), com_i, hvy_block, msg="balanceLoad_tree", hvy_tmp=hvy_tmp )
+    ! For selective mask updates, transfer the mask data together with the
+    ! state vector during load balancing, but only if a mask is actually used.
+    ! Otherwise, the mask array contains only a dummy entry and must be skipped.
+    if (present(hvy_tmp)) then
+        if (size(hvy_tmp,5) > 1) then
+            call block_xfer( params, sfc_com_list(1:3, 1:com_i), com_i, hvy_block, msg="balanceLoad_tree", hvy_tmp=hvy_tmp )
+        else
+            call block_xfer( params, sfc_com_list(1:3, 1:com_i), com_i, hvy_block, msg="balanceLoad_tree" )
+        endif
+    else
+        call block_xfer( params, sfc_com_list(1:3, 1:com_i), com_i, hvy_block, msg="balanceLoad_tree" )
+    endif
 
     ! the block xfer changes the light data, and afterwards active lists are outdated.
     call updateMetadata_tree(params, tree_ID, search_overlapping=full_tree_grid_apply, Jmin_set=Jmin_set_apply)

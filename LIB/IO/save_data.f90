@@ -36,10 +36,10 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-    ! create mask function at current time. (this routine is rarely called and thus
-    ! the overhead of calling createMask_tree if the mask is not stored is supposed
-    ! to be small)
-    call createMask_tree(params, time, hvy_mask, hvy_tmp)
+    ! Update only the time-dependent mask components before saving.
+    ! The time-independent components are already stored in hvy_mask
+    ! and do not need to be recomputed.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
 
     ! extra preparatory step. Some things have to be prepared on grid-level and not on block-level. This is especially important when deriving any quantities by solving the poisson-equation
     if (params%physics_type == "NSPP") then
@@ -141,10 +141,10 @@ implicit none
     ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-    ! create mask function at current time. (this routine is rarely called and thus
-    ! the overhead of calling createMask_tree if the mask is not stored is supposed
-    ! to be small)
-    call createMask_tree(params, time, hvy_mask, hvy_tmp)
+    ! Update only the time-dependent mask components before saving.
+    ! The time-independent components are already stored in hvy_mask
+    ! and do not need to be recomputed.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
 
     ! extra preparatory step. Some things have to be prepared on grid-level and not on block-level. This is especially important when deriving any quantities by solving the poisson-equation
     if (params%physics_type == "NSPP") then

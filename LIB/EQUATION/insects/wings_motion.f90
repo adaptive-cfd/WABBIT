@@ -16,6 +16,26 @@ subroutine FlappingMotionWrap ( time, Insect, wingID )
     Insect%Wings(wingID)%phi_dt, Insect%Wings(wingID)%alpha_dt, Insect%Wings(wingID)%theta_dt, &
     wingID )
 
+    if (Insect%wing_fsi == "feathering") then
+
+      ! Error check
+      if (Insect%BodyMotion/="free_flight") then
+        call abort(9033,"Error: wing_fsi=feathering requires BodyMotion=free_flight")
+      endif
+
+      select case (wingID)
+      case (1) ! left front wing
+        Insect%Wings(wingID)%alpha    = Insect%STATE(14)
+        Insect%Wings(wingID)%alpha_dt = Insect%STATE(15)
+
+      case (2) ! right front wing
+        Insect%Wings(wingID)%alpha    = Insect%STATE(16)
+        Insect%Wings(wingID)%alpha_dt = Insect%STATE(17)
+      end select
+      ! the hind wings are regularly computed with prescribed motion
+
+    endif
+
 end subroutine FlappingMotionWrap
 
 

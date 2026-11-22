@@ -207,6 +207,11 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta, wsign
   logical :: variable_wing_thickness
 
+  ! Number of grid points where the wing overlaps with the body mask.
+  integer :: n_collisions
+
+  n_collisions = 0
+
   if ( ((Insect%Wings(wingID)%WingShapeType)/="linear") .and. ((Insect%Wings(wingID)%WingShapeType)/="fourier") .and. ((Insect%Wings(wingID)%WingShapeType)/="fourierY") ) then
       call abort(26111902,"draw_wing_fourier is called with a wing that is neither linear/fourier/fourierY ...")
   endif
@@ -300,6 +305,15 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
                           !-----------------------------------------
                           if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0)) then
 
+                                ! Check for overlap between the body and wing masks.
+                                ! Preserve the body mask and count overlapping grid points.
+                                if (Insect%checkBodyWing_collision == 1) then
+                                    if (mask_color(ix,iy,iz) == real(Insect%color_body, kind=rk)) then
+                                        n_collisions = n_collisions + 1
+                                        cycle
+                                    endif
+                                endif
+
                               mask(ix,iy,iz) = mask_tmp
                               mask_color(ix,iy,iz) = color_wing
 
@@ -325,6 +339,11 @@ subroutine draw_wing_fourier(xx0, ddx, mask, mask_color, us, Insect, color_wing,
           enddo
       enddo
   enddo
+
+  if (n_collisions > 0) then
+     write(*,*) "WARNING: Collision between body and wing detected. ", &
+            " Number of points:", n_collisions
+  endif
 
   !-----------------------------------------------------------------------------
   ! bristles
@@ -654,6 +673,12 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
     real(kind=rk) :: y_tmp, x_tmp, z_tmp, y_left, y_right
     real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
 
+    ! Number of grid points where the wing overlaps with the body mask.
+    integer :: n_collisions
+
+    n_collisions = 0
+
+
     ! wing shape (determine between which x-values (x_bot, x_top) the wing is
     ! these values depend on the spanwise direction (which is y)
     x_top = 0.085_rk ! determinded from a calliphora wing, roughly estimated
@@ -704,6 +729,16 @@ subroutine draw_wing_rectangular(xx0, ddx, mask, mask_color, us,Insect,color_win
                             mask_tmp = z_tmp*y_tmp*x_tmp
 
                             if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0_rk)) then
+
+                                ! Check for overlap between the body and wing masks.
+                                ! Preserve the body mask and count overlapping grid points.
+                                if (Insect%checkBodyWing_collision == 1) then
+                                    if (mask_color(ix,iy,iz) == real(Insect%color_body, kind=rk)) then
+                                        n_collisions = n_collisions + 1
+                                        cycle
+                                    endif
+                                endif
+
                                 mask(ix,iy,iz) = mask_tmp
                                 mask_color(ix,iy,iz) = color_wing
                                 !------------------------------------------------
@@ -747,6 +782,12 @@ subroutine draw_wing_rectangular_suzuki_butterfly(xx0, ddx, mask, mask_color, us
     real(kind=rk) :: R, R0, R_tmp
     real(kind=rk) :: y_tmp, x_tmp, z_tmp, y_left, y_right
     real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
+
+    ! Number of grid points where the wing overlaps with the body mask.
+    integer :: n_collisions
+
+    n_collisions = 0
+
 
     ! wing shape (determine between which x-values (x_bot, x_top) the wing is
     ! these values depend on the spanwise direction (which is y)
@@ -797,6 +838,16 @@ subroutine draw_wing_rectangular_suzuki_butterfly(xx0, ddx, mask, mask_color, us
                             mask_tmp = z_tmp*y_tmp*x_tmp
 
                             if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0_rk)) then
+                                
+                                ! Check for overlap between the body and wing masks.
+                                ! Preserve the body mask and count overlapping grid points.
+                                if (Insect%checkBodyWing_collision == 1) then
+                                    if (mask_color(ix,iy,iz) == real(Insect%color_body, kind=rk)) then
+                                        n_collisions = n_collisions + 1
+                                        cycle
+                                    endif
+                                endif
+
                                 mask(ix,iy,iz) = mask_tmp
                                 mask_color(ix,iy,iz) = color_wing
                                 !------------------------------------------------
@@ -840,12 +891,17 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
   integer(kind=2),intent(in) :: color_wing, wingID  !< wing id number: 1 = left, 2 = right, 3 = 2nd left, 4 = 2nd right
   real(kind=rk),intent(in)::M_g2b(1:3,1:3),M_b2w(1:3,1:3),x_pivot_b(1:3),rot_rel_wing_w(1:3)
 
-
   integer :: ix,iy,iz
   real(kind=rk) :: x_body(1:3),x_wing(1:3),x(1:3)
   real(kind=rk) :: R, R0, R_tmp,a_body
   real(kind=rk) :: y_tmp, x_tmp, z_tmp
   real(kind=rk) :: v_tmp(1:3), mask_tmp, theta,x_top,x_bot
+
+  ! Number of grid points where the wing overlaps with the body mask.
+  integer :: n_collisions
+
+  n_collisions = 0
+
 
   a_body = 0.5_rk
 
@@ -900,6 +956,16 @@ subroutine draw_wing_twoellipses(xx0, ddx, mask, mask_color, us,Insect,color_win
               mask_tmp = z_tmp*y_tmp*x_tmp
 
               if ((mask(ix,iy,iz) < mask_tmp).and.(mask_tmp>0.0)) then
+
+                ! Check for overlap between the body and wing masks.
+                ! Preserve the body mask and count overlapping grid points.
+                if (Insect%checkBodyWing_collision == 1) then
+                    if (mask_color(ix,iy,iz) == real(Insect%color_body, kind=rk)) then
+                        n_collisions = n_collisions + 1
+                        cycle
+                    endif
+                endif
+
                 mask(ix,iy,iz) = mask_tmp
                 mask_color(ix,iy,iz) = color_wing
                 !------------------------------------------------
@@ -1112,12 +1178,16 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
     real(kind=rk) :: phi_xy, phi_z, phi, mask_value, v_tmp(1:3)
     logical :: inside_polygon
 
+    ! Number of grid points where the wing overlaps with the body mask.
+    integer :: n_collisions
 
     if ((Insect%Wings(wingID)%WingShapeType) /= "polygon") call abort(01072601,"draw_wing_polygon called with non-polygon wing...")
     if (.not. allocated(Insect%Wings(wingID)%polygon_wings)) call abort(01072602, "draw_wing_polygon: polygon_wings is not allocated")
     if (Insect%Wings(wingID)%damaged) call abort(21072601, "draw_wing_polygon can currently only be used with non-damaged wings")
     if (Insect%Wings(wingID)%corrugated) call abort(21072602, "draw_wing_polygon can currently only be used with non-corrugated wings")
     if ( Insect%wings(wingID)%wing_thickness_distribution=="variable") call abort(21072603, "draw_wing_polygon can currently only be used with a constant wing thickness")
+
+    n_collisions = 0
 
     !-----------------------------------------------------------------------------
     ! bristles (in this type of wing we need to start with them)
@@ -1448,6 +1518,16 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
 
                 ! update only if the new mask value is higher than the one before
                 if ((mask_value > mask(ix,iy,iz)) .and. (mask_value>0.0_rk)) then
+
+                    ! Check for overlap between the body and wing masks.
+                    ! Preserve the body mask and count overlapping grid points.
+                    if (Insect%checkBodyWing_collision == 1) then
+                        if (mask_color(ix,iy,iz) == real(Insect%color_body, kind=rk)) then
+                            n_collisions = n_collisions + 1
+                            cycle
+                        endif
+                    endif
+
                     mask(ix,iy,iz) = mask_value
                     mask_color(ix,iy,iz) = color_wing
 
@@ -1461,6 +1541,11 @@ subroutine draw_wing_polygon(xx0, ddx, mask, mask_color, us, Insect, color_wing,
             enddo
         enddo
     enddo
+
+    if (n_collisions > 0) then
+        write(*,*) "WARNING: Body-wing collision detected. ", &
+                "Body was not overwritten. Number of points:", n_collisions
+    endif
 
 end subroutine draw_wing_polygon
 

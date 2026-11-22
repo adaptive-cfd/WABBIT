@@ -41,8 +41,9 @@ contains
         real(kind=rk), intent(in)    :: x0(1:3), dx(1:3), time
         integer(kind=ik), intent(in) :: Bs(1:3), g
         !     stage == "time-dependent-part"
-        !     stage == "time-independent-part"
         !     stage == "all-parts"
+        !     stage == "init_stage"
+        !     stage == "time-independent-part"
         character(len=*), intent(in) :: stage
         ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
         ! mask functions separately. This makes the mask routines tree-level routines (and no longer
@@ -51,12 +52,22 @@ contains
         ! On input, the mask array is correctly filled. You cannot create the full mask here.
         real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
 
-        mask = 0.0_rk
-        ! color is resetted to 1
-        mask(:,:,:,5) = 1.0_rk
-
         select case ( physics )
         case ('ACM-new')
+            select case (stage)
+            case ("init_stage", "time-dependent-part",  "time-independent-part")
+                ! a full resett of the mask is not necessary
+                ! for the selective mask update a specific reset for the 
+                ! time-dependent mask is included in create_mask_3D_ACM
+            case ("all-parts")
+                ! Reset of the entire mask
+                mask = 0.0_rk
+                mask(:,:,:,5) = 1.0_rk
+            case default
+                call abort(1313, "Unknown mask stage")
+
+            end select
+
             if (size(mask,3)==1) then
                 call create_mask_2D_ACM( time, x0, dx, Bs, g, mask, stage )
             else
@@ -65,11 +76,29 @@ contains
 
         case ('ConvDiff-new')
             ! not implemented yet (this module does not use penalization)
+            mask = 0.0_rk
+            mask(:,:,:,5) = 1.0_rk
 
         case ('navier_stokes')
+            mask = 0.0_rk
+            mask(:,:,:,5) = 1.0_rk
             call create_mask_NSTOKES( time, x0, dx, Bs, g, mask, stage )
 
         case ('NSPP')
+            select case (stage)
+            case ("init_stage", "time-dependent-part",  "time-independent-part")
+                ! a full resett of the mask is not necessary
+                ! for the selective mask update a specific reset for the 
+                ! time-dependent mask is included in create_mask_3D_ACM
+            case ("all-parts")
+                ! Reset of the entire mask
+                mask = 0.0_rk
+                mask(:,:,:,5) = 1.0_rk
+            case default
+                call abort(1313, "Unknown mask stage")
+
+            end select
+
             if (size(mask,3)==1) then
                 call create_mask_2D_NSPP( time, x0, dx, Bs, g, mask, stage )
             else

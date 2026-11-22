@@ -360,10 +360,11 @@ subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_I
 
     ! at first, we update the mask
     t0 = MPI_Wtime()
-    ! Note the "all_parts=.false." means that we do not bypass the pruned trees. This functionality should
-    ! work as designed, but use it carefully, as it is still developped. If the PARAMS file sets
-    ! params%dont_use_pruned_tree_mask=1, it is deactivated anyways.
-    ! While this uses hvy_tmp as well, we use different tree_ID so there is no clash
+
+    ! Allow selective mask updates to preserve time-independent components.
+    ! The complete mask is regenerated if required by createMask_tree.
+    ! the entiere insect mask will be regenerated: all_parts=.true.
+    ! selective mask update (wings only)         : all_parts=.false.   
     call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
     call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
     

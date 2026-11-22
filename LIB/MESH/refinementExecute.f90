@@ -1,13 +1,14 @@
 !> \brief Refine block by interpolating it to the next finer level and creating
 !!  four(2D) or eight(3D) new blocks, each carrying a part of the interpolated data.
 !> Interpolated data is set in array, and last daughter overwrites motherblock
-subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
+subroutine refineBlock(params, hvy_block, hvyID, tree_ID, hvy_mask)
     implicit none
 
     type (type_params), intent(in)      :: params                               !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)             !> heavy data array - block data
     integer(kind=ik), intent(in)        :: hvyID                                !> Block to be reined
     integer(kind=ik), intent(in)        :: tree_ID
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
 
     integer(kind=ik)                    :: k, N, dF, k_daughter                 ! loop variables
     integer(kind=ik)                    :: rank, dim
@@ -111,6 +112,15 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID)
             hvy_block( :, :, :, 1:size(hvy_block,4), free_hvy_id ) = \
                 data_predict_fine( idx_d(1,1):idx_d(2,1), idx_d(1,2):idx_d(2,2), idx_d(1,3):idx_d(2,3), 1:size(hvy_block,4))
         endif
+
+        ! Initialize mask data on newly created blocks, if available.
+        ! Simulations without penalization use a dummy mask array.
+        if (present(hvy_mask)) then
+            if (size(hvy_mask,5) > 1) then
+                hvy_mask(:,:,:,:,free_hvy_id) = 0.0_rk
+            endif
+        endif
+
     end do
 
 end subroutine refineBlock
@@ -229,7 +239,7 @@ end subroutine refineBlock2SpaghettiWD
 !! input:    - params, light and heavy data \n
 !! output:   - light and heavy data arrays \n
 ! ********************************************************************************************
-subroutine refinement_execute_tree( params, hvy_block, tree_ID, time )
+subroutine refinement_execute_tree( params, hvy_block, tree_ID, time, hvy_mask )
 
     implicit none
 
@@ -242,6 +252,7 @@ subroutine refinement_execute_tree( params, hvy_block, tree_ID, time )
     integer(kind=ik)                    :: blocks_refined
     integer(kind=ik), allocatable, save :: blocks_refined_list(:)
     character(len=clong) :: format_string, string_prepare
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
 
     ! every proc loop over its active heavy data array
     blocks_refined = 0
@@ -252,7 +263,13 @@ subroutine refinement_execute_tree( params, hvy_block, tree_ID, time )
         ! block wants to refine
         if ( (lgt_block( lgt_id, idx_refine_sts) == +1) ) then
             blocks_refined = blocks_refined + 1
-            call refineBlock(params, hvy_block, hvy_active(i_b, tree_ID), tree_ID)
+
+            ! If no mask array is provided, only the state vector is refined
+            if ( present(hvy_mask)) then
+                call refineBlock(params, hvy_block, hvy_active(i_b, tree_ID), tree_ID, hvy_mask)
+            else
+                call refineBlock(params, hvy_block, hvy_active(i_b, tree_ID), tree_ID)
+            endif
         endif
     end do
 

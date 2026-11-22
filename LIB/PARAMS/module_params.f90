@@ -51,7 +51,7 @@ module module_params
         ! butcher tableau containing coefficients for Runge-Kutta method
         real(kind=rk), dimension(:,:), allocatable :: butcher_tableau
 
-        logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false., dont_use_pruned_tree_mask=.false.
+        logical :: penalization=.false., mask_time_dependent_part=.false., mask_time_independent_part=.false.
 
         character(len=1), dimension(:), ALLOCATABLE :: symmetry_vector_component
 

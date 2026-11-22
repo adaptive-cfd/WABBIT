@@ -62,7 +62,29 @@ subroutine RHS_wrapper(time, params, hvy_block, hvy_rhs, hvy_mask, hvy_tmp, tree
     ! create mask function at current time
     !-------------------------------------------------------------------------
     t1 = MPI_wtime()
-    call createMask_tree(params, time, hvy_mask, hvy_tmp)
+    ! (EG, 19.11.26) currently the selective mask update is only implemented for insect simulations using RK4. 
+    ! RungeKuttaGeneric is the only time stepping scheme that uses the variable "stage", therefore we are here 
+    ! scanning for that parameter.
+    ! selective mask update                     : all_parts=.false.
+    ! resetting the full mask in every time step: all_parts=.true.
+    ! if (present(stage)) then
+    !     call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    ! else
+    !     call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.true.)
+    ! endif
+
+    ! Selective mask updates are supported for RungeKuttaGeneric (RK4)
+    ! and RungeKuttaChebychev. All other time stepping methods require
+    ! a complete mask update.
+    if (trim(standardize_string(params%time_step_method)) == "rungekuttageneric" .or. &
+        trim(standardize_string(params%time_step_method)) == "rungekuttachebychev") then
+
+        call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    else
+        call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.true.)
+    endif
+
+
     call toc( "RHS_wrapper::createMask_tree", 31, MPI_wtime()-t1 )
 
 

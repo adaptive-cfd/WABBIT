@@ -38,6 +38,12 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     real(kind=rk), dimension(0:3) :: ep
     real(kind=rk), dimension(1:3) :: ROT, torque_body
     real(kind=rk), dimension(1:3,1:3) :: M_g2b, M_b2w_l
+    
+    ! passive feathering
+    real(kind=rk) :: dt, M_aero, dummy(4), phi_dt_i1(2), phi_dt_i2(2), theta_dt_i1(2), theta_dt_i2(2), &
+                    phi_dt2(2), theta_dt2(2), mom_aero_w(3,2)
+    integer(kind=2) :: wingID, color
+    integer :: idx_state, partID
 
     ! initialization
     rhs = 0.0_rk
@@ -68,7 +74,7 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
     if (Insect%startup_conditioner=="yes") then
         s = startup_conditioner(time, 0.1_rk, 0.5_rk)
     else
-        s = 1._rk
+        s = 1.0_rk
     endif
 
     !-----------------------------------------------------------------------------
@@ -129,7 +135,91 @@ subroutine rigid_solid_rhs(time, it, state, rhs, force_g, torque_g, Insect)
         call append_t_file('forces_rk.t', (/time, rhs(3), rhs(6), force_g(3)/))
     endif
 
-end subroutine
+    !-------------------------------------------------------------------------------
+    ! wing dynamics
+    !-------------------------------------------------------------------------------
+    
+    ! passive feathering
+    if (Insect%wing_fsi == "feathering") then
+
+        ! Time increment for finite differences
+        dt = 1.0e-8_rk
+        
+        ! 1. Kinematics and aerodynamic torque
+        do wingID = 1, 2
+            ! 1 = left, 2 = right
+
+            ! for each wing, we compute phi/theta and phi_dt/theta_dt
+            ! for the current state and 2 approximate future states so we 
+            ! can compute the second derivatives phi_dt2/theta_dt2 using a FD stencil
+
+            ! current time t
+            call FlappingMotion ( time, Insect, Insect%Wings(wingID)%FlappingMotion, &
+                                Insect%Wings(wingID)%phi, dummy(2), Insect%Wings(wingID)%theta, &
+                                Insect%Wings(wingID)%phi_dt, dummy(4), Insect%Wings(wingID)%theta_dt, &
+                                wingID )
+            ! t + dt
+            call FlappingMotion(time+dt, Insect, Insect%Wings(wingID)%FlappingMotion, &
+                                dummy(1), dummy(2), dummy(3), &
+                                phi_dt_i1(wingID), dummy(4), theta_dt_i1(wingID), wingID)
+            ! t + 2*dt
+            call FlappingMotion(time+2.0_rk*dt, Insect, Insect%Wings(wingID)%FlappingMotion, &
+                                dummy(1), dummy(2), dummy(3), &
+                                phi_dt_i2(wingID), dummy(4), theta_dt_i2(wingID), wingID)
+
+            ! now the second derivative
+            ! of phi and theta
+            phi_dt2(wingID) = &
+                ( -3.0_rk*Insect%Wings(wingID)%phi_dt + 4.0_rk*phi_dt_i1(wingID) - phi_dt_i2(wingID) ) &
+                / (2.0_rk*dt)
+            theta_dt2(wingID) = &
+                ( -3.0_rk*Insect%Wings(wingID)%theta_dt + 4.0_rk*theta_dt_i1(wingID) - theta_dt_i2(wingID) ) &
+                / (2.0_rk*dt)
+
+            ! now we compute the aerodynamic torque of the wings (in the wing system)
+            ! Wings and body forces color - 1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing
+            partID = wingID + 1
+            mom_aero_w(:,wingID) = matmul( Insect%Wings(wingID)%M_b2w, &
+                                    matmul( Insect%M_g2b, &
+                                            Insect%PartIntegrals(partID)%Torque + &
+                                            Insect%PartIntegrals(partID)%Torque_unst ) )
+
+        enddo
+
+        ! 2. Passive feathering equation
+        do wingID = 1, 2
+            ! 1 = left, 2 = right
+
+            M_aero = mom_aero_w(2,wingID)
+            ! Right wing sign convention
+            if (wingID == 2) then
+                M_aero = -M_aero
+            endif
+
+            ! making it: 
+            ! 14: alpha_dt left,  15: alpha_dt2 left
+            ! 16: alpha_dt right, 17: alpha_dt2 right
+            idx_state = 12 + 2*wingID
+
+            ! Since DK defined the coordinate system slighty different when deriving the
+            ! equation, we have to add (-) infront of tetha
+            call rhs_alpha(M_aero, Insect%Wings(wingID)%Jyy, Insect%Wings(wingID)%Jxy, &
+                            Insect%Wings(wingID)%stif, Insect%Wings(wingID)%damp, Insect%Wings(wingID)%ang0, &
+                            Insect%Wings(wingID)%phi, &
+                            -Insect%Wings(wingID)%theta, &
+                            Insect%Wings(wingID)%phi_dt, &
+                            - Insect%Wings(wingID)%theta_dt, &
+                            phi_dt2(wingID), &
+                            -theta_dt2(wingID), &
+                            state(idx_state:idx_state+1), rhs(idx_state:idx_state+1) )
+
+            ! Startup conditioning on angular acceleration
+            rhs(idx_state+1) = rhs(idx_state+1) * s
+        enddo
+
+    endif
+
+end subroutine rigid_solid_rhs
 
 
 
@@ -145,6 +235,8 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
     integer :: mpicode, n_lines, n_cols, n_header, it, n_candidates
     real(kind=rk), dimension(0:3) :: ep
     logical :: file_exists
+    integer(kind=2) :: wingID
+    real(kind=rk), dimension(1:4) :: dummy
 
     Insect%time = time
     Insect%STATE = 0.0_rk
@@ -236,8 +328,59 @@ subroutine rigid_solid_init(time, Insect, resume_backup, Insect_ID)
         Insect%STATE(1:3) = Insect%xc_body_g
         Insect%STATE(4:6) = Insect%vc_body_g
         Insect%STATE(11:13) = Insect%rot_body_b
+
+
+        ! ---- passive feathering ----
+        if (Insect%wing_fsi == "feathering") then            
+            ! only looking at the front wings for now
+
+            ! left wing
+            wingID = 1
+            call FlappingMotion(time, Insect, Insect%Wings(wingID)%FlappingMotion, dummy(1), Insect%Wings(wingID)%alpha, &
+                                dummy(2), dummy(3), Insect%Wings(wingID)%alpha_dt, dummy(4), wingID)
+            Insect%STATE(14) = Insect%Wings(wingID)%alpha
+            Insect%STATE(15) = Insect%Wings(wingID)%alpha_dt
+
+            ! right
+            wingID = 2
+            call FlappingMotion(time, Insect, Insect%Wings(wingID)%FlappingMotion, dummy(1), Insect%Wings(wingID)%alpha, &
+                                dummy(2), dummy(3), Insect%Wings(wingID)%alpha_dt, dummy(4), wingID)
+            Insect%STATE(16) = Insect%Wings(wingID)%alpha
+            Insect%STATE(17) = Insect%Wings(wingID)%alpha_dt
+
+        endif ! passive feathering
+
     endif ! of backup/no backup if
 
 
     if(root) write(*,'("Insect%STATE=(",20(es15.8,1x),")")')  Insect%STATE
-end subroutine
+end subroutine rigid_solid_init
+
+
+subroutine rhs_alpha(M_aero, Jyy, Jxy, stif, damp, ang0, phi, theta, phi_dt, theta_dt, phi_dt2, theta_dt2, alpha_state, alpha_rhs)
+
+    implicit none
+    real(kind=rk), intent(in) :: M_aero, Jyy, Jxy, stif, damp, ang0, phi, theta, phi_dt, theta_dt, &
+                             phi_dt2, theta_dt2, alpha_state(2)
+    real(kind=rk), intent(out) :: alpha_rhs(2)
+    real(kind=rk) :: alpha, alpha_dt, M_inertia
+
+    ! NOTE from DK: This formulation assumes that the body does not move.
+
+    alpha    = alpha_state(1)
+    alpha_dt = alpha_state(2)
+
+    M_inertia = Jyy * (0.5_rk * (phi_dt**2 * cos(theta)**2 - theta_dt**2) * sin(2.0_rk*alpha) &
+                        - phi_dt2 * sin(theta) - phi_dt * theta_dt * cos(theta) &
+                        * (1.0_rk + cos(2.0_rk*alpha)) ) &
+                + Jxy * (phi_dt2 * cos(theta) * cos(alpha) + theta_dt2 * sin(alpha) &
+                        + 0.5_rk * phi_dt**2 * sin(2.0_rk*theta) * sin(alpha) &
+                        - 2.0_rk * phi_dt * theta_dt * sin(theta) * cos(alpha) )
+
+    ! first derivative
+    alpha_rhs(1) = alpha_dt
+
+    ! second derivative
+    alpha_rhs(2) = ( M_inertia + M_aero - stif * (alpha-ang0) - damp * alpha_dt ) / Jyy
+
+end subroutine rhs_alpha

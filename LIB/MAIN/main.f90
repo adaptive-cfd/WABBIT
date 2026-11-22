@@ -318,10 +318,13 @@ program main
             ! This might not be given for the first iteration so we just skip this (if adapt_tree was not called yet)
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this can be the case as well, because
             ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks, resulting in spikes for blocks_rhs
+
+            ! (EG, 19.11.26) For the selective mask update, the mask data must be refined together
+            ! with the state vector to preserve the time-independent mask components on newly created blocks.
             if (params%refinement_indicator == "significant" .and. iteration == 0 .and. .not. params%adapt_inicond) then
-                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time )
+                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
             else
-                call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time )
+                call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
             endif
             ! if refine_tree runs out-of-memory (OOM), it does not actually do the refinement, but returns after realizing
             ! there won't be enough mem. We can thus jump to 17 to save a backup and terminate.

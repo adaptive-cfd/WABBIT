@@ -12,7 +12,7 @@
 !! output:   - light and heavy data arrays
 ! ********************************************************************************************
 
-subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_full_tree, time)
+subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_full_tree, time, hvy_mask)
     use module_indicators
 
     implicit none
@@ -24,7 +24,7 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     logical, intent(out)   :: error_OOM !> Out-of-memory error, causes the main time loop to exit.
     logical, intent(in), optional :: check_full_tree  !> if true, checks if a full tree can be created in deterministic fashion
     real(kind=rk), intent(in), optional :: time  !> current simulation time, used for development output only
-
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
 
     ! cpu time variables for running time calculation
     real(kind=rk)                  :: t0, t1, t2, t_misc, test(1:size(hvy_block, 4))
@@ -80,7 +80,9 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     ! To ensure perfect balancing, a second step is done after the actual refinement.
     if ((.not. params%force_maxlevel_dealiasing .and. Jmax_active == params%Jmax) .or. (trim(indicator)/="everywhere")) then
         t1 = MPI_Wtime()
-        call balanceLoad_tree( params, hvy_block, tree_ID, balanceMode="refine_predictive", balance_name='refine_pre', time=time )
+        ! for selective mask-update: transfer mask data together with the 
+        ! state vector to preserve the time-independent mask components
+        call balanceLoad_tree( params, hvy_block, tree_ID, balanceMode="refine_predictive", balance_name='refine_pre', time=time, hvy_tmp=hvy_mask  )
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 
@@ -99,7 +101,10 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     !> (d) execute refinement, interpolate the new mesh. Blocks with status=+1 are refined, often
     !! that means all blocks are refined.
     t1 = MPI_Wtime()
-    call refinement_execute_tree( params, hvy_block, tree_ID, time=time )
+    ! for selective mask-update: 
+    ! since we are now preserving the mask field with the time-independent mask
+    ! between time steps, the mask must also be refined on newly created blocks
+    call refinement_execute_tree( params, hvy_block, tree_ID, time=time, hvy_mask=hvy_mask)
     call toc( "refine_tree (refinement_execute)", 144, MPI_Wtime()-t1 )
 
     !> (e) as the grid changed now with the refinement, we have to update the list of
@@ -120,7 +125,8 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     !! This of course implies any other indicator than "everywhere" requires balancing here.
     if ((.not. params%force_maxlevel_dealiasing .and. Jmax_active == params%Jmax) .or. (trim(indicator)/="everywhere")) then
         t1 = MPI_Wtime()
-        call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='refine_post', time=time )
+        ! for selective mask-update: transfer mask data together with the state vector
+        call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='refine_post', time=time, hvy_tmp=hvy_mask  )
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 

@@ -336,6 +336,9 @@ module module_insects
       ! Wings and body forces (1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing)
       type(Integrals), dimension(1:5) :: PartIntegrals
 
+      ! Check body-wing collisions and prevent overwriting body points
+      integer :: checkBodyWing_collision = 0
+
       !-------------------------------------------------------------
       ! parameters for mask coloring
       !-------------------------------------------------------------

@@ -54,7 +54,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     integer(kind=ik)                    :: ix, iy
     real(kind=rk)                       :: n_points
 
-
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
     ! the ideal solution, as it is trickier to see what does in/out of a routine. But it drastically shortenes
@@ -241,7 +240,19 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! ToDo: we sync directly afterwards so we could only transfer inner points, but this needs the buffering from xfer_bock_data
     if (.not. params%no_loadbalance_after_adapt_tree) then  ! experimental feature to skip loadbalance after coarsening, as it only concerns saving
         t_block = MPI_Wtime()
-        call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time )
+
+        ! for the selective mask-update:
+        ! Transfer the mask data together with the state vector to preserve
+        ! the time-independent mask components during load balancing.
+        if (present(hvy_mask)) then
+            if (size(hvy_mask,5) > 1) then
+                call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time, hvy_tmp=hvy_mask )
+            else
+                call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time )
+            endif
+        else
+            call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time )
+        endif
         call toc( "adapt_tree (balanceLoad_tree)", 106, MPI_Wtime()-t_block )
     endif
 

@@ -328,6 +328,9 @@ subroutine initialize_insect(time, fname_ini, Insect, SECTION, Insect_ID, resume
     defaultvec = Insect%Wings(2)%x_pivot_b
     call read_param_mpi(PARAMS, SECTION, "x_pivot_r2",Insect%Wings(4)%x_pivot_b, defaultvec)
 
+    ! Check and prevent body-wing collisions
+    call read_param_mpi(PARAMS, SECTION, "checkBodyWing_collision", Insect%checkBodyWing_collision, 0)
+
     !---------------------------------------------------------------------------
     ! Setup of colors (used to tell different parts of the animal apart)
     !---------------------------------------------------------------------------

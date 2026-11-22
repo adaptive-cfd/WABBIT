@@ -20,6 +20,8 @@ subroutine create_mask_3D_nspp( time, x0, dx, Bs, g, mask, stage )
     real(kind=rk), intent(in) :: x0(1:3), dx(1:3), time
 
     integer(kind=ik) :: i_geom, insect_id
+    ! loop variables
+    integer(kind=ik) :: ix, iy, iz
 
     ! usually, the routine should not be called with no penalization, but if it still
     ! happens, do nothing.
@@ -73,22 +75,41 @@ subroutine create_mask_3D_nspp( time, x0, dx, Bs, g, mask, stage )
             call get_insect_id(i_geom, insect_id)  ! retrieve the id of the insect
 
             select case(stage)
-            case ("time-independent-part")
-                ! insect body: note non-tethered-flight is a problem
-                if (Insects(insect_id)%body_moves == "no") then
-                    call draw_insect_body( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
-                    mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id))
-                endif
-
 
             case ("time-dependent-part")
+
                 if (Insects(insect_id)%body_moves == "no") then
-                    ! wings
+                    ! Delete everything except the static body
+                    do iz = g+1, Bs(3)+g
+                        do iy = g+1, Bs(2)+g
+                            do ix = g+1, Bs(1)+g
+
+                                if (mask(ix,iy,iz,5) /= real(Insects(insect_id)%color_body, kind=rk)) then
+                                    
+                                    ! Reset mask function and solid velocity
+                                    mask(ix,iy,iz,1:4) = 0.0_rk
+                                    ! Reset color
+                                    mask(ix,iy,iz,5) = 1.0_rk
+
+                                endif
+
+                            enddo
+                        enddo
+                    enddo
+
+                    ! now create the time-dependent wing mask
                     call draw_insect_wings( time, x0-dble(g)*dx, dx, mask(:,:,:,1), &
                     mask(:,:,:,5), mask(:,:,:,2:4), Insects(insect_id))
                 else
-                    ! draw entire insect. Note: insect module is ghost-nodes aware, but requires origin shift.
+
+                    ! usually moving bodies would use the all-parts path and the mask function
+                    ! is resett in CREATE_MASK_meta, however incase there is a user error, we
+                    ! include a mask resett and recreation of the entire insect here
+                    ! Note: insect module is ghost-nodes aware, but requires origin shift.
+                    mask = 0.0_rk
+                    mask(:,:,:,5) = 1.0_rk
                     call Draw_Insect( time, Insects(insect_id), x0-dble(g)*dx, dx, mask(:,:,:,1), mask(:,:,:,5), mask(:,:,:,2:4))
+                    
                 endif
 
             case ("all-parts")

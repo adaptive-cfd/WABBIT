@@ -77,7 +77,7 @@ tests = [
     # ===== WABBIT-INTERNAL TESTS =====
     # These tests verify internal WABBIT wavelet operations.
     # They run quickly and don't require reference HDF5 files.
-    "\n--- WABBIT internal test (wavelet transform)---",
+    #"\n--- WABBIT internal test (wavelet transform)---",
 
     # Equidistant refine-coarsening tests. After refining and subsequent coarsening, the original data should be recovered. 
     # If it is not, the wavelet coefficients have a serious problem.
@@ -247,7 +247,10 @@ tests = [
     {"name": "bumblebeeFlowEquiFD4_CDF40", "type": "simulation", "root_folder": "acm", "wavelet": 40, "dim": 3,
         "groups": ["acm", "insects"], "input_files": ["*.ini"],
         "commands": ["{mpi_command} {run_dir}/wabbit PARAMS.ini --memory={memory}"]},
-
+    {"name": "bumblebeeFlowAdaptFD4_CDF44", "type": "simulation", "root_folder": "acm", "wavelet": 40, "dim": 3,
+            "groups": ["acm", "insects"], "input_files": ["*.ini"],
+            "commands": ["{mpi_command} {run_dir}/wabbit PARAMS.ini --memory={memory}"]},
+    
     "\n---Mask generation tests (dry runs)---",
     # Dry run tests (insect flight simulations)
     # These are quick validation tests that don't produce full simulation output.
@@ -258,7 +261,10 @@ tests = [
         "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
     {"name": "dry_bumblebee_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
         "groups": ["insects", "mask", "short"], "input_files": ["*.ini"],
-        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+    "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},
+    {"name": "dry_bumblebee_selectiveUpdateMask_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
+            "groups": ["insects", "mask", "short"], "input_files": ["*.ini"],
+            "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory}"]},
     {"name": "dry_emundus_4wings_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
         "groups": ["insects", "mask"], "input_files": ["*.ini"],
         "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned --save-us"]},
@@ -318,7 +324,7 @@ tests = [
 
     {"name": "dry_Insects-CompleteModel-Dragonfly", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 3,
         "groups": ["insects", "mask"], "input_files": ["*.ini","*.sstl"],
-        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned --save-us"]},
+        "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS.ini --memory={memory} --pruned --save-us"]}, #
     {"name": "dry_snowman_2D_CDF22", "type": "simulation", "root_folder": "insects", "wavelet": 22, "dim": 2,
         "groups": ["mask"], "input_files": ["*.ini"],
         "commands": ["{mpi_command} {run_dir}/wabbit-post --dry-run PARAMS_dry_run.ini --memory={memory} --pruned"]},

@@ -30,7 +30,7 @@ subroutine post_dry_run(params)
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect, first_snapshot
     type(inifile) :: FILE
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
-    logical :: create_time_independent_mask
+    logical :: create_all_parts, moving_insect_body
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -189,6 +189,12 @@ subroutine post_dry_run(params)
     if (any(params_acm%geometries(:) == "Insect") &
     .or. any(params_acm%geometries(:)=="cylinder-free").or.any(params_acm%geometries(:)=="sphere-free").or.any(params_acm%geometries(:)=="plate-free")) is_insect = .true.
 
+    ! Moving insect bodies require a complete mask update for each snapshot
+    moving_insect_body = .false.
+    if (any(params_acm%geometries == "Insect")) then
+        moving_insect_body = (Insects(1)%body_moves /= "no")
+    endif
+
     !-----------------------------------
     if (is_insect) call init_insect_data(overwrite=.true.)
     !-----------------------------------
@@ -209,15 +215,20 @@ subroutine post_dry_run(params)
         do while ( time < params%time_max .or. (include_tfinal .and. time == params%time_max) )
             t0 = MPI_wtime()        
 
+            ! Generate the complete mask for the first snapshot or moving bodies.
+            ! Otherwise, do the selective mask update
+            if (first_snapshot .or. moving_insect_body) then
+                create_all_parts = .true.
+            else
+                create_all_parts = .false.
+            endif
+            
             if ( first_snapshot ) then
                 ! First snapshot: The grid needs to be created from scratch.
                 ! This mimicks the routine setInitialCondition_tree, but it uses only one component of the state vector
                 ! (saves memory) and always sets "zero" for the state vector start with an equidistant grid on coarsest level.
                 ! Note: createEquidistantGrid_tree also deletes any existing mesh in the tree.
                 call createEquidistantGrid_tree( params, hvy_block, Jmin_equi, verbosity=.true., tree_ID=tree_ID_flow )
-                ! the body is not yet there - we need to create it
-                create_time_independent_mask = .true.
-
                 ! init data with zeros (interpolation and coarsening wont change that)
                 call setZeros_tree(params, hvy_block, tree_ID_flow)
 
@@ -233,16 +244,11 @@ subroutine post_dry_run(params)
                     write(*,*) ""
                     write(*,'("Starting mask generation for next snapshot. time=",g12.4)') time
                 endif
-                ! the body is existing from the previous snapshot (has not been deleted).
-                ! We do not need to re-create it.
-                create_time_independent_mask = .false.
-                ! once EGs work on not deleting the mask function is done, the next line can be removed
-                ! create_time_independent_mask = .true. 
             endif
 
 
-            ! generate mask at current time on current grid
-            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
+            ! Initialize or update the mask on the current grid.
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
 
 
             ! loop: refine, create mask, coarsen until the grid no longer changes.
@@ -263,21 +269,22 @@ subroutine post_dry_run(params)
                 ! The reason is that if a block has no mask function (all zeros), we cannot be sure that it won't have
                 ! a mask function after refinement. Hence, "mask-anynonzero" would not trigger the refinement.
                 ! Therefore, "everywhere" is a suitable strategy.
-                call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM )
+                call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM, hvy_mask=hvy_mask)
 
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
-                ! Create mask
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
+                ! Update the mask on the refined grid
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
+
                 Nmask = lgt_n(tree_ID_flow)
 
                 ! we only want the real mask checking, so wavelet thresholding is ignored, in order to simulate the real mask behaviour
                 call adapt_tree( time, params, hvy_block, tree_ID_flow, params%coarsening_indicator, hvy_tmp, hvy_mask=hvy_mask )
                 lgt_n_new = lgt_n(tree_ID_flow)
 
-                ! Create mask
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
-
+                ! Update the mask after coarsening.
+                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
+                
                 ! current finest level is:
                 Jnow = maxActiveLevel_tree(tree_ID_flow)
 
@@ -304,8 +311,9 @@ subroutine post_dry_run(params)
                 endif
             enddo
 
-            ! Create mask
-            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_time_independent_mask)
+
+            ! Prepare the mask on the final adapted grid before saving.
+            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
 
             if (params%rank==0) write(*,'(A, g12.4)') "Snapshot done. t_elapsed=", MPI_wtime()-t0
 
@@ -345,7 +353,9 @@ subroutine post_dry_run(params)
             ! allreduce to get the total volume for each color
             call MPI_ALLREDUCE(MPI_IN_PLACE, mask_volume, 100, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, ierr)
             call MPI_ALLREDUCE(MPI_IN_PLACE, sponge_volume, 1, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, ierr)
-            ! usually, the physics module know how many colors there are, but we do not have access to it. So let's just assume 20 and write 20 values plus sponge volume
+            
+            ! usually, the physics module know how many colors there are, but we do not have access to it. 
+            ! So let's just assume 20 and write 20 values plus sponge volume
             if (save_sponge) then
                 call append_t_file( 'mask_volume.t', (/time, mask_volume(1:20), sponge_volume/) )
             else
@@ -362,8 +372,6 @@ subroutine post_dry_run(params)
                 if (params%rank==0) write(*,'(A)') "now pruning!"
 
                 call delete_tree(params, tree_ID_mask)
-
-                ! tree pruning requires 
                 call copy_tree(params, hvy_mask, tree_ID_mask, tree_ID_flow)
 
                 call prune_tree( params, hvy_mask, tree_ID=tree_ID_mask, prune_val=0.0_rk )
@@ -397,9 +405,6 @@ subroutine post_dry_run(params)
                 
                 
             time = time + params%write_time
-
-            ! delete pruned tree copy after saving to HDF5 file to save on memory
-            if (pruned) call delete_tree(params, tree_ID_mask)
 
             if (params%rank==0) write(*,'(A)') ""
             if (params%rank==0) write(*,'(A)') ""

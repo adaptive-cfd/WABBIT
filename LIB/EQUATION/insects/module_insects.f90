@@ -337,7 +337,7 @@ module module_insects
       type(Integrals), dimension(1:5) :: PartIntegrals
 
       ! Check body-wing collisions and prevent overwriting body points
-      integer :: checkBodyWing_collision = 0
+      logical :: checkBodyWing_collision = .false.
 
       !-------------------------------------------------------------
       ! parameters for mask coloring

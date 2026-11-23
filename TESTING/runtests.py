@@ -250,6 +250,9 @@ tests = [
     {"name": "bumblebeeFlowAdaptFD4_CDF44", "type": "simulation", "root_folder": "acm", "wavelet": 40, "dim": 3,
             "groups": ["acm", "insects"], "input_files": ["*.ini"],
             "commands": ["{mpi_command} {run_dir}/wabbit PARAMS.ini --memory={memory}"]},
+    {"name": "bumblebeeFlow-freeFlight", "type": "simulation", "root_folder": "acm", "wavelet": 20, "dim": 3,
+            "groups": ["acm", "insects"], "input_files": ["*.ini"],
+            "commands": ["{mpi_command} {run_dir}/wabbit PARAMS_BB_freeflight.ini --memory={memory}"]},
     
     "\n---Mask generation tests (dry runs)---",
     # Dry run tests (insect flight simulations)

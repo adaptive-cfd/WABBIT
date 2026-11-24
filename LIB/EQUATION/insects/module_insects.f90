@@ -169,6 +169,13 @@ module module_insects
       logical :: rigid = .true.
 
 
+      ! Sample points in material coordinates
+      real(kind=rk), allocatable, dimension(:,:) :: sample_points_mat
+      real(kind=rk), allocatable, dimension(:,:) :: sample_points_global
+      real(kind=rk), allocatable, dimension(:,:) :: sample_velocity_global
+      logical :: use_material_sampling = .true.
+
+
    end type
 
    ! **********************************************************************************************
@@ -316,6 +323,7 @@ module module_insects
       ! Being well aware that changing the size of the main kinematics file could break tools expecting a different array size etc.,
       ! the deformation kinematics are saved in a separate t file.
       character(len=clong) :: deformation_kinematics_file = "deformation_kinematics.t"
+      character(len=clong) :: material_sample_file = "samplepoints_mat.dat"
 
       ! rotation matrices for the various coordinate system for the insect
       real(kind=rk),dimension(1:3,1:3) :: M_g2b, M_b2g
@@ -500,9 +508,10 @@ contains
       logical, intent(in) :: overwrite
       character(len=clong) :: deformation_header(1:4*n_insects*3 + 1) ! used, rigid, gradient_dalpha
 
-      integer :: i, i_check, j, j_check
+      integer :: i, i_check, j, j_check, wingID, n_entries, n_wings
       logical :: do_init
       character(len=clong) :: header(1:43*n_insects+1)
+      character(len=clong), ALLOCATABLE :: header_samplegrid(:)
 
       header(1) = "time"
 
@@ -577,8 +586,8 @@ contains
          write(header(12+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r:gradient_dalpha"
          write(header(13+(i-1)*12), '(A, i0.2, A)') "insect", i, ":wing_r2:gradient_dalpha"
       end do
-      call init_t_file( Insects(1)%deformation_kinematics_file, overwrite, header=header(1:12*n_insects+1))
 
+      call init_t_file( Insects(1)%deformation_kinematics_file, overwrite, header=header(1:12*n_insects+1))
 
    end subroutine Init_insect_data
 
@@ -589,7 +598,10 @@ contains
       implicit none
       real(kind=rk), intent(in) :: time
       real(kind=rk), allocatable, dimension(:) :: buffer_local
-      integer :: i, n_entries, n_entries_deformation
+      integer :: i, n_entries, n_entries_deformation, wingID, n_wings, j
+      integer :: io, stat
+      CHARACTER(len=clong) :: fnameXYZ, fnameU
+      real(KIND=rk) :: x_mat(1:3), x_w(1:3), x_b(1:3), x_g(1:3), M_twist(1:3, 1:3), v_tmp(1:3), v_tmp_b(1:3), us_tip_g(1:3)
 
       n_entries = 43
       n_entries_deformation = 3
@@ -658,6 +670,69 @@ contains
             /)
       enddo
       call append_t_file( Insects(1)%deformation_kinematics_file, (/time, buffer_local(1:n_insects*4*n_entries_deformation) /) )
+
+
+
+      do wingID =1,4
+            
+         if (Insects(1)%Wings(wingID)%use_material_sampling) THEN
+
+            ! transform points to global
+            write(fnameXYZ, '(A,I8.8,A)') "XYZg_", nint(time*1000000.0_rk), ".dat"
+            write(fnameU, '(A,I8.8,A)') "UVWg_", nint(time*1000000.0_rk), ".dat"
+
+            open (unit=10,file=fnameXYZ,action="write")
+            open (unit=11,file=fnameU,action="write")
+
+            do i=1,size(Insects(1)%Wings(wingID)%sample_points_mat, 1)
+               x_mat=Insects(1)%Wings(wingID)%sample_points_mat(i, :)
+               x_w = x_mat
+               if (.not. Insects(1)%Wings(wingID)%rigid) then
+                  call material2wing(time, x_w, Insects(1)%Wings(wingID)%deformation, Insects(1)%Wings(wingID)%side)
+               endif
+
+               x_b = MATMUL(TRANSPOSE(Insects(1)%Wings(wingID)%M_b2w), x_w) + Insects(1)%Wings(wingID)%x_pivot_b
+               x_g = MATMUL(Insects(1)%M_b2g, x_b) + Insects(1)%xc_body_g
+
+               v_tmp(1) = Insects(1)%Wings(wingID)%rot_rel_wing_w(2)*x_w(3)-Insects(1)%Wings(wingID)%rot_rel_wing_w(3)*x_w(2)
+               v_tmp(2) = Insects(1)%Wings(wingID)%rot_rel_wing_w(3)*x_w(1)-Insects(1)%Wings(wingID)%rot_rel_wing_w(1)*x_w(3)
+               v_tmp(3) = Insects(1)%Wings(wingID)%rot_rel_wing_w(1)*x_w(2)-Insects(1)%Wings(wingID)%rot_rel_wing_w(2)*x_w(1)
+
+               ! calculate the velocity component through the deformation
+
+               if (.not. Insects(1)%Wings(wingID)%rigid) then
+                  call add_deformation_velocity(Insects(1)%time, x_w, v_tmp, Insects(1)%Wings(wingID)%deformation, Insects(1)%Wings(wingID)%side)
+               end if
+
+               v_tmp_b = matmul(transpose(Insects(1)%Wings(wingID)%M_b2w), v_tmp) ! in body system
+
+
+               !    ! translational part. we compute the rotational part in the body
+               !    ! reference frame, therefore, we must transform the body translation
+               !    ! velocity Insect%vc (which is in global coordinates) to the body frame
+               v_tmp = matmul(Insects(1)%M_g2b,Insects(1)%vc_body_g)
+
+               !    ! add solid body rotation to the translational velocity field. Note
+               !    ! that rot_body_b and x_body are in the body reference frame
+               v_tmp(1) = v_tmp(1) + Insects(1)%rot_body_b(2)*x_b(3)-Insects(1)%rot_body_b(3)*x_b(2)
+               v_tmp(2) = v_tmp(2) + Insects(1)%rot_body_b(3)*x_b(1)-Insects(1)%rot_body_b(1)*x_b(3)
+               v_tmp(3) = v_tmp(3) + Insects(1)%rot_body_b(1)*x_b(2)-Insects(1)%rot_body_b(2)*x_b(1)
+
+               !    ! the body motion is added to the wing motion, which is already in us
+               !    ! and they are also in the body refrence frame. However, us has to be
+               !    ! in the global reference frame, so M_b2g is applied
+               us_tip_g = matmul( transpose(Insects(1)%M_g2b), v_tmp_b + v_tmp )
+
+               write (10,*)  (x_g(j), j=1,3)
+               write (11,*)  (us_tip_g(j), j=1,3)
+            end do
+
+            close(10)
+            close(11)
+
+         end if
+
+      end do
 
    end subroutine Write_insect_data
 

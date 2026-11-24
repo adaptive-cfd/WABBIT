@@ -179,14 +179,14 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
 
       ! -- Dalpha offset
 
-      call read_param_mpi(kinefile,"deformation","nfft_Dalpha_offset",Insect%Wings(wingID)%deformation%nfft_Dalpha_offset,0)
+      !call read_param_mpi(kinefile,"deformation","nfft_Dalpha_offset",Insect%Wings(wingID)%deformation%nfft_Dalpha_offset,0)
 
-      if (.not. allocated(Insect%Wings(wingID)%deformation%ai_Dalpha_offset)) allocate(Insect%Wings(wingID)%deformation%ai_Dalpha_offset(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_offset)))
-      if (.not. allocated(Insect%Wings(wingID)%deformation%bi_Dalpha_offset)) allocate(Insect%Wings(wingID)%deformation%bi_Dalpha_offset(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_offset)))
+      !if (.not. allocated(Insect%Wings(wingID)%deformation%ai_Dalpha_offset)) allocate(Insect%Wings(wingID)%deformation%ai_Dalpha_offset(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_offset)))
+      !if (.not. allocated(Insect%Wings(wingID)%deformation%bi_Dalpha_offset)) allocate(Insect%Wings(wingID)%deformation%bi_Dalpha_offset(max(1,Insect%Wings(wingID)%deformation%nfft_Dalpha_offset)))
 
-      call read_param_mpi(kinefile,"deformation","ai_Dalpha_offset",Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
-      call read_param_mpi(kinefile,"deformation","bi_Dalpha_offset",Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
-      call read_param_mpi(kinefile,"deformation","a0_Dalpha_offset",Insect%Wings(wingID)%deformation%a0_Dalpha_offset, 0.0_rk)
+      !call read_param_mpi(kinefile,"deformation","ai_Dalpha_offset",Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+      !call read_param_mpi(kinefile,"deformation","bi_Dalpha_offset",Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+      !call read_param_mpi(kinefile,"deformation","a0_Dalpha_offset",Insect%Wings(wingID)%deformation%a0_Dalpha_offset, 0.0_rk)
 
 
       Insect%Wings(wingID)%initialized = .true.
@@ -213,10 +213,10 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       if (.not. Insect%Wings(wingID)%rigid) then
         call fseries_eval(time,Insect%Wings(wingID)%deformation%dDalpha_dy,Insect%Wings(wingID)%deformation%dDalpha_dydt, Insect%Wings(wingID)%deformation%a0_Dalpha_gradient, Insect%Wings(wingID)%deformation%ai_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient), Insect%Wings(wingID)%deformation%bi_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient))
         ! add twist offset from deformation measurements and suoerimpore upon alpha. 
-        call fseries_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%a0_Dalpha_offset, Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset), Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+        !call fseries_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%a0_Dalpha_offset, Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset), Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
 
-        alpha = alpha + twistOffset
-        alpha_dt = alpha_dt + twistOffset_dt
+        !alpha = alpha + twistOffset
+        !alpha_dt = alpha_dt + twistOffset_dt
       end if
 
     case ("Hermite","hermite","HERMITE")
@@ -231,10 +231,10 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
 
 
         ! add twist offset from deformation measurements and suoerimpore upon alpha. 
-        call hermite_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset), Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
+        !call hermite_eval(time, twistOffset, twistOffset_dt, Insect%Wings(wingID)%deformation%ai_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset), Insect%Wings(wingID)%deformation%bi_Dalpha_offset(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_offset))
 
-        alpha = alpha + twistOffset
-        alpha_dt = alpha_dt + twistOffset_dt
+        !alpha = alpha + twistOffset
+        !alpha_dt = alpha_dt + twistOffset_dt
       end if
 
     case default

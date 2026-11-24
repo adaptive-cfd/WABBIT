@@ -1,2 +1,2 @@
-character(len=*), parameter :: git_version = "0c14753940e26dcd992bbf50a341ff405edf88f1"
-character(len=*), parameter :: build_date = "Wed Nov  4 12:41:39 PM CET 2026"
+character(len=*), parameter :: git_version = "28ae3895411909cf4b20e18ab17b32a91bf3d602"
+character(len=*), parameter :: build_date = "Tue Nov 24 02:39:06 PM CET 2026"

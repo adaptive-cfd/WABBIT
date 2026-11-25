@@ -365,7 +365,11 @@ subroutine coarseningIndicatorMask_tree( time, params, hvy_mask, hvy_tmp, tree_I
     ! The complete mask is regenerated if required by createMask_tree.
     ! the entiere insect mask will be regenerated: all_parts=.true.
     ! selective mask update (wings only)         : all_parts=.false.   
-    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    ! call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    
+    ! Force a complete mask update during initial grid adaptation.
+    ! Otherwise, allow selective updates if permitted by createMask_tree.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=params%initial_grid_adaptation)
     call toc( "coarseningIndicator (createMask_tree)", 120, MPI_Wtime()-t0 )
     
     ! loop over all blocks

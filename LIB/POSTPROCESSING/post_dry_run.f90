@@ -269,7 +269,11 @@ subroutine post_dry_run(params)
                 ! The reason is that if a block has no mask function (all zeros), we cannot be sure that it won't have
                 ! a mask function after refinement. Hence, "mask-anynonzero" would not trigger the refinement.
                 ! Therefore, "everywhere" is a suitable strategy.
-                call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM, hvy_mask=hvy_mask)
+                if (params%selective_mask_update) then
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM, hvy_mask=hvy_mask)
+                else
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID_flow, error_OOM)
+                endif
 
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 

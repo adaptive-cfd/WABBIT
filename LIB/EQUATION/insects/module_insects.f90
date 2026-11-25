@@ -55,6 +55,11 @@ module module_insects
       ! coordinates of shoulder (pivot) point
       real(kind=rk), dimension(1:3) :: x_pivot_g, x_pivot_b
 
+      ! aerodynamic force and moment acting on this wing
+      ! in the global reference frame
+      real(kind=rk), dimension(1:3) :: force_g  = 0.0_rk
+      real(kind=rk), dimension(1:3) :: moment_g = 0.0_rk
+
       !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       !~                SHAPE / GEOMETRY                    ~
       !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,7 +165,7 @@ module module_insects
 
       ! ---- not prescribed kinematics ----
       ! passive feathering
-      ! hinge/torsional stifness, rotational damping, 
+      ! hinge/torsional stifness, rotational damping:
       real(kind=rk) :: stif=1.0_rk, damp=0.0_rk, ang0=0.0_rk
       ! muscle driven wing model coefficients
       ! real(kind=rk) :: musc_amf2=0.0_rk, musc_c1mf=0.0_rk, musc_kmf2=0.0_rk

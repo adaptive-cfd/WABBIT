@@ -121,6 +121,9 @@ program main
     call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
+    if (params%rank == 0) then
+        write(*,'(A,L1)') "Selective mask updates supported: ", params%selective_mask_update
+    endif
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
     ! have the pysics module read their own parameters
@@ -319,12 +322,24 @@ program main
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this can be the case as well, because
             ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks, resulting in spikes for blocks_rhs
 
-            ! (EG, 19.11.26) For the selective mask update, the mask data must be refined together
-            ! with the state vector to preserve the time-independent mask components on newly created blocks.
+            ! (EG, 19.11.26) For the selective mask update (if used), the mask data must be refined together
+            ! with the state vector to preserve the time-independent mask components on newly created blocks
             if (params%refinement_indicator == "significant" .and. iteration == 0 .and. .not. params%adapt_inicond) then
-                call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
+                if (params%selective_mask_update) then
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, &
+                                      error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
+                else
+                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, &
+                                      error_OOM=error_OOM, check_full_tree=.true., time=time)
+                endif
             else
-                call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
+                if (params%selective_mask_update) then
+                    call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, &
+                                    error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
+                else
+                    call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, &
+                                      error_OOM=error_OOM, check_full_tree=.true., time=time)
+                endif
             endif
             ! if refine_tree runs out-of-memory (OOM), it does not actually do the refinement, but returns after realizing
             ! there won't be enough mem. We can thus jump to 17 to save a backup and terminate.

@@ -80,9 +80,11 @@ subroutine refine_tree( params, hvy_block, indicator, tree_ID, error_OOM, check_
     ! To ensure perfect balancing, a second step is done after the actual refinement.
     if ((.not. params%force_maxlevel_dealiasing .and. Jmax_active == params%Jmax) .or. (trim(indicator)/="everywhere")) then
         t1 = MPI_Wtime()
-        ! for selective mask-update: transfer mask data together with the 
-        ! state vector to preserve the time-independent mask components
-        call balanceLoad_tree( params, hvy_block, tree_ID, balanceMode="refine_predictive", balance_name='refine_pre', time=time, hvy_tmp=hvy_mask  )
+        ! for selective mask-update: transfer mask data together with the state
+        ! vector to preserve the time-independent mask components, only if required
+        call balanceLoad_tree( params, hvy_block, tree_ID, balanceMode="refine_predictive", &
+                                   balance_name='refine_pre', time=time, hvy_tmp=hvy_mask  )
+
         call toc( "refine_tree (balanceLoad_tree)", 145, MPI_Wtime()-t1 )
     endif
 

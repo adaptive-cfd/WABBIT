@@ -2,7 +2,7 @@
 !##############################################################
 ! This routine refines/coarsens to given target_level.
 ! If target_level is not passed, then max_treelevel is assumed
-subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level, verbosity)
+subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_level, verbosity, hvy_mask)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -14,6 +14,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
     real(kind=rk), intent(inout)      :: hvy_tmp(:, :, :, :, :) !< used for saving, filtering, and helper qtys
     integer(kind=ik), intent(in), optional :: target_level
     logical, intent(in),optional      :: verbosity !< if true: additional information of processing
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :) !< mask data, kept consistent during refine/coarsen/balance
     !-----------------------------------------------------------------
     integer(kind=ik):: level,k,treecode_size, lgt_id, rank, hvy_id, d, newBlocks, level_this
     logical :: verbose = .false.
@@ -46,7 +47,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
         ! this might not be necessary since we start from an admissible grid
         call ensureGradedness_tree( params, tree_ID )
 
-        call executeCoarsening_tree( params, hvy_block, tree_ID)
+        call executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask=hvy_mask)
 
         call updateMetadata_tree(params, tree_ID)
     end do
@@ -54,7 +55,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
     ! refine
     do while (minActiveLevel_tree( tree_ID )<level)
 
-        call balanceLoad_tree( params, hvy_block, tree_ID )
+        call balanceLoad_tree( params, hvy_block, tree_ID, hvy_tmp=hvy_mask )
 
         ! check where refinement is actually needed
         ! Even if the blocks are equally distributed (balance_load), some CPU now create more blocks, and
@@ -84,7 +85,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
 
         call ensureGradedness_tree( params, tree_ID )
 
-        call refinement_execute_tree( params, hvy_block, tree_ID )
+        call refinement_execute_tree( params, hvy_block, tree_ID, hvy_mask=hvy_mask )
 
         call updateMetadata_tree(params, tree_ID)
 
@@ -93,7 +94,7 @@ subroutine refineToEquidistant_tree(params, hvy_block, hvy_tmp, tree_ID, target_
 
     ! final balancing: this routine is often used in postprocessing (and during simulations
     ! only for initialization), it's good to have the load balanced now
-    call balanceLoad_tree( params, hvy_block, tree_ID )
+    call balanceLoad_tree( params, hvy_block, tree_ID, hvy_tmp=hvy_mask )
 end subroutine
 !##############################################################
 

@@ -1,7 +1,7 @@
 ! ********************************************************************************************
 !> \brief Apply mesh coarsening: Merge tagged blocks into new, coarser blocks
 ! ********************************************************************************************
-subroutine executeCoarsening_tree( params, hvy_block, tree_ID)
+subroutine executeCoarsening_tree( params, hvy_block, tree_ID, hvy_mask)
     ! it is not technically required to include the module here, but for VS code it reduces the number of wrong "errors"
     use module_params
 
@@ -12,6 +12,9 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID)
     !> heavy data array - block data
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)
     integer(kind=ik), intent(in)        :: tree_ID
+    !> optional mask data array - transferred together with hvy_block so the merged
+    ! mother block can receive a valid (constant) mask, see merge_blocks
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
 
     ! loop variables
     integer(kind=ik)                    :: k, Jmax, N, j
@@ -91,7 +94,18 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID)
 
     ! actual xfer
     n_xfer = 0  ! transfer counter
-    call block_xfer( params, xfer_list, n_xfer, hvy_block )
+    
+    ! for the selective mask update, transfer the mask together with the state vector,
+    ! but only if a mask is actually used (otherwise the mask array is a dummy entry)
+    if (present(hvy_mask)) then
+        if (size(hvy_mask,5) > 1) then
+            call block_xfer( params, xfer_list, n_xfer, hvy_block, hvy_tmp=hvy_mask )
+        else
+            call block_xfer( params, xfer_list, n_xfer, hvy_block )
+        endif
+    else
+        call block_xfer( params, xfer_list, n_xfer, hvy_block )
+    endif
 
     ! the active lists are outdates after the transfer: we need to create
     ! them or findSisters_tree will not be able to do its job
@@ -115,7 +129,11 @@ subroutine executeCoarsening_tree( params, hvy_block, tree_ID)
             ! Then only the responsible rank will perform the heavy data merging.
             call find_sisters( params, lgtID, light_ids(1:N))
             ! note the newly merged block has status 0
-            call merge_blocks( params, hvy_block, light_ids(1:N) )
+            if (present(hvy_mask)) then
+                call merge_blocks( params, hvy_block, light_ids(1:N), hvy_mask=hvy_mask )
+            else
+                call merge_blocks( params, hvy_block, light_ids(1:N) )
+            endif
         endif
     enddo
 end subroutine executeCoarsening_tree

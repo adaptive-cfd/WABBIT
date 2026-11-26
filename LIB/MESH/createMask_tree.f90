@@ -38,9 +38,10 @@ subroutine createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts)
     ! using RK4) and require a time-independent mask component and a 3D simulation.
     force_all_parts                                              = .true.
     if (present(all_parts)) force_all_parts                      = all_parts
+    if (.not. params%selective_mask_update) force_all_parts      = .true.
+
     if (.not. params%mask_time_independent_part) force_all_parts = .true.
     if (params%dim == 2) force_all_parts                         = .true.
-
 
     !-----------------------------------------------------------------------
     ! complete generation of all parts, if required

@@ -55,6 +55,11 @@ module module_insects
       ! coordinates of shoulder (pivot) point
       real(kind=rk), dimension(1:3) :: x_pivot_g, x_pivot_b
 
+      ! aerodynamic force and moment acting on this WING (not the whole animal -> this force is in Insect)
+      ! in the global reference frame
+      real(kind=rk), dimension(1:3) :: force_g  = 0.0_rk
+      real(kind=rk), dimension(1:3) :: moment_g = 0.0_rk
+
       !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       !~                SHAPE / GEOMETRY                    ~
       !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,7 +165,7 @@ module module_insects
 
       ! ---- not prescribed kinematics ----
       ! passive feathering
-      ! hinge/torsional stifness, rotational damping, 
+      ! hinge/torsional stifness, rotational damping:
       real(kind=rk) :: stif=1.0_rk, damp=0.0_rk, ang0=0.0_rk
       ! muscle driven wing model coefficients
       ! real(kind=rk) :: musc_amf2=0.0_rk, musc_c1mf=0.0_rk, musc_kmf2=0.0_rk
@@ -272,7 +277,8 @@ module module_insects
       !-------------------------------------------------------------
       real(kind=rk) :: time=0.0_rk
       real(kind=rk), allocatable :: RHS(:,:)
-      ! this is the force and moment that is applied on the insect from the fluid, it will be computed and stored during RHS computations
+      ! this is the force and moment that is applied on the insect from the fluid, 
+      ! it will be computed and stored during RHS computations
       real(kind=rk), dimension(1:3) :: force_g=0.0_rk, moment_g=0.0_rk
       real(kind=rk), dimension(1:20) :: STATE=0.0_rk
       ! STATE(1) : x-position of body
@@ -332,7 +338,7 @@ module module_insects
       ! some more VPM parameters will be stored in the insect, that can be individual
       character(len=clong) :: smoothing_type=""
       integer :: smoothing_type_int=0  ! in point-wise loops, we have to avoid character comparisons, so we use this integer
-      real(kind=rk) :: epsilon_hester=0.0_rk
+      real(kind=rk) :: epsilon_hester=0.0_rk      
       ! Wings and body forces (1:body, 2:left wing, 3:right wing, 4:left wing, 5:right wing)
       type(Integrals), dimension(1:5) :: PartIntegrals
 

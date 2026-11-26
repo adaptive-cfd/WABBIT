@@ -90,7 +90,17 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
     ! Blocks always pass their SC to their mother (pendant to excuteCoarsening of old function), new blocks only synch from medium neighbors to avoid CE
     ! This is repeated until all blocks on the layer JMin are present with wavelet decomposed values
     t_block = MPI_Wtime()
-    call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, Jmin_set=Jmin, time=time)
+    ! Preserve mask data on newly created mother blocks only
+    ! if selective mask updates are enabled.
+    if (params%selective_mask_update .and. present(hvy_mask)) then
+        call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, &
+                                        init_full_tree_grid=initFullTreeGrid, &
+                                        Jmin_set=Jmin, time=time, hvy_mask=hvy_mask)
+    else
+        call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, &
+                                        init_full_tree_grid=initFullTreeGrid, &
+                                        Jmin_set=Jmin, time=time)
+    endif
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -244,7 +254,7 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
         ! for the selective mask-update:
         ! Transfer the mask data together with the state vector to preserve
         ! the time-independent mask components during load balancing.
-        if (present(hvy_mask)) then
+        if (params%selective_mask_update .and. present(hvy_mask)) then
             if (size(hvy_mask,5) > 1) then
                 call balanceLoad_tree( params, hvy_block, tree_ID, balance_name='adapt', time=time, hvy_tmp=hvy_mask )
             else
@@ -272,7 +282,7 @@ end subroutine
 !! First, the full tree grid is prepared, then the leaf-layer is decomposed in one go
 !! in order to have load-balanced work there, then the mothers are lvl-wise updated and consequently
 !! decomposed until all blocks have the decomposed values. Afterwards, the grid will be in full tree format.
-subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, Jmin_set, time, verbose_check)
+subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid, compute_SC_only, scaling_filter, Jmin_set, time, verbose_check, hvy_mask)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -281,6 +291,9 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
     integer(kind=ik), intent(in)        :: tree_ID
     !> heavy tmp data array - block data.
     real(kind=rk), intent(inout)        :: hvy_tmp(:, :, :, :, :)
+    ! optional mask data array - used to initialize the mask slot of newly created mother
+    ! blocks (init_full_tree), so it does not hold stale data during the full tree pass
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :) 
     logical, intent(in), optional       :: init_full_tree_grid  !< if false, grid is already in full tree format, defaults to true
     logical, intent(in), optional       :: compute_SC_only  !< only apply scaling function filter, defaults to false
     real(kind=rk), optional :: scaling_filter(:)  !< filter to be used for the SC, only used with compute_SC_only=T, defaults to params%HD
@@ -352,7 +365,7 @@ subroutine wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init
 
         ! at first, initialize all mothers without any values yet
         t_block = MPI_Wtime()
-        call init_full_tree(params, tree_ID, Jmin_set=Jmin)
+        call init_full_tree(params, tree_ID, Jmin_set=Jmin, hvy_mask=hvy_mask)
         call toc( "decompose_tree (init_mothers_tree)", 110, MPI_Wtime()-t_block )
         ! now, all mothers have been created and share the ref status REF_TMP_EMPTY, leafs share status -1
     else
@@ -1003,7 +1016,7 @@ end subroutine wavelet_reconstruct_full_tree_CEoptimized
 !> \details This functions inits all mother blocks from a leaf-only grid down to JMin.
 !! This will be used for wavelet_decompose_full_tree in order to prepare the grid, which it then fills with values.
 !! The benefit is, that the grid topology needs to be updated only once instead of once every loop cycle.
-subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check)
+subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check, hvy_mask)
     implicit none
 
     type (type_params), intent(in)      :: params
@@ -1011,8 +1024,11 @@ subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check)
     integer(kind=ik), intent(in), optional :: set_ref     !< if not set, ref will be set to REF_TMP_EMPTY, else to this number
     integer(kind=ik), intent(in), optional :: Jmin_set    !< if set, this is the minimum level to which we create mothers, else params%Jmin
     logical, intent(in), optional       :: verbose_check  !< No matter the value, if this is present we debug
+    !> optional mask data array - used to initialize the mask slot of newly created mother blocks
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)
 
     integer(kind=ik)     :: i_level, j, k, N, lgt_ID, hvy_ID, level_b, iteration, level, data_rank, lgt_merge_id, hvy_merge_id, hvy_n_old, digit, refset, Jmin
+    integer(kind=ik)     :: Bs(1:3), g
     real(kind=rk)        :: t_block, t_loop
     character(len=clong) :: format_string
     logical              :: iterate
@@ -1024,6 +1040,8 @@ subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check)
     if (present(set_ref)) refset = set_ref
     Jmin = params%Jmin
     if (present(Jmin_set)) Jmin = Jmin_set
+    Bs = params%Bs
+    g  = params%g
 
     ! number of blocks to merge, 4 or 8
     N = 2**params%dim
@@ -1071,6 +1089,21 @@ subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check)
                     ! update myself that I have created my own mother
                     ! sisters will not be updated but as only one daughter will surely create the mother there will be no doubles
                     hvy_family(hvy_ID, 1) = lgt_merge_id
+
+                    ! For the selective mask update (mask_time_independent_part): initialize the
+                    ! new mother's mask slot with a constant value taken from this (local) daughter,
+                    ! so it does not hold stale data. The mask is not restricted during the wavelet
+                    ! decomposition; non-leaf blocks are fully regenerated in createMask_tree.
+                    if (present(hvy_mask)) then
+                        if (size(hvy_mask,5) > 1) then  ! hvy_mask may be a dummy allocation with size 1,1,1,1,1 for physics modules without penalization
+                            hvy_mask(:,:,:,:,hvy_merge_id) = 0.0_rk
+                            if (maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 1, hvy_ID)) > 1.0e-12_rk) then
+                                hvy_mask(:,:,:,1,hvy_merge_id) = 1.0_rk
+                                hvy_mask(:,:,:,5,hvy_merge_id) = hvy_mask(g+1, g+1, merge(1, 1+g, params%dim==2), 5, hvy_ID)
+                            endif
+                        endif
+                    endif
+
                 endif
             endif
         enddo

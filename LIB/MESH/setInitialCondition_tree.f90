@@ -21,7 +21,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     !> heavy work data array used for adapt_tree
     real(kind=rk), intent(inout), optional        :: hvy_work(:, :, :, :, :, :)
 
-    logical :: tmp, error_OOM
+    logical :: tmp, error_OOM!, selective_mask_update_backup
     integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -33,6 +33,13 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     lgt_n_old = 9999999
     iter = 0
     time = 0.0_rk
+
+    ! Force complete mask updates during initial grid adaptation.
+    ! params%initial_grid_adaptation = .true.
+    params%selectiveMaskUpdateReady = .false. 
+    ! selective_mask_update_backup = params%selective_mask_update
+    ! params%selective_mask_update = .false.
+
     ! default is Jmin, if Jini is not set
     if (params%Jini<0) params%Jini = params%Jmin
 
@@ -156,7 +163,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                 ! we have to repeat the adapation process until the grid has reached a final
                 ! state. Since we start on the coarsest level, in each iteration we cannot loose
                 ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
-                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%Jmax-params%Jmin))
+                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%Jmax-params%Jmin)+10)
                     lgt_n_old = lgt_n(tree_ID)
 
                     ! push up the entire grid one level.
@@ -208,8 +215,14 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
             ! for example if one does non-adaptive non-equidistant spatial convergence tests
             if (params%inicond_refinements > 0) then
                 do k = 1, params%inicond_refinements
-                    ! refine entire mesh.
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM)
+                    ! refine entire mesh and mask if selective
+                    ! mask updates are enabled.
+                    if (params%selective_mask_update .and. present(hvy_mask)) then
+                        call refine_tree(params, hvy_block, "everywhere", tree_ID, error_OOM, hvy_mask=hvy_mask)
+                    else
+                        call refine_tree(params, hvy_block, "everywhere", tree_ID, error_OOM)
+                    endif
+                    ! call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM)
 
                     if (error_OOM) call abort(2512114,"Refinement failed, out of memory. Try with more memory.")
 
@@ -266,6 +279,12 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         endif
     end if
 
+
+    ! Initial grid adaptation is complete. From now on we can use the seletive mask update.
+    ! params%initial_grid_adaptation = .false.
+    params%selectiveMaskUpdateReady = .true.
+    ! params%selective_mask_update = selective_mask_update_backup
+
     !---------------------------------------------------------------------------
     ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks
     ! so the neighboring information and active lists are outdated. It is good practice that a routine
@@ -282,8 +301,17 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! update list of sorted nunmerical treecodes, used for finding blocks
     call updateMetadata_tree(params,  tree_ID)
 
-    ! balance the load
-    call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time )
+    ! Balance the load and preserve mask data only
+    ! if selective mask updates are enabled.
+    if (params%selective_mask_update .and. present(hvy_mask)) then
+        if (size(hvy_mask,5) > 1) then
+            call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time, hvy_tmp=hvy_mask)
+        else
+            call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time)
+        endif
+    else
+        call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time)
+    endif
 
     ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but
     ! it is a safety issue. Better simply keep it.

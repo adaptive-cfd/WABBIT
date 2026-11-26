@@ -17,6 +17,8 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID, hvy_mask)
     real(kind=rk), allocatable, save    :: data_predict_fine(:,:,:,:)  ! data fields for interpolation
     integer(kind=ik)                    :: lgt_free_id, free_hvy_id, lgt_id, level, idx_d(2,3)
     integer(kind=tsize)                 :: treecode
+    logical                             :: mask_solid
+    real(kind=rk)                       :: mask_color_mother
 
     dim  = params%dim
     N    = params%number_blocks
@@ -64,6 +66,48 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID, hvy_mask)
     !------------------------------------------------------------------------------------------------------
     ! 2nd Step: split new data and write into new blocks
     !------------------------------------------------------------------------------------------------------
+
+    ! For the selective mask update (mask_time_independent_part), the mask is not interpolated
+    ! onto the new blocks. Instead each daughter receives a constant mask: if the mother block
+    ! contains any solid (chi>0), the daughter is set to chi=1 with the mother's (constant)
+    ! color, otherwise chi=0. This is exact for blocks with constant mask (body interior or
+    ! pure fluid); blocks with a non-constant mask (smoothing layer at the interface) are not
+    ! refined (see refine_tree). The solid velocity us stays 0, which is exact for a
+    ! non-moving body (body_moves=="no").
+
+    mask_solid = .false.
+    mask_color_mother = 0.0_rk
+
+    if (present(hvy_mask)) then
+        if (size(hvy_mask,5) > 1) then
+
+            mask_solid = maxval(hvy_mask(g+1:Bs(1)+g, &
+                                        g+1:Bs(2)+g, &
+                                        merge(1, 1+g, dim==2):merge(1, Bs(3)+g, dim==2), &
+                                        1, hvyID)) > 1.0e-12_rk
+
+            mask_color_mother = hvy_mask(g+1, g+1, merge(1, 1+g, dim==2), 5, hvyID)
+
+        endif
+    endif
+
+    ! In case the selective mask update is used, blocks could potentially be refined on the inside  
+    ! of the insect (or the outside). We therefore need to check the chi-value of the mother block.
+    !motherBlock_is_mask = .false.
+    !if (present(hvy_mask)) then
+    !    if (size(hvy_mask,5) > 1 .and. dim == 3) then
+
+    !        ! since the interface is never refined (not flagged for 
+    !        ! refinement), we really only need to check one point
+    !        motherBlock_is_mask = (hvy_mask(g+1,g+1,g+1,1,hvyID) == 1.0_rk)
+
+    !        if (motherBlock_is_mask) then
+    !            motherBlock_color = hvy_mask(g+1,g+1,g+1,5,hvyID)
+    !        endif
+
+    !    endif
+    !endif
+
 
     ! create all 4 or 8 new daughters
     do k_daughter = 0, 2**(params%dim) -1
@@ -113,11 +157,18 @@ subroutine refineBlock(params, hvy_block, hvyID, tree_ID, hvy_mask)
                 data_predict_fine( idx_d(1,1):idx_d(2,1), idx_d(1,2):idx_d(2,2), idx_d(1,3):idx_d(2,3), 1:size(hvy_block,4))
         endif
 
-        ! Initialize mask data on newly created blocks, if available.
-        ! Simulations without penalization use a dummy mask array.
+        ! Set constant mask data on newly created blocks (selective mask update), 
+        ! if available. Simulations without penalization use a dummy mask array.
         if (present(hvy_mask)) then
             if (size(hvy_mask,5) > 1) then
+
+                ! fluid
                 hvy_mask(:,:,:,:,free_hvy_id) = 0.0_rk
+                hvy_mask(:,:,:,5,free_hvy_id) = mask_color_mother
+
+                ! or body
+                if (mask_solid) hvy_mask(:,:,:,1,free_hvy_id) = 1.0_rk
+                
             endif
         endif
 

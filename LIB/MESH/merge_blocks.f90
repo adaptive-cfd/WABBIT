@@ -9,7 +9,7 @@
 !! Note we keep the light data synchronized among CPUS, so that after moving, all CPU are up-to-date with their light data.
 !! However, the active lists are outdated after this routine.
 ! ********************************************************************************************
-subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
+subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge, hvy_mask )
     use module_treelib
     use module_globals
     implicit none
@@ -17,6 +17,7 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     type (type_params), intent(in)      :: params                         !> user defined parameter structure
     real(kind=rk), intent(inout)        :: hvy_block(:, :, :, :, :)       !> heavy data array - block data
     integer(kind=ik), intent(inout)     :: lgt_blocks_to_merge(:)         !> list of blocks to merge, can contain 4 or 8 blocks
+    real(kind=rk), intent(inout), optional :: hvy_mask(:, :, :, :, :)     !> mask data array, transferred/restricted analogously to hvy_block
     real(kind=rk), ALLOCATABLE, save    :: tmpblock(:,:,:,:)
     integer(kind=ik)                    :: N_merge                        ! number of blocks to be merged, can be 4 or 8
     ! what CPU is responsible for merging:
@@ -24,7 +25,8 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
     integer(kind=ik)                    :: hvy_ids(8), tree_ID          ! list of block ids, proc ranks
 
     integer(kind=tsize)                 :: treecode
-    integer(kind=ik) :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
+    integer(kind=ik)                    :: i1, i2, im, i, g, level, lgt_merge_id, Jmax, hvy_merge_id, N
+    real(kind=rk)                       :: chi_max, chi_max_all, mask_color_merged
     integer(kind=ik), dimension(3)      ::  icoars1, icoars2, icoarsm, Bs, ifine1, ifine2
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -120,6 +122,28 @@ subroutine merge_blocks( params, hvy_block, lgt_blocks_to_merge )
 
         ! get heavy id of merge block
         call lgt2hvy( hvy_merge_id, lgt_merge_id, data_rank(1), params%number_blocks )
+
+        ! For the selective mask update (mask_time_independent_part): set a constant mask on
+        ! the merged mother block - the mask is not restricted like the state vector. If any
+        ! sister contains solid (chi>0), the mother gets chi=1 with that sister's (constant)
+        ! color, otherwise chi=0. Exact for families without smoothing layer (protected from
+        ! coarsening by threshold_mask); otherwise the mother is regenerated in createMask_tree.
+        if (present(hvy_mask)) then
+            if (size(hvy_mask,5) > 1) then
+                chi_max_all = 0.0_rk
+                mask_color_merged = 0.0_rk
+                do i = 1, N_merge
+                    chi_max = maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 1, hvy_ids(i)))
+                    if (chi_max > chi_max_all) then
+                        chi_max_all = chi_max
+                        mask_color_merged = hvy_mask(g+1, g+1, merge(1, 1+g, params%dim==2), 5, hvy_ids(i))
+                    endif
+                enddo
+                hvy_mask(:,:,:,:,hvy_merge_id) = 0.0_rk
+                hvy_mask(:,:,:,5,hvy_merge_id) = mask_color_merged
+                if (chi_max_all > 1.0e-12_rk) hvy_mask(:,:,:,1,hvy_merge_id) = 1.0_rk
+            endif
+        endif
 
         ! indices of subblocks on new, merged, coarser block
         do i = 1, params%dim

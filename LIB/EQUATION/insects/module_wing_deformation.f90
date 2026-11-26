@@ -184,7 +184,7 @@ module module_wing_deformation
             xt = x_w
             call material2wing(time, xt, deformation, side)
             res = xt - x_mat
-            if (maxval(abs(res)) < 1.0e-12_rk) exit
+            if (maxval(abs(res)) < 1.0e-7_rk) exit
             x_w = x_w - res
         enddo
         x_mat = x_w

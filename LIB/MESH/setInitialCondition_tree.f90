@@ -21,7 +21,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     !> heavy work data array used for adapt_tree
     real(kind=rk), intent(inout), optional        :: hvy_work(:, :, :, :, :, :)
 
-    logical :: tmp, error_OOM
+    logical :: tmp, error_OOM!, selective_mask_update_backup
     integer(kind=ik) :: lgt_n_old, k, iter, lgt_n_tmp
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
@@ -35,7 +35,10 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     time = 0.0_rk
 
     ! Force complete mask updates during initial grid adaptation.
-    params%initial_grid_adaptation = .true.
+    ! params%initial_grid_adaptation = .true.
+    params%selectiveMaskUpdateReady = .false. 
+    ! selective_mask_update_backup = params%selective_mask_update
+    ! params%selective_mask_update = .false.
 
     ! default is Jmin, if Jini is not set
     if (params%Jini<0) params%Jini = params%Jmin
@@ -215,11 +218,9 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                     ! refine entire mesh and mask if selective
                     ! mask updates are enabled.
                     if (params%selective_mask_update .and. present(hvy_mask)) then
-                        call refine_tree(params, hvy_block, "everywhere", &
-                                        tree_ID, error_OOM, hvy_mask=hvy_mask)
+                        call refine_tree(params, hvy_block, "everywhere", tree_ID, error_OOM, hvy_mask=hvy_mask)
                     else
-                        call refine_tree(params, hvy_block, "everywhere", &
-                                        tree_ID, error_OOM)
+                        call refine_tree(params, hvy_block, "everywhere", tree_ID, error_OOM)
                     endif
                     ! call refine_tree( params, hvy_block, "everywhere", tree_ID, error_OOM)
 
@@ -279,8 +280,10 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     end if
 
 
-    ! Initial grid adaptation is complete.
-    params%initial_grid_adaptation = .false.
+    ! Initial grid adaptation is complete. From now on we can use the seletive mask update.
+    ! params%initial_grid_adaptation = .false.
+    params%selectiveMaskUpdateReady = .true.
+    ! params%selective_mask_update = selective_mask_update_backup
 
     !---------------------------------------------------------------------------
     ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks
@@ -302,16 +305,12 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     ! if selective mask updates are enabled.
     if (params%selective_mask_update .and. present(hvy_mask)) then
         if (size(hvy_mask,5) > 1) then
-            call balanceLoad_tree(params, hvy_block, tree_ID, &
-                                balance_name='setInitialCondition', &
-                                time=time, hvy_tmp=hvy_mask)
+            call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time, hvy_tmp=hvy_mask)
         else
-            call balanceLoad_tree(params, hvy_block, tree_ID, &
-                                balance_name='setInitialCondition', time=time)
+            call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time)
         endif
     else
-        call balanceLoad_tree(params, hvy_block, tree_ID, &
-                            balance_name='setInitialCondition', time=time)
+        call balanceLoad_tree(params, hvy_block, tree_ID, balance_name='setInitialCondition', time=time)
     endif
 
     ! synchronize ghosts now, in order to start with a clean grid. NOTE this can actually be removed, but

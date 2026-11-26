@@ -123,7 +123,8 @@ module module_params
         ! switch for mesh adaption
         logical :: adapt_tree=.false., adapt_inicond=.false.
         ! Runtime flag indicating whether initial grid adaptation is in progress.
-        logical :: initial_grid_adaptation = .false.
+! logical :: initial_grid_adaptation = .false.
+        logical :: selectiveMaskUpdateReady = .false.
         !> Indicates whether the simulation configuration supports selective mask updates.
         logical :: selective_mask_update = .false.
         ! number of allocated heavy data fields per process

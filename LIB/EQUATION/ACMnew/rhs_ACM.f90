@@ -53,10 +53,10 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     real(kind=rk), allocatable, save :: vor(:,:,:,:)
     integer(kind=ik) :: mpierr, i, dim, ix, iy, iz
     integer(kind=ik), dimension(3) :: Bs
-    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), x, y, z, f_block(1:3), C_eta_apply_inv(0:ncolors)
+    real(kind=rk) :: tmp(1:3), tmp2, dV, dV2, penal(1:3), x, y, z, C_eta_apply_inv(0:ncolors)
     integer(kind=2) :: color
     integer(kind=ik) :: i_insect, wingID
-    real(kind=rk) :: r_hinge(1:3)
+    real(kind=rk) :: x_lever(1:3)
 
     if (.not. params_acm%initialized) write(*,*) "WARNING: RHS_ACM called but ACM not initialized"
 
@@ -112,13 +112,17 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         ! let's update all insects. If there is none, then this is just an empty loop, so no problemo
         call Update_All_Insects(time)
 
+        ! The free flight solver allows solving the EOM for free flight (newtons law
+        ! for rotation and translation) as well as the passive feathering equations
+        ! as 1st order wing flexibility modeling. Either of those require the forces
+        ! and moments for the rigid solid timer stepper
         if (params_acm%use_free_flight_solver) then
-            ! reset forces, we compute their value now
             do i_insect = 1, n_insects
+                ! reset forces/moments on the entire animal
                 Insects(i_insect)%force_g = 0.0_rk
                 Insects(i_insect)%moment_g = 0.0_rk
 
-                ! reset forces/moments acting on individual wing
+                ! reset forces/moments acting on individual wing(s)
                 do wingID = 1, 4
                     if (Insects(i_insect)%Wings(wingID)%used) then
                         Insects(i_insect)%Wings(wingID)%force_g  = 0.0_rk
@@ -183,12 +187,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
         ! if (params_acm%geometry == "Insect".and. params_acm%use_free_flight_solver) then
         if (params_acm%use_free_flight_solver) then
             dV = product(dx(1:params_acm%dim))
-
-            !f_block = 0.0_rk
             do i_insect = 1, n_insects
-                ! do we want the reset of f_block for every insect here??
-                f_block = 0.0_rk
-
                 do iz = merge(1, g+1, params_acm%dim == 2), merge(1, Bs(3)+g, params_acm%dim == 2)
                     if (params_acm%dim == 2) then
                         z = 0.0_rk
@@ -203,31 +202,26 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                             ! get this points color
                             color = int( mask(ix, iy, iz, 5), kind=2 )
 
-                            ! only include parts of the insect
+                            ! only include parts of this insect (i_insect, we might have several ones)
                             if (any(color == (/insects(i_insect)%color_body, insects(i_insect)%color_l, insects(i_insect)%color_r, insects(i_insect)%color_l2, insects(i_insect)%color_r2/))) then
                                 ! penalization term
                                 penal = -mask(ix,iy,iz,1) * (u(ix,iy,iz,1:3) - mask(ix,iy,iz,2:4)) * C_eta_apply_inv(color)
 
                                 ! total insect force
-                                f_block(1:params_acm%dim) = f_block(1:params_acm%dim) - penal(1:params_acm%dim)
-
-                                ! x_lev = periodize_coordinate(x_lev, (/xl,yl,zl/))
-
-                                ! total insect moment. For insects, we compute the total moment wrt to the body center
+                                insects(i_insect)%force_g = insects(i_insect)%force_g - penal*dV
                                 insects(i_insect)%moment_g = insects(i_insect)%moment_g - cross((/x, y, z/), penal)*dV
 
                                 ! wing-specific force and moment
                                 do wingID = 1, 4
                                     if (Insects(i_insect)%Wings(wingID)%used) then
                                         if (color == Insects(i_insect)%Wings(wingID)%color) then
-
+                                            ! force
                                             Insects(i_insect)%Wings(wingID)%force_g = Insects(i_insect)%Wings(wingID)%force_g - penal*dV
 
                                             ! vector from wing hinge to current grid point
-                                            r_hinge = (/x, y, z/) - (Insects(i_insect)%Wings(wingID)%x_pivot_g - Insects(i_insect)%xc_body_g)
-
-                                            Insects(i_insect)%Wings(wingID)%moment_g =  Insects(i_insect)%Wings(wingID)%moment_g - cross(r_hinge, penal)*dV
-
+                                            x_lever = (/x, y, z/) - Insects(i_insect)%Wings(wingID)%x_pivot_g
+                                            ! moment
+                                            Insects(i_insect)%Wings(wingID)%moment_g = Insects(i_insect)%Wings(wingID)%moment_g - cross(x_lever, penal)*dV
                                         endif
                                     endif
                                 enddo
@@ -235,8 +229,6 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                         enddo
                     enddo
                 enddo
-
-                insects(i_insect)%force_g = insects(i_insect)%force_g + f_block*dV
             enddo
             ! NOTE: MPI_SUM is perfomed in the post_stage.
         endif
@@ -267,11 +259,9 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
                 call MPI_ALLREDUCE(MPI_IN_PLACE, insects(i_insect)%moment_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
 
                 do wingID = 1, 4
-                    if (Insects(i_insect)%Wings(wingID)%used) then
-                        
+                    if (Insects(i_insect)%Wings(wingID)%used) then                        
                         call MPI_ALLREDUCE(MPI_IN_PLACE, Insects(i_insect)%Wings(wingID)%force_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
                         call MPI_ALLREDUCE(MPI_IN_PLACE, Insects(i_insect)%Wings(wingID)%moment_g, 3, MPI_DOUBLE_PRECISION, MPI_SUM, WABBIT_COMM, mpierr)
-
                     endif
                 enddo
 

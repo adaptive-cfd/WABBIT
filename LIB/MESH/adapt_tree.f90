@@ -101,7 +101,6 @@ subroutine adapt_tree( time, params, hvy_block, tree_ID, indicator, hvy_tmp, hvy
                                         init_full_tree_grid=initFullTreeGrid, &
                                         Jmin_set=Jmin, time=time)
     endif
-    ! call wavelet_decompose_full_tree(params, hvy_block, tree_ID, hvy_tmp, init_full_tree_grid=initFullTreeGrid, Jmin_set=Jmin, time=time, hvy_mask=hvy_mask)
     call toc( "adapt_tree (decompose_tree)", 102, MPI_Wtime()-t_block )
     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1095,9 +1094,8 @@ subroutine init_full_tree(params, tree_ID, set_ref, Jmin_set, verbose_check, hvy
                     ! new mother's mask slot with a constant value taken from this (local) daughter,
                     ! so it does not hold stale data. The mask is not restricted during the wavelet
                     ! decomposition; non-leaf blocks are fully regenerated in createMask_tree.
-
                     if (present(hvy_mask)) then
-                        if (size(hvy_mask,5) > 1) then
+                        if (size(hvy_mask,5) > 1) then  ! hvy_mask may be a dummy allocation with size 1,1,1,1,1 for physics modules without penalization
                             hvy_mask(:,:,:,:,hvy_merge_id) = 0.0_rk
                             if (maxval(hvy_mask(g+1:Bs(1)+g, g+1:Bs(2)+g, merge(1, 1+g, params%dim==2):merge(1, Bs(3)+g, params%dim==2), 1, hvy_ID)) > 1.0e-12_rk) then
                                 hvy_mask(:,:,:,1,hvy_merge_id) = 1.0_rk

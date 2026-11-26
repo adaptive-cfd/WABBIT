@@ -66,6 +66,7 @@ program main
     character(len=cshort)               :: tfile_headers(1:100)
     character(len=8)                    :: date_now
     character(len=10)                   :: time_now
+    character(len=cshort)               :: refinement_indicator_used
     ! cpu time variables for running time calculation
     real(kind=rk)                       :: sub_t0, t4, tstart, dt, t_elapsed
     ! decide if data is saved or not
@@ -121,9 +122,9 @@ program main
     call get_command_argument( 1, filename )
     ! read ini-file and save parameters in struct
     call ini_file_to_params( params, filename )
-    if (params%rank == 0) then
-        write(*,'(A,L1)') "Selective mask updates supported: ", params%selective_mask_update
-    endif
+    ! FYI:
+    if (params%rank == 0) write(*,'(A,L1)') "Selective mask updates supported: ", params%selective_mask_update
+
     ! initializes the communicator for Wabbit and creates a bridge if needed
     call initialize_communicator(params)
     ! have the pysics module read their own parameters
@@ -320,26 +321,23 @@ program main
             ! "significant", the refinement flags from the last call to adapt_tree call are reused. 
             ! This might not be given for the first iteration so we just skip this (if adapt_tree was not called yet)
             ! and use the "everywhere" indicator. Note: after resuming a run from backup, this can be the case as well, because
-            ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks, resulting in spikes for blocks_rhs
+            ! the refinement_flag is 0 and this results in "significant" refining in fact all blocks, resulting in spikes for blocks_rhs. 
+            ! This latter scenario happens only if params%adapt_inicond = .false.
 
             ! (EG, 19.11.26) For the selective mask update (if used), the mask data must be refined together
             ! with the state vector to preserve the time-independent mask components on newly created blocks
+            refinement_indicator_used = params%refinement_indicator
             if (params%refinement_indicator == "significant" .and. iteration == 0 .and. .not. params%adapt_inicond) then
-                if (params%selective_mask_update) then
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, &
-                                      error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
-                else
-                    call refine_tree( params, hvy_block, "everywhere", tree_ID=tree_ID_flow, &
-                                      error_OOM=error_OOM, check_full_tree=.true., time=time)
-                endif
+                ! first time step, and no adapt_tree called yet -- refine everywhere instead of refine_significant
+                refinement_indicator_used = "everywhere"
+            endif
+
+            if (params%selective_mask_update) then
+                call refine_tree( params, hvy_block, refinement_indicator_used, tree_ID=tree_ID_flow, &
+                                error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
             else
-                if (params%selective_mask_update) then
-                    call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, &
-                                    error_OOM=error_OOM, check_full_tree=.true., time=time, hvy_mask=hvy_mask )
-                else
-                    call refine_tree( params, hvy_block, params%refinement_indicator, tree_ID=tree_ID_flow, &
-                                      error_OOM=error_OOM, check_full_tree=.true., time=time)
-                endif
+                call refine_tree( params, hvy_block, refinement_indicator_used, tree_ID=tree_ID_flow, &
+                                    error_OOM=error_OOM, check_full_tree=.true., time=time)
             endif
             ! if refine_tree runs out-of-memory (OOM), it does not actually do the refinement, but returns after realizing
             ! there won't be enough mem. We can thus jump to 17 to save a backup and terminate.

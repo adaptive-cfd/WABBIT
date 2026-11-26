@@ -209,7 +209,10 @@ subroutine ini_file_to_params( params, filename )
             (params%dim == 3) .and. &
             (params%physics_type == "ACM-new" .or. &
             params%physics_type == "NSPP")
-
+   ! selective mask update can be done only after the mask has been created one time
+   ! completely, i.e., the time invariant part is ready. Use this flag to decide if we're ready
+   ! or not.
+   params%selectiveMaskUpdateReady = .false.
 
    !***************************************************************************
    ! read DEBUG parameters

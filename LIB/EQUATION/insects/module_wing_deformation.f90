@@ -74,66 +74,7 @@ module module_wing_deformation
         model%flexion_angle = 3.141592654_rk * model%flexion_angle / 180.0_rk
 
         select case (model%model_name)
-
-            case ("linearAlpha")
-
-                ! work on the spatial distribution first
-                
-                alpha_tip = model%D_alpha_tilde%coeffs(2)
-                alpha_root = model%D_alpha_tilde%coeffs(1)
-
-                if (model%units == "deg") then
-                ! rescale so we can work with degrees
-
-                model%D_alpha_tilde%coeffs(2) = 2.0_rk * 3.141592654_rk * ((alpha_tip - alpha_root) / R) / 360.0_rk
-                model%D_alpha_tilde%coeffs(1) = 2.0_rk * 3.141592654_rk * (alpha_root / R) / 360.0_rk
-
-                end if
-
-
-                ! make sure no higher order terms sneak into our spatial distribution (the keyword is LINEAR alpha)
-
-                do i = 3, size(model%D_alpha_tilde%coeffs)
-                    model%D_alpha_tilde%coeffs(i) = 0.0_rk
-                end do
-
-                model%D_alpha_tilde%function_name = "polynomial"
-
-                if ((model%A_tilde%function_name == "sin") .or. (model%A_tilde%function_name == "square")) then
-
-                    ! total range of amplitudes, also accounting for when the wing twists negatively
-
-                    model%A_tilde%coeffs(1) = 1.0_rk + model%A_tilde%coeffs(4)
-
-                    ! calculate wing reversals per wingbeat
-
-                    model%A_tilde%coeffs(2) = 2.0_rk * 3.141592654_rk * model%A_tilde%coeffs(2)
-                    ! calculate reversal phasemodel
-
-                    model%A_tilde%coeffs(3) = 2.0_rk * 3.141592654_rk * model%A_tilde%coeffs(3) / 360.0_rk
-
-                    ! accout for negative twist offset
-
-                    model%A_tilde%coeffs(4) = 1.0_rk - model%A_tilde%coeffs(4)
-                endif
-                model%model_name = "generic_angle_distribution"
-
-            case("WalkerTaylor")
-                ! Import deformation measurements according to 
-                ! Walker, S. M., & Taylor, G. K. (n.d.). A semi-empirical model of the aerodynamics of manoeuvring insect flight.
-                ! for now, we only consider the periodic components of the local twist. The offset could be added to the feathering angle.
-                ! 
-                model%D_alpha_tilde%function_name = "polynomial"
-
-                if (model%units == "deg") then
-                ! the amplitude is set by the fourier coefficients. note the deg2rad conversion in the polynomial!
-                model%D_alpha_tilde%coeffs = (/0.0_rk, 3.141592654_rk/180.0_rk, 0.0_rk, 0.0_rk, 0.0_rk/)
-
-                end if
-                model%A_tilde%function_name = "fseries"
-                model%model_name = "generic_angle_distribution"
-
-            case("generic_angle_distribution", "lin_sin", "WalkerTaylor_clean")
+            case("WalkerTaylor_clean")
 
                 ! don't try to translate these models
 
@@ -147,7 +88,9 @@ module module_wing_deformation
 
     end subroutine
 
-    subroutine wing2material(time, x_mat, model, side)
+    subroutine material2wing(time, x_mat, model, side)
+
+        implicit none
 
         ! Map material coordinates inherent to the wing to their position in wing coordinates.
         ! x_mat^(mat) -> x_mat^(w)
@@ -174,7 +117,7 @@ module module_wing_deformation
                 ! This falls together with the wing coordinate in the rigid case.
                 ! x_c_mat_w denotes the points that lie in the centreplane of the wing's material coordinates.
 
-                x_c_mat_w = x_wing
+                x_c_mat_w = x_mat
                 x_c_mat_w(3) = 0
 
                 
@@ -182,45 +125,46 @@ module module_wing_deformation
                 ! So we effectively conduct a passive rotation, but for readability, this will be changed...
                 ! calculate the deformation angle
 
-                dDalpha_dy = model%dDalpha_dy
+                dDalpha_dy = -model%dDalpha_dy
 
                 ! yes, this is confusing. Bear in mind that walker and taylor define their angles relative to the right wing
                 if (side == "L") then
                     dDalpha_dy = -dDalpha_dy
                 endif
 
-                D_alpha = dDalpha_dy * x_wing(2)
+                D_alpha = dDalpha_dy * x_mat(2)
 
                 ! factor to rescale our normal to 1
 
-                normalisation = 1 / sqrt(dDalpha_dy ** 2 * x_wing(1) ** 2 + 1)
+                normalisation = 1 / sqrt(dDalpha_dy ** 2 * x_mat(1) ** 2 + 1)
 
-                ! row wise calculation of the surface normal. IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
+                ! row wise calculation of the surface normal. I
+                ! IMPORTANT!!!!A At the beginning I calculated using active rotations rather than passive rotations, as should have been the norm. The angle has been negated for now
                 ! So we effectively conduct a passive rotation, but for readability, this will be changed...
 
                 e_n_mat_w(1) = normalisation * sin(D_alpha)
-                e_n_mat_w(2) = normalisation * dDalpha_dy * x_wing(1)
-                e_n_mat_w(3) = - normalisation * cos(D_alpha)
+                e_n_mat_w(2) = - normalisation * dDalpha_dy * x_mat(1)
+                e_n_mat_w(3) = normalisation * cos(D_alpha)
 
                 ! section-wise rotation around the flexion axis of the centreplane of the material coordinates
                 
-                x_c_mat_w(1) = cos(D_alpha)*x_wing(1)
-                x_c_mat_w(2) = x_wing(2)
-                x_c_mat_w(3) = sin(D_alpha)*x_wing(1)
+                x_c_mat_w(1) = cos(D_alpha)*x_mat(1)
+                x_c_mat_w(2) = x_mat(2)
+                x_c_mat_w(3) = sin(D_alpha)*x_mat(1)
 
                 ! By definition, the z coordinate is normal to the material x, y plane. Extrude normally to the centreplane, but describe this extrusion in the wing system
 
-                x_wing(1) = x_c_mat_w(1) - x_mat(3) * e_n_mat_w(1) 
-                x_wing(2) = x_c_mat_w(2) - x_mat(3) * e_n_mat_w(2) 
-                x_wing(3) = x_c_mat_w(3) - x_mat(3) * e_n_mat_w(3) 
+                x_wing(1) = x_c_mat_w(1) + x_mat(3) * e_n_mat_w(1) 
+                x_wing(2) = x_c_mat_w(2) + x_mat(3) * e_n_mat_w(2) 
+                x_wing(3) = x_c_mat_w(3) + x_mat(3) * e_n_mat_w(3) 
 
                 x_mat = x_wing
             case default
                 call abort(23673, "model not selected!")
         end select
-    end subroutine wing2material
+    end subroutine material2wing
 
-    subroutine material2wing(time, x_mat, deformation, side)
+    subroutine wing2material(time, x_mat, deformation, side)
 
         ! Map material coordinates inherent to the wing to their position in wing coordinates. This is expensive and not exact, which is why we only use this to approximate the bonding box corners!
         ! x_mat^(mat) -> x_mat^(w)
@@ -238,13 +182,13 @@ module module_wing_deformation
         x_w = x_mat
         do it = 1, 20
             xt = x_w
-            call wing2material(time, xt, deformation, side)
+            call material2wing(time, xt, deformation, side)
             res = xt - x_mat
             if (maxval(abs(res)) < 1.0e-12_rk) exit
             x_w = x_w - res
         enddo
         x_mat = x_w
-    end subroutine material2wing
+    end subroutine wing2material
 
 
     subroutine add_deformation_velocity(time, x_wing, u_s_w, model, side)
@@ -253,7 +197,6 @@ module module_wing_deformation
         real(kind=rk), intent(inout) :: u_s_w(1:3)
         real(kind=rk), intent(in) :: x_wing(1:3)
         character(len=1), intent(in) :: side
-
         real(kind=rk) :: A_tilde
         real(kind=rk) :: D_alpha, D_alphadot,A_tildedot,normalisation,normalisationdot, D_alpha_tilde, dA_tilde_dt, dD_alpha_tilde_dy, dDalpha_dy, dDalpha_dydt
         real(kind=rk) :: x_w, y_w, z_w, x_n, y_n, z_n
@@ -265,8 +208,7 @@ module module_wing_deformation
             case("walkerTaylor_clean")
 
 
-                ! more generic case. Here, we assume that the angle distribution follows a prescribed, separable function with a derivative along the y(mat) axis and a time derivative.
-                ! We define a material coordinate inherent to the wing, which describes a material point independent of deformation. This falls together with the wing coordinate in the rigid case.
+                ! model according to Walker, S. M., & Taylor, G. K. (n.d.). A semi-empirical model of the aerodynamics of manoeuvring insect flight.
 
                 x_mat = x_wing
 
@@ -306,11 +248,11 @@ module module_wing_deformation
 
                 de_n_mat_w_dt(2) = normalisationdot * x_c_mat_w(1) * &
                                         dDalpha_dy &
-                                    + normalisation * x_c_mat_w(1) * &
+                                    - normalisation * x_c_mat_w(1) * &
                                         dDalpha_dydt
 
                 de_n_mat_w_dt(3) = - normalisationdot * cos(D_alpha) &
-                    + normalisation * sin(D_alpha) * &
+                    - normalisation * sin(D_alpha) * &
                     dDalpha_dydt * x_c_mat_w(2)
 
                 ! finally we can calculate the velocity. start by calculating the velocity of the material centre plane and then add the velocity component through the distance normal to the surface

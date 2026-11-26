@@ -225,7 +225,7 @@ subroutine FlappingMotion(time, Insect, protocoll, phi, alpha, theta, phi_dt, &
       call hermite_eval(time, alpha, alpha_dt, Insect%Wings(wingID)%ai_alpha(1:Insect%Wings(wingID)%nfft_alpha), Insect%Wings(wingID)%bi_alpha(1:Insect%Wings(wingID)%nfft_alpha))
       call hermite_eval(time, theta, theta_dt, Insect%Wings(wingID)%ai_theta(1:Insect%Wings(wingID)%nfft_theta), Insect%Wings(wingID)%bi_theta(1:Insect%Wings(wingID)%nfft_theta))
 
-      ! calculate gradient of the feathering angle alon gth e wing
+      ! calculate gradient of the feathering angle along the wing
       if (.not. Insect%Wings(wingID)%rigid) then
         call hermite_eval(time,Insect%Wings(wingID)%deformation%dDalpha_dy,Insect%Wings(wingID)%deformation%dDalpha_dydt, Insect%Wings(wingID)%deformation%ai_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient), Insect%Wings(wingID)%deformation%bi_Dalpha_gradient(1:Insect%Wings(wingID)%deformation%nfft_Dalpha_gradient))
 

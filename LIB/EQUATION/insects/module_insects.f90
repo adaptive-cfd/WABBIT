@@ -701,7 +701,7 @@ contains
                ! calculate the velocity component through the deformation
 
                if (.not. Insects(1)%Wings(wingID)%rigid) then
-                  call add_deformation_velocity(Insects(1)%time, x_w, v_tmp, Insects(1)%Wings(wingID)%deformation, Insects(1)%Wings(wingID)%side)
+                  call add_deformation_velocity(Insects(1)%time, x_mat, v_tmp, Insects(1)%Wings(wingID)%deformation, Insects(1)%Wings(wingID)%side)
                end if
 
                v_tmp_b = matmul(transpose(Insects(1)%Wings(wingID)%M_b2w), v_tmp) ! in body system

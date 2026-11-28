@@ -43,22 +43,19 @@ contains
         !     stage == "time-dependent-part"
         !     stage == "all-parts"
         !     stage == "init_stage"
-        !     stage == "time-independent-part"
         character(len=*), intent(in) :: stage
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        ! mask data. (mask, usx, usy, usz, color, sponge)
         real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
 
         select case ( physics )
         case ('ACM-new')
             select case (stage)
-            case ("init_stage", "time-dependent-part",  "time-independent-part")
+            case ("init_stage", "time-dependent-part")
                 ! a full resett of the mask is not necessary
                 ! for the selective mask update a specific reset for the 
                 ! time-dependent mask is included in create_mask_3D_ACM
+
+                ! do nothing
             case ("all-parts")
                 ! Reset of the entire mask
                 mask = 0.0_rk
@@ -86,10 +83,12 @@ contains
 
         case ('NSPP')
             select case (stage)
-            case ("init_stage", "time-dependent-part",  "time-independent-part")
+            case ("init_stage", "time-dependent-part")
                 ! a full resett of the mask is not necessary
                 ! for the selective mask update a specific reset for the 
                 ! time-dependent mask is included in create_mask_3D_ACM
+
+                ! do nothing
             case ("all-parts")
                 ! Reset of the entire mask
                 mask = 0.0_rk
@@ -213,11 +212,7 @@ contains
 
         ! output in work array.
         real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        ! mask data. ! mask data. (mask, usx, usy, usz, color, sponge)
         real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
         ! when implementing boundary conditions, it is necessary to know if the local field (block)
         ! is adjacent to a boundary, because the stencil has to be modified on the domain boundary.
@@ -317,11 +312,7 @@ contains
         ! output. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
 
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        ! mask data. ! mask data. (mask, usx, usy, usz, color, sponge)
         real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
 
 
@@ -395,11 +386,7 @@ contains
         ! output. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: thresholdfield_block(1:,1:,1:,1:)
 
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        ! mask data. ! mask data. (mask, usx, usy, usz, color, sponge)
         real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
 
        ! !> if true then wabbit will ignore threshold_field and use the normal statevector instead
@@ -458,11 +445,7 @@ contains
         ! output. Note assumed-shape arrays
         real(kind=rk), intent(inout) :: rhs(1:,1:,1:,1:)
 
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        ! mask data. ! mask data. (mask, usx, usy, usz, color, sponge)
         real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
 
@@ -518,11 +501,7 @@ contains
         ! work array
         real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
-        ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-        ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-        ! block level) so the physics modules have to provide an interface to create the mask at a tree
-        ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-        ! On input, the mask array is correctly filled. You cannot create the full mask here.
+        ! mask data. ! mask data. (mask, usx, usy, usz, color, sponge)
         real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
         select case(physics)

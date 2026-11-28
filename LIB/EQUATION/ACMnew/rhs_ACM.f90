@@ -32,11 +32,7 @@ subroutine RHS_ACM( time, u, g, x0, dx, rhs, mask, stage, n_domain )
     ! use these integral qtys for the actual RHS evaluation.
     character(len=*), intent(in) :: stage
 
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! mask data. (mask, usx, usy, usz, color, sponge)
     real(kind=rk), intent(in) :: mask(1:,1:,1:,1:)
 
     ! when implementing boundary conditions, it is necessary to know if the local field (block)
@@ -330,11 +326,7 @@ subroutine RHS_2D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! mask data. (mask, usx, usy, usz, color, sponge)
     real(kind=rk), intent(in)               :: mask(:,:,:)
     !> discretization order
     character(len=cshort), intent(in)       :: order_discretization
@@ -965,11 +957,7 @@ subroutine RHS_3D_acm(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:,:)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! mask data. (mask, usx, usy, usz, color, sponge)
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
     character(len=cshort), intent(in)       :: order_discretization
@@ -1824,11 +1812,7 @@ subroutine RHS_scalar(g, Bs, dx, x0, phi, order_discretization, time, rhs, mask,
     !> datafields
     real(kind=rk), intent(inout)            :: phi(:,:,:,:)
     real(kind=rk), intent(inout)            :: rhs(:,:,:,:)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! mask data. (mask, usx, usy, usz, color, sponge)
     real(kind=rk), intent(in)               :: mask(:,:,:,:)
     !> discretization order
     character(len=clong), intent(in)        :: order_discretization

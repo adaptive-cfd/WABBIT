@@ -13,7 +13,6 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
     ! components: mask, usx, usy, usz, color, sponge
     real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
     !     stage == "init_stage"
-    !     stage == "time-independent-part"
     !     stage == "time-dependent-part"
     !     stage == "all-parts"
     character(len=*), intent(in) :: stage
@@ -59,7 +58,8 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
         select case (trim(standardize_string(params_acm%geometries(i_geom))))
 
         case ('sphere-fixed')
-            if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_sphere( mask(:,:,:,1), mask(:,:,:,5), x0, dx, g, params_acm%x_cntr(1:3), params_acm%R_cyl, color_set=1_ik, smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
@@ -77,9 +77,9 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
 
             select case(stage)
             
-            ! SELECTIVE MASK UPDATE:
+            ! SELECTIVE MASK UPDATE (THIS IS ITS HEART!):
             ! for insects in tethered flight we no longer regenerate the whole mask funktion but instead,
-            ! simply do not delete the body (time-independent-part) and only update the wings (time-dependent-part)
+            ! simply do not delete the body and only update the wings (time-dependent-part)
             case ("time-dependent-part")
                 if (Insects(insect_id)%body_moves == "no") then
 
@@ -129,7 +129,8 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
             end select
 
         case ('channel-3d')
-            if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_channel(x0, dx, Bs, g, mask, i_geom=i_geom)
             endif
         
@@ -144,7 +145,8 @@ subroutine create_mask_3D_acm( time, x0, dx, Bs, g, mask, stage )
                 else
                     call abort(260603, "ERROR: primitives-collection geometry selected but no geometry string or file provided!")
                 endif
-            elseif (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available
+            elseif (stage == "time-dependent-part" .or. stage == "all-parts") then
                 ! normal call, everything is prepared so we can just call it
                 call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom), i_collection=i_geom)
             endif
@@ -223,19 +225,22 @@ subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
             endif
 
         case ('circle', 'cylinder')  ! someone called this cylinder, but it is actually a circle in 2D
-            if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available in 2D
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, params_acm%x_cntr(1:2), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
         case ('lamballais')
-            if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available in 2D
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 call draw_lamballais( mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom, use_separate_ring_smoothing=.false. )
             endif
 
         case ('lamballais-local')
-        if (stage == "time-independent-part" .or. stage == "all-parts") then
-            call draw_lamballais(mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom, use_separate_ring_smoothing=.true. )
-        endif
+            ! always draw, because selective mask update is not available in 2D
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
+                call draw_lamballais(mask(:,:,1,:), x0, dx, Bs, g, i_geom=i_geom, use_separate_ring_smoothing=.true. )
+            endif
 
         case ('plate-free')
             if (stage == "time-dependent-part" .or. stage == "all-parts") then
@@ -255,14 +260,16 @@ subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
             endif
 
         case ('two-circles', 'two-cylinders')  ! actually two circles in 2D
-            if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available in 2D
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 ! center coefficients where hardcoded, I just repeat them here to include this old condition
                 call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.5884_rk*params_acm%domain_size(1), 0.4116_rk*params_acm%domain_size(2)/), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
                 call draw_circle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, (/0.4116_rk*params_acm%domain_size(1), 0.5884_rk*params_acm%domain_size(2)/), params_acm%R_cyl, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
             endif
 
         case ('cavity')
-            if (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available in 2D
+            if (stage == "time-dependent-part" .or. stage == "all-parts") then
                 ! cavity means that the periodic borders are walls. It is like drawing 4 rectangles with half-size l and height infinity to cover all borders
                 call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_acm%domain_size(1), 0.0_rk/), half_size=(/1.0e6_rk, params_acm%length/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
                 call draw_rectangle( mask(:,:,1,1), mask(:,:,1,5), x0, dx, g, center=(/0.5_rk*params_acm%domain_size(1), params_acm%domain_size(2)/), half_size=(/1.0e6_rk, params_acm%length/), angle=0.0_rk, color_set=params_acm%geometry_colors(i_geom), smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom) )
@@ -282,7 +289,8 @@ subroutine create_mask_2D_acm( time, x0, dx, Bs, g, mask, stage )
                 else
                     call abort(260603, "ERROR: primitives collection geometry selected but no collection string or file provided!")
                 endif
-            elseif (stage == "time-independent-part" .or. stage == "all-parts") then
+            ! always draw, because selective mask update is not available in 2D
+            elseif (stage == "time-dependent-part" .or. stage == "all-parts") then
                 ! normal call, everything is prepared so we can just call it
                 call draw_primitives_collection(mask, x0, dx, Bs, g, smoothing_type_int=params_acm%smoothing_type_int(i_geom), smoothing_width=params_acm%smoothing_width(i_geom), smoothing_safety=params_acm%smoothing_safety(i_geom), i_collection=i_geom)
             endif

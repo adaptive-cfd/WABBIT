@@ -19,11 +19,7 @@ subroutine TIME_STATISTICS_NSPP( time, dt, time_start, u, g, x0, dx, work, mask 
     ! in 2D, 3rd coindex is simply one. Note assumed-shape arrays
     real(kind=rk), intent(inout) :: work(1:,1:,1:,1:)
 
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! mask data. (mask, usx, usy, usz, color, sponge)
     real(kind=rk), intent(inout) :: mask(1:,1:,1:,1:)
 
     ! as you are allowed to compute the RHS only in the interior of the field

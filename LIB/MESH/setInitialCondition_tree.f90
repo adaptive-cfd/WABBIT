@@ -35,10 +35,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
     time = 0.0_rk
 
     ! Force complete mask updates during initial grid adaptation.
-    ! params%initial_grid_adaptation = .true.
     params%selectiveMaskUpdateReady = .false. 
-    ! selective_mask_update_backup = params%selective_mask_update
-    ! params%selective_mask_update = .false.
 
     ! default is Jmin, if Jini is not set
     if (params%Jini<0) params%Jini = params%Jmin
@@ -163,7 +160,7 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
                 ! we have to repeat the adapation process until the grid has reached a final
                 ! state. Since we start on the coarsest level, in each iteration we cannot loose
                 ! blocks, but only gain or no change. Therefore, iterate until lgt_n is constant.
-                do while ( lgt_n(tree_ID) /= lgt_n_old  .and. iter<(params%Jmax-params%Jmin)+10)
+                do while ( lgt_n(tree_ID) /= lgt_n_old )
                     lgt_n_old = lgt_n(tree_ID)
 
                     ! push up the entire grid one level.
@@ -279,11 +276,14 @@ subroutine setInitialCondition_tree(params, hvy_block, tree_ID, adapt, time, ite
         endif
     end if
 
+    ! in some cases, the createMask routine is never called, for example on equidistant grids. 
+    ! we hence always call it now that the grid is finnished - then we are sure that the mask is there.
+    ! As params%selectiveMaskUpdateReady is .false. at this point, no selective mask update.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
+
 
     ! Initial grid adaptation is complete. From now on we can use the seletive mask update.
-    ! params%initial_grid_adaptation = .false.
     params%selectiveMaskUpdateReady = .true.
-    ! params%selective_mask_update = selective_mask_update_backup
 
     !---------------------------------------------------------------------------
     ! Finalization. Note this routine has modified the grid, added some blocks, removed some blocks

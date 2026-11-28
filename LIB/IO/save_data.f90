@@ -11,11 +11,7 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(inout)                    :: hvy_tmp(:, :, :, :, :)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! heavy mask array (for penalization, mask, usx, usy, usz, color, sponge)
     real(kind=rk), intent(inout)                    :: hvy_mask(:, :, :, :, :)
 
     ! loop variable
@@ -36,10 +32,8 @@ subroutine save_data(iteration, time, params, hvy_block, hvy_tmp, hvy_mask, tree
     ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-    ! Update only the time-dependent mask components before saving.
-    ! The time-independent components are already stored in hvy_mask
-    ! and do not need to be recomputed.
-    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    ! Create the mask. Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
     ! extra preparatory step. Some things have to be prepared on grid-level and not on block-level. This is especially important when deriving any quantities by solving the poisson-equation
     if (params%physics_type == "NSPP") then
@@ -102,11 +96,7 @@ implicit none
     real(kind=rk), intent(inout)                    :: hvy_block(:, :, :, :, :)
     !> heavy temp data: used for saving, filtering, and helper qtys (reaction rate, mask function)
     real(kind=rk), intent(inout)                    :: hvy_tmp(:, :, :, :, :)
-    ! mask data. we can use different trees (4est module) to generate time-dependent/indenpedent
-    ! mask functions separately. This makes the mask routines tree-level routines (and no longer
-    ! block level) so the physics modules have to provide an interface to create the mask at a tree
-    ! level. All parts of the mask shall be included: chi, boundary values, sponges.
-    ! On input, the mask array is correctly filled. You cannot create the full mask here.
+    ! mask data.
     real(kind=rk), intent(inout)                    :: hvy_mask(:, :, :, :, :)
 
     ! loop variable
@@ -141,10 +131,8 @@ implicit none
     ! we need to sync ghost nodes in order to compute the vorticity, if it is used and stored.
     call sync_ghosts_tree( params, hvy_block, tree_ID_flow )
 
-    ! Update only the time-dependent mask components before saving.
-    ! The time-independent components are already stored in hvy_mask
-    ! and do not need to be recomputed.
-    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    ! Create the mask. Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
     ! extra preparatory step. Some things have to be prepared on grid-level and not on block-level. This is especially important when deriving any quantities by solving the poisson-equation
     if (params%physics_type == "NSPP") then

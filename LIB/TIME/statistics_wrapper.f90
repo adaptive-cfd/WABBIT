@@ -36,9 +36,8 @@ subroutine statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mask, tr
     hvy_id = 1
     
 
-    ! selective mask update: recompute only the time-dependent mask components
-    ! required for the statistics, the time-independent components are preserved in mask
-    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    ! Create the mask. Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
     !-------------------------------------------------------------------------
     ! 1st stage: init_stage. (called once, not for all blocks)
@@ -105,9 +104,8 @@ subroutine time_statistics_wrapper(time, dt, params, hvy_block, hvy_tmp, hvy_mas
     integer(kind=ik), dimension(3)      :: Bs
 
   
-    ! selective mask update: recompute only the time-dependent mask components
-    ! required for the statistics, the time-independent components are preserved in mask
-    call createMask_tree(params, time, hvy_mask, hvy_tmp, all_parts=.false.)
+    ! Create the mask. Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+    call createMask_tree(params, time, hvy_mask, hvy_tmp)
 
     do k = 1, hvy_n(tree_ID)
         hvy_id = hvy_active(k,tree_ID)

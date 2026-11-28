@@ -207,8 +207,7 @@ subroutine ini_file_to_params( params, filename )
             params%mask_time_independent_part .and. &
             params%threshold_mask .and. &
             (params%dim == 3) .and. &
-            (params%physics_type == "ACM-new" .or. &
-            params%physics_type == "NSPP")
+            (params%physics_type == "ACM-new" .or. params%physics_type == "NSPP")
    ! selective mask update can be done only after the mask has been created one time
    ! completely, i.e., the time invariant part is ready. Use this flag to decide if we're ready
    ! or not.

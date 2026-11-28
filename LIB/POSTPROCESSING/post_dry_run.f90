@@ -30,7 +30,7 @@ subroutine post_dry_run(params)
     logical :: pruned, help1, help2, save_us, iterate, error_OOM, save_color, save_sponge, include_tfinal, is_insect, first_snapshot
     type(inifile) :: FILE
     real(kind=rk), allocatable          :: hvy_block(:, :, :, :, :)
-    logical :: create_all_parts, moving_insect_body
+    logical :: moving_insect_body
 
     ! NOTE: after 24/08/2022, the arrays lgt_active/lgt_n hvy_active/hvy_n as well as lgt_sortednumlist,
     ! hvy_neighbors, tree_N and lgt_block are global variables included via the module_forestMetaData. This is not
@@ -199,6 +199,12 @@ subroutine post_dry_run(params)
     if (is_insect) call init_insect_data(overwrite=.true.)
     !-----------------------------------
 
+    ! selective mask update can be done only after the mask has been created one time
+    ! completely, i.e., the time invariant part is ready. Use this flag to decide if we're ready
+    ! or not.
+    params%selectiveMaskUpdateReady = .false.
+
+
     if (grid_list == "none" ) then
         !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ! traditional mode: create the grid AND the mask, possibly with pruning.
@@ -217,10 +223,10 @@ subroutine post_dry_run(params)
 
             ! Generate the complete mask for the first snapshot or moving bodies.
             ! Otherwise, do the selective mask update
-            if (first_snapshot .or. moving_insect_body) then
-                create_all_parts = .true.
+            if (first_snapshot) then
+                params%selectiveMaskUpdateReady = .false.
             else
-                create_all_parts = .false.
+                params%selectiveMaskUpdateReady = .true.
             endif
             
             if ( first_snapshot ) then
@@ -247,8 +253,8 @@ subroutine post_dry_run(params)
             endif
 
 
-            ! Initialize or update the mask on the current grid.
-            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
+            ! Create the mask. Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+            call createMask_tree(params, time, hvy_mask, hvy_mask)
 
 
             ! loop: refine, create mask, coarsen until the grid no longer changes.
@@ -277,8 +283,8 @@ subroutine post_dry_run(params)
 
                 if (error_OOM) call abort(2512177,"Refinement failed, out of memory. Try with more memory.")
 
-                ! Update the mask on the refined grid
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
+                ! Create the mask. Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+                call createMask_tree(params, time, hvy_mask, hvy_mask)
 
                 Nmask = lgt_n(tree_ID_flow)
 
@@ -287,7 +293,7 @@ subroutine post_dry_run(params)
                 lgt_n_new = lgt_n(tree_ID_flow)
 
                 ! Update the mask after coarsening.
-                call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
+                call createMask_tree(params, time, hvy_mask, hvy_mask)
                 
                 ! current finest level is:
                 Jnow = maxActiveLevel_tree(tree_ID_flow)
@@ -317,7 +323,8 @@ subroutine post_dry_run(params)
 
 
             ! Prepare the mask on the final adapted grid before saving.
-            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=create_all_parts)
+            ! Selective mask update is enabled if params%selective_mask_update and params%selectiveMaskUpdateReady.
+            call createMask_tree(params, time, hvy_mask, hvy_mask)
 
             if (params%rank==0) write(*,'(A, g12.4)') "Snapshot done. t_elapsed=", MPI_wtime()-t0
 
@@ -432,7 +439,8 @@ subroutine post_dry_run(params)
             call readHDF5vct_tree( (/fname/), params, hvy_mask, tree_ID_flow, time=time)
 
             ! create the mask
-            call createMask_tree(params, time, hvy_mask, hvy_mask, all_parts=.false.)
+            ! because we never set params%selectiveMaskUpdateReady to .true, this is always a full mask creation
+            call createMask_tree(params, time, hvy_mask, hvy_mask)
 
             ! as we intend to create the mask on a given grid, pruning makes no sense
 

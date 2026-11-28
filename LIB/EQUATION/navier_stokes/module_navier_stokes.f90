@@ -827,7 +827,6 @@ contains
         integer(kind=ik), intent(in) :: Bs(3), g
         !> mask term for every grid point of this block
         real(kind=rk), dimension(:,:,:,:), intent(inout) :: mask
-        !     stage == "time-independent-part"
         !     stage == "time-dependent-part"
         !     stage == "all-parts"
         character(len=*), intent(in) :: stage
